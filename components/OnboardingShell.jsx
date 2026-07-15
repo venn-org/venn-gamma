@@ -1,13 +1,13 @@
-import { View, Text, TouchableOpacity, StyleSheet, Animated } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Animated, Platform } from 'react-native';
 import { useRouter } from 'expo-router';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors } from '../lib/theme';
 
 export default function OnboardingShell({ step, total, children, footer, slideX = 0, opacity = 1 }) {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const pct = `${(step / total) * 100}%`;
+  const pct = `${Math.round((step / total) * 100)}%`;
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
@@ -36,7 +36,7 @@ export default function OnboardingShell({ step, total, children, footer, slideX 
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.paper },
+  container: { flex: 1, backgroundColor: colors.paper, ...Platform.select({ web: { height: '100dvh', overflow: 'hidden' } }) },
   topBar: { paddingHorizontal: 28, paddingTop: 14, gap: 8 },
   progressTrack: { height: 3, backgroundColor: 'rgba(0,0,0,0.08)', borderRadius: 2, overflow: 'hidden' },
   progressFill: { height: '100%', borderRadius: 2 },

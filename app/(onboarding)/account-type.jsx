@@ -1,99 +1,138 @@
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { useState } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, Platform } from 'react-native';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
-import OnboardingShell from '../../components/OnboardingShell';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors } from '../../lib/theme';
-import { useOnboarding } from '../../hooks/useOnboarding';
-import React from 'react';
+import { useOnboarding } from '../../lib/auth';
 
 export default function AccountTypeScreen() {
   const router = useRouter();
-  const { state, updateField } = useOnboarding();
-  const [role, setRole] = React.useState(state.role);
+  const insets = useSafeAreaInsets();
+  const { data, updateData, submitData } = useOnboarding();
+  const [loading, setLoading] = useState(false);
 
-  const handleNext = () => {
-    updateField('role', role);
+  const [type, setType] = useState(data.type || null);
+
+  const handleContinue = async () => {
+    if (!type) return;
+    setLoading(true);
+    updateData({ type });
+    setLoading(false);
     router.push('/birthday');
   };
 
   return (
-    <OnboardingShell
-      step={2}
-      total={8}
-      footer={
-        <TouchableOpacity onPress={handleNext} disabled={!role}>
+    <View style={[styles.container, { paddingTop: insets.top }]}>
+      <View style={styles.topBar}>
+        <View style={styles.progressTrack}>
           <LinearGradient
-            colors={['#335CFF', '#8A5BFF']}
+            colors={[colors.blue, colors.violet]}
             start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-            style={[s.btn, !role && { opacity: 0.5 }]}
-          >
-            <Text style={s.btnText}>Continue</Text>
-          </LinearGradient>
-        </TouchableOpacity>
-      }
-    >
-      <Text style={s.title}>I am...</Text>
+            style={[styles.progressFill, { width: '22%' }]}
+          />
+        </View>
+        <Text style={styles.stepLabel}>STEP 2 OF 9</Text>
+      </View>
 
-      <View style={s.cards}>
-        <TouchableOpacity
-          style={[s.card, role === 'seeking' && s.cardActive]}
-          onPress={() => setRole('seeking')}
-          activeOpacity={0.8}
-        >
-          <View style={s.cardTop}>
-            <View style={[s.iconBox, role === 'seeking' && s.iconBoxActive]}>
-              <Ionicons name="search" size={24} color={role === 'seeking' ? '#fff' : colors.slate} />
-            </View>
-            <View style={[s.radio, role === 'seeking' && s.radioActive]}>
-              {role === 'seeking' && <View style={s.radioDot} />}
-            </View>
-          </View>
-          <Text style={[s.cardTitle, role === 'seeking' && s.cardTitleActive]}>Looking for a flat</Text>
-          <Text style={[s.cardSub, role === 'seeking' && s.cardSubActive]}>I need a room or flatmates to team up with.</Text>
-        </TouchableOpacity>
+      <TouchableOpacity style={styles.back} onPress={() => router.back()}>
+        <Text style={styles.backArrow}>‹</Text>
+      </TouchableOpacity>
+
+      <View style={styles.body}>
+        <Text style={styles.title}>What brings you to Venn?</Text>
+        <Text style={styles.subtitle}>This shapes how your profile appears to others.</Text>
 
         <TouchableOpacity
-          style={[s.card, role === 'owner' && s.cardActive]}
-          onPress={() => setRole('owner')}
+          style={[styles.card, type === 'seeking' && styles.cardActive]}
+          onPress={() => setType('seeking')}
           activeOpacity={0.8}
         >
-          <View style={s.cardTop}>
-            <View style={[s.iconBox, role === 'owner' && s.iconBoxActive]}>
-              <Ionicons name="home" size={24} color={role === 'owner' ? '#fff' : colors.slate} />
-            </View>
-            <View style={[s.radio, role === 'owner' && s.radioActive]}>
-              {role === 'owner' && <View style={s.radioDot} />}
-            </View>
+          <View style={[styles.cardIcon, type === 'seeking' && styles.cardIconActive]}>
+            <Text style={{ fontSize: 30 }}>🔍</Text>
           </View>
-          <Text style={[s.cardTitle, role === 'owner' && s.cardTitleActive]}>I have a flat / room</Text>
-          <Text style={[s.cardSub, role === 'owner' && s.cardSubActive]}>I have an empty room and need someone to fill it.</Text>
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.cardTitle, type === 'seeking' && styles.cardTitleActive]}>
+              I'm looking for a flat
+            </Text>
+            <Text style={[styles.cardSub, type === 'seeking' && styles.cardSubActive]}>
+              Your profile appears in others' feeds as a potential flatmate
+            </Text>
+          </View>
+          {type === 'seeking' && (
+            <Ionicons name="checkmark-circle" size={22} color={colors.blue} />
+          )}
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.card, type === 'owner' && styles.cardActive]}
+          onPress={() => setType('owner')}
+          activeOpacity={0.8}
+        >
+          <View style={[styles.cardIcon, type === 'owner' && styles.cardIconActive]}>
+            <Text style={{ fontSize: 30 }}>🏠</Text>
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.cardTitle, type === 'owner' && styles.cardTitleActive]}>
+              I have a flat
+            </Text>
+            <Text style={[styles.cardSub, type === 'owner' && styles.cardSubActive]}>
+              Your listing appears in Standouts — people send you a Key 🔑 to connect
+            </Text>
+          </View>
+          {type === 'owner' && (
+            <Ionicons name="checkmark-circle" size={22} color={colors.blue} />
+          )}
         </TouchableOpacity>
       </View>
-    </OnboardingShell>
+
+      <View style={[styles.footer, { paddingBottom: insets.bottom + 24 }]}>
+        <TouchableOpacity
+          style={[styles.btn, (!type || loading) && styles.btnDisabled]}
+          onPress={handleContinue}
+          disabled={!type || loading}
+          activeOpacity={0.85}
+        >
+          <Text style={styles.btnText}>{loading ? 'Saving…' : 'Continue'}</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
   );
 }
 
-const s = StyleSheet.create({
-  title: { fontFamily: 'SpaceGrotesk_700Bold', fontSize: 32, color: colors.ink, marginBottom: 32, letterSpacing: -1 },
-  
-  cards: { gap: 16 },
-  card: { backgroundColor: '#fff', borderRadius: 20, padding: 20, borderWidth: 2, borderColor: 'transparent', shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 10, shadowOffset: { width: 0, height: 4 }, elevation: 2 },
-  cardActive: { borderColor: colors.blue, backgroundColor: '#F8F9FF' },
-  
-  cardTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 },
-  iconBox: { width: 48, height: 48, borderRadius: 16, backgroundColor: colors.canvas, alignItems: 'center', justifyContent: 'center' },
-  iconBoxActive: { backgroundColor: colors.blue },
-  
-  radio: { width: 24, height: 24, borderRadius: 12, borderWidth: 2, borderColor: '#D0D3DE', alignItems: 'center', justifyContent: 'center' },
-  radioActive: { borderColor: colors.blue },
-  radioDot: { width: 12, height: 12, borderRadius: 6, backgroundColor: colors.blue },
-  
-  cardTitle: { fontFamily: 'SpaceGrotesk_700Bold', fontSize: 20, color: colors.ink, marginBottom: 6 },
+const styles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: colors.paper, ...Platform.select({ web: { height: '100dvh', overflow: 'hidden' } }) },
+  topBar: { paddingHorizontal: 28, paddingTop: 14, gap: 8 },
+  progressTrack: { height: 3, backgroundColor: 'rgba(0,0,0,0.08)', borderRadius: 2, overflow: 'hidden' },
+  progressFill: { height: '100%', borderRadius: 2 },
+  stepLabel: { fontFamily: 'SpaceMono_400Regular', fontSize: 10, color: colors.placeholder, letterSpacing: 1.2, textAlign: 'right' },
+  back: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center', marginLeft: 16, marginTop: 4 },
+  backArrow: { fontSize: 28, color: colors.ink, lineHeight: 32 },
+  body: { flex: 1, paddingHorizontal: 28, paddingTop: 28 },
+  title: { fontFamily: 'SpaceGrotesk_700Bold', fontSize: 32, color: colors.ink, letterSpacing: -1, lineHeight: 38, marginBottom: 8 },
+  subtitle: { fontSize: 14, color: colors.slate, lineHeight: 22, marginBottom: 32 },
+
+  card: {
+    flexDirection: 'row', alignItems: 'center', gap: 16,
+    backgroundColor: '#fff', borderRadius: 20, padding: 20,
+    marginBottom: 14, borderWidth: 2, borderColor: 'transparent',
+    shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 8, shadowOffset: { width: 0, height: 2 },
+    elevation: 2,
+  },
+  cardActive: { borderColor: colors.blue, backgroundColor: '#EEF1FF' },
+  cardIcon: {
+    width: 56, height: 56, borderRadius: 16,
+    backgroundColor: colors.canvas, alignItems: 'center', justifyContent: 'center',
+  },
+  cardIconActive: { backgroundColor: '#fff' },
+  cardTitle: { fontFamily: 'SpaceGrotesk_700Bold', fontSize: 16, color: colors.ink, marginBottom: 4 },
   cardTitleActive: { color: colors.blue },
-  cardSub: { fontFamily: 'HankenGrotesk_400Regular', fontSize: 14, color: colors.slate, lineHeight: 20 },
+  cardSub: { fontSize: 13, color: colors.slate, lineHeight: 18 },
   cardSubActive: { color: colors.ink },
-  
-  btn: { borderRadius: 50, paddingVertical: 18, alignItems: 'center' },
-  btnText: { fontFamily: 'SpaceGrotesk_700Bold', fontSize: 16, color: '#fff' },
+
+  footer: { paddingHorizontal: 28, paddingTop: 12 },
+  btn: { backgroundColor: colors.ink, borderRadius: 50, paddingVertical: 18, alignItems: 'center' },
+  btnDisabled: { opacity: 0.32 },
+  btnText: { color: '#fff', fontSize: 16, fontWeight: '600' },
 });

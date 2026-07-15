@@ -1,82 +1,85 @@
 import { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
-import { LinearGradient } from 'expo-linear-gradient';
-import OnboardingShell from '../../components/OnboardingShell';
 import { colors } from '../../lib/theme';
-import { useOnboarding } from '../../hooks/useOnboarding';
+import { useOnboarding } from '../../lib/auth';
+import OnboardingShell from '../../components/OnboardingShell';
 
-const PRONOUNS = ['she/her', 'he/him', 'they/them'];
+const OPTIONS = ['She/her', 'He/him', 'They/them', 'Ze/zir', 'Ze/zan', 'Other'];
 
 export default function PronounsScreen() {
   const router = useRouter();
-  const { state, updateField } = useOnboarding();
-  const [selected, setSelected] = useState(state.pronouns || []);
+  const { data, updateData } = useOnboarding();
+  const [loading, setLoading] = useState(false);
 
-  const toggle = (p) => {
-    if (selected.includes(p)) {
-      setSelected(selected.filter(x => x !== p));
-    } else {
-      setSelected([...selected, p]);
-    }
+  const [selected, setSelected] = useState(data.pronouns || []);
+
+  const toggle = (opt) => {
+    setSelected(prev => {
+      if (prev.includes(opt)) return prev.filter(x => x !== opt);
+      if (prev.length >= 4) return prev;
+      return [...prev, opt];
+    });
   };
 
-  const handleNext = () => {
-    updateField('pronouns', selected);
+  const handleContinue = async () => {
+    setLoading(true);
+    updateData({ pronouns: selected });
+    setLoading(false);
     router.push('/gender');
   };
 
   return (
     <OnboardingShell
-      step={4}
-      total={8}
+      step={4} total={9}
       footer={
-        <TouchableOpacity onPress={handleNext}>
-          <LinearGradient
-            colors={['#335CFF', '#8A5BFF']}
-            start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-            style={s.btn}
+        <View style={styles.footerInner}>
+          <Text style={styles.visible}>Visible on profile</Text>
+          <TouchableOpacity
+            style={styles.nextBtn}
+            onPress={handleContinue}
+            disabled={loading}
+            activeOpacity={0.8}
           >
-            <Text style={s.btnText}>Continue</Text>
-          </LinearGradient>
-        </TouchableOpacity>
+            <View style={[styles.nextGrad, { backgroundColor: colors.ink }]}>
+              <Text style={styles.nextArrow}>→</Text>
+            </View>
+          </TouchableOpacity>
+        </View>
       }
     >
-      <Text style={s.title}>My pronouns are</Text>
-      
-      <View style={s.options}>
-        {PRONOUNS.map(p => {
-          const active = selected.includes(p);
+      <Text style={styles.title}>What are your pronouns?</Text>
+      <Text style={styles.subtitle}>Optional. Pick up to four that feel right.</Text>
+
+      <ScrollView showsVerticalScrollIndicator={false}>
+        {OPTIONS.map(opt => {
+          const on = selected.includes(opt);
           return (
-            <TouchableOpacity 
-              key={p} 
-              style={[s.option, active && s.optionActive]} 
-              onPress={() => toggle(p)}
-              activeOpacity={0.7}
-            >
-              <Text style={[s.optionText, active && s.optionTextActive]}>{p}</Text>
+            <TouchableOpacity key={opt} style={[styles.row, on && styles.rowOn]} onPress={() => toggle(opt)} activeOpacity={0.8}>
+              <Text style={styles.rowLabel}>{opt}</Text>
+              <View style={[styles.check, on && styles.checkOn]}>
+                {on && <Text style={styles.checkMark}>✓</Text>}
+              </View>
             </TouchableOpacity>
           );
         })}
-      </View>
-      
-      <Text style={s.hint}>We show this on your profile so others know how to refer to you. You can choose more than one.</Text>
+      </ScrollView>
     </OnboardingShell>
   );
 }
 
-const s = StyleSheet.create({
-  title: { fontFamily: 'SpaceGrotesk_700Bold', fontSize: 32, color: colors.ink, marginBottom: 32, letterSpacing: -1 },
-  
-  options: { gap: 12, flexDirection: 'row', flexWrap: 'wrap' },
-  option: { paddingVertical: 14, paddingHorizontal: 24, borderRadius: 50, borderWidth: 2, borderColor: colors.mist },
-  optionActive: { borderColor: colors.blue, backgroundColor: '#EEF1FF' },
-  
-  optionText: { fontFamily: 'HankenGrotesk_600SemiBold', fontSize: 16, color: colors.slate },
-  optionTextActive: { color: colors.blue },
-  
-  hint: { fontFamily: 'HankenGrotesk_400Regular', fontSize: 13, color: colors.slate, marginTop: 24, lineHeight: 20 },
-  
-  btn: { borderRadius: 50, paddingVertical: 18, alignItems: 'center' },
-  btnText: { fontFamily: 'SpaceGrotesk_700Bold', fontSize: 16, color: '#fff' },
+const styles = StyleSheet.create({
+  title: { fontFamily: 'SpaceGrotesk_700Bold', fontSize: 30, color: colors.ink, letterSpacing: -0.8, lineHeight: 36, marginBottom: 8 },
+  subtitle: { fontSize: 14, color: colors.slate, lineHeight: 22, marginBottom: 24 },
+  row: { backgroundColor: '#fff', borderRadius: 18, padding: 18, marginBottom: 10, borderWidth: 2, borderColor: 'transparent', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  rowOn: { borderColor: colors.blue, backgroundColor: '#EEF1FF' },
+  rowLabel: { fontSize: 17, color: colors.ink },
+  check: { width: 24, height: 24, borderRadius: 6, borderWidth: 2, borderColor: '#C8CAD2', backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center' },
+  checkOn: { backgroundColor: colors.blue, borderColor: colors.blue },
+  checkMark: { color: '#fff', fontSize: 13, fontWeight: '700' },
+  footerInner: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  visible: { fontSize: 14, color: colors.ink, fontWeight: '500' },
+  nextBtn: { width: 52, height: 52, borderRadius: 26, overflow: 'hidden' },
+  nextGrad: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  nextArrow: { color: '#fff', fontSize: 20, fontWeight: '700' },
 });

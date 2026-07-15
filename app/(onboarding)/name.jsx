@@ -1,71 +1,92 @@
-import { View, Text, StyleSheet, TextInput, TouchableOpacity } from 'react-native';
+import { useState } from 'react';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, Platform } from 'react-native';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
-import OnboardingShell from '../../components/OnboardingShell';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors } from '../../lib/theme';
-import { useOnboarding } from '../../hooks/useOnboarding';
+import { useOnboarding } from '../../lib/auth';
 
 export default function NameScreen() {
   const router = useRouter();
-  const { state, updateField } = useOnboarding();
-  const [firstName, setFirstName] = useState(state.name.split(' ')[0] || '');
-  const [lastName, setLastName] = useState(state.name.split(' ').slice(1).join(' ') || '');
+  const insets = useSafeAreaInsets();
+  const { data, updateData, submitData } = useOnboarding();
+  const [loading, setLoading] = useState(false);
 
-  // Need to import useState locally
-  const React = require('react');
-  const [localFirst, setLocalFirst] = React.useState(firstName);
-  const [localLast, setLocalLast] = React.useState(lastName);
+  const [first, setFirst] = useState(data.firstName || '');
+  const [last, setLast] = useState(data.lastName || '');
 
-  const handleNext = () => {
-    const fullName = [localFirst.trim(), localLast.trim()].filter(Boolean).join(' ');
-    updateField('name', fullName);
+  const handleContinue = async () => {
+    if (!first.trim()) return;
+    setLoading(true);
+    updateData({ firstName: first.trim(), lastName: last.trim() });
+    setLoading(false);
     router.push('/account-type');
   };
 
   return (
-    <OnboardingShell
-      step={1}
-      total={8}
-      footer={
-        <TouchableOpacity onPress={handleNext} disabled={localFirst.trim().length === 0}>
-          <LinearGradient
-            colors={['#335CFF', '#8A5BFF']}
-            start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-            style={[s.btn, localFirst.trim().length === 0 && { opacity: 0.5 }]}
-          >
-            <Text style={s.btnText}>Continue</Text>
-          </LinearGradient>
-        </TouchableOpacity>
-      }
-    >
-      <Text style={s.title}>My name is</Text>
-      
-      <TextInput
-        style={s.input}
-        placeholder="First name"
-        placeholderTextColor={colors.placeholder}
-        value={localFirst}
-        onChangeText={setLocalFirst}
-        autoFocus
-      />
-      <Text style={s.hint}>This is how it will appear on your profile.</Text>
+    <View style={[styles.container, { paddingTop: insets.top }]}>
+      <View style={styles.topBar}>
+        <View style={styles.progressTrack}>
+          <LinearGradient colors={[colors.blue, colors.violet]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={[styles.progressFill, { width: '11%' }]} />
+        </View>
+        <Text style={styles.stepLabel}>STEP 1 OF 9</Text>
+      </View>
 
-      <TextInput
-        style={[s.input, { marginTop: 24 }]}
-        placeholder="Last name"
-        placeholderTextColor={colors.placeholder}
-        value={localLast}
-        onChangeText={setLocalLast}
-      />
-      <Text style={s.hint}>Only your first initial is shown publicly.</Text>
-    </OnboardingShell>
+      <View style={styles.body}>
+        <Text style={styles.title}>What's your name?</Text>
+        <Text style={styles.subtitle}>Venn doesn't verify names. We count on flatmates to be real with each other.</Text>
+
+        <Text style={styles.label}>FIRST NAME</Text>
+        <TextInput
+          style={styles.input}
+          placeholder="Your first name"
+          placeholderTextColor={colors.placeholder}
+          value={first}
+          onChangeText={setFirst}
+          autoFocus
+        />
+
+        <Text style={[styles.label, { marginTop: 14 }]}>LAST NAME <Text style={styles.optional}>(optional)</Text></Text>
+        <TextInput
+          style={styles.input}
+          placeholder="Your last name"
+          placeholderTextColor={colors.placeholder}
+          value={last}
+          onChangeText={setLast}
+        />
+
+        <Text style={styles.hint}>Last name is optional and only shared with confirmed matches.</Text>
+      </View>
+
+      <View style={[styles.footer, { paddingBottom: insets.bottom + 24 }]}>
+        <TouchableOpacity
+          style={[styles.btn, (!first.trim() || loading) && styles.btnDisabled]}
+          onPress={handleContinue}
+          disabled={!first.trim() || loading}
+          activeOpacity={0.85}
+        >
+          <Text style={styles.btnText}>{loading ? 'Saving…' : 'Continue'}</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
   );
 }
 
-const s = StyleSheet.create({
-  title: { fontFamily: 'SpaceGrotesk_700Bold', fontSize: 32, color: colors.ink, marginBottom: 32, letterSpacing: -1 },
-  input: { fontFamily: 'SpaceGrotesk_700Bold', fontSize: 24, color: colors.ink, borderBottomWidth: 2, borderBottomColor: colors.ink, paddingVertical: 8 },
-  hint: { fontFamily: 'HankenGrotesk_400Regular', fontSize: 13, color: colors.slate, marginTop: 8 },
-  btn: { borderRadius: 50, paddingVertical: 18, alignItems: 'center' },
-  btnText: { fontFamily: 'SpaceGrotesk_700Bold', fontSize: 16, color: '#fff' },
+const styles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: colors.paper, ...Platform.select({ web: { height: '100dvh', overflow: 'hidden' } }) },
+  topBar: { paddingHorizontal: 28, paddingTop: 14, gap: 8 },
+  progressTrack: { height: 3, backgroundColor: 'rgba(0,0,0,0.08)', borderRadius: 2, overflow: 'hidden' },
+  progressFill: { height: '100%', borderRadius: 2 },
+  stepLabel: { fontFamily: 'SpaceMono_400Regular', fontSize: 10, color: colors.placeholder, letterSpacing: 1.2, textAlign: 'right' },
+  body: { flex: 1, paddingHorizontal: 28, paddingTop: 32 },
+  title: { fontFamily: 'SpaceGrotesk_700Bold', fontSize: 32, color: colors.ink, letterSpacing: -1, lineHeight: 38, marginBottom: 8 },
+  subtitle: { fontSize: 14, color: colors.slate, lineHeight: 22, marginBottom: 32 },
+  label: { fontFamily: 'SpaceMono_400Regular', fontSize: 10, letterSpacing: 1.5, color: colors.slate, marginBottom: 7 },
+  optional: { fontFamily: 'System', textTransform: 'none', letterSpacing: 0, color: colors.placeholder, fontSize: 12 },
+  input: { backgroundColor: colors.inputBg, borderRadius: 14, paddingHorizontal: 18, paddingVertical: 17, fontSize: 16, color: colors.ink, borderWidth: 2, borderColor: 'transparent', marginBottom: 4 },
+  hint: { fontSize: 12, color: colors.placeholder, textAlign: 'center', marginTop: 16 },
+  footer: { paddingHorizontal: 28, paddingTop: 12 },
+  btn: { backgroundColor: colors.ink, borderRadius: 50, paddingVertical: 18, alignItems: 'center' },
+  btnDisabled: { opacity: 0.32 },
+  btnText: { color: '#fff', fontSize: 16, fontWeight: '600' },
 });

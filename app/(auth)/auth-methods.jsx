@@ -1,21 +1,37 @@
-import { View, Text, StyleSheet, ImageBackground, TouchableOpacity, Platform, Alert } from 'react-native';
-import { useRouter, useLocalSearchParams } from 'expo-router';
-import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
-import { colors } from '../../lib/theme';
+import { LinearGradient } from 'expo-linear-gradient';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { Alert, ImageBackground, Platform, StyleSheet, Text, TouchableOpacity, View, Animated } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useEffect, useRef, useState } from 'react';
 import { signInWithGoogle } from '../../lib/auth';
+import { colors } from '../../lib/theme';
 
 export default function AuthMethodsScreen() {
   const router = useRouter();
   const { mode } = useLocalSearchParams(); // 'signup' or 'signin'
+  const insets = useSafeAreaInsets();
+  const [loading, setLoading] = useState(false);
+
+  const slideY = useRef(new Animated.Value(50)).current;
+  const opacity = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(opacity, { toValue: 1, duration: 400, useNativeDriver: true }),
+      Animated.spring(slideY, { toValue: 0, friction: 8, tension: 50, useNativeDriver: true })
+    ]).start();
+  }, []);
 
   const title = mode === 'signup' ? 'Get started' : 'Welcome back';
-  
-  const handleGoogle = async () => {
+  const subtitle = mode === 'signup' ? "Choose how you'd like to create your account." : "Choose how you'd like to continue.";
+
+  const handleGoogleSignUp = async () => {
     if (Platform.OS !== 'web') {
       Alert.alert('Not available', 'Google sign-in on native requires a dev-build. Use phone or email instead.');
       return;
     }
+    setLoading(true);
     try {
       await signInWithGoogle();
       // Auth listener routes automatically
@@ -23,63 +39,93 @@ export default function AuthMethodsScreen() {
       if (e.code !== 'auth/popup-closed-by-user') {
         Alert.alert('Sign in failed', e.message);
       }
+      setLoading(false);
     }
   };
 
   return (
-    <ImageBackground source={require('../../assets/hero.jpeg')} style={s.bg} resizeMode="cover">
-      <LinearGradient colors={['rgba(10,10,20,0)', 'rgba(10,10,20,0.85)', '#0a0a14']} style={s.overlay} locations={[0, 0.4, 1]}>
-        
-        <View style={s.topBar}>
-          <TouchableOpacity onPress={() => router.back()} style={s.backBtn}>
-            <Ionicons name="arrow-back" size={24} color="#fff" />
-          </TouchableOpacity>
-        </View>
+    <View style={styles.frame}>
+      <ImageBackground source={require('../../assets/images/hero.jpeg')} style={styles.bg} imageStyle={styles.bgImage} resizeMode="cover">
+        <LinearGradient colors={['transparent', 'rgba(0,0,0,0.92)']} style={styles.overlay} />
 
-        <View style={s.content}>
-          <Text style={s.headline}>{title}</Text>
-          <Text style={s.sub}>Choose how you'd like to continue.</Text>
-
-          <View style={s.btnGroup}>
-            <TouchableOpacity onPress={() => router.push('/phone')} activeOpacity={0.85}>
-              <LinearGradient colors={['#335CFF', '#8A5BFF']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.btnPrimary}>
-                <Ionicons name="call" size={18} color="#fff" style={{ marginRight: 10 }} />
-                <Text style={s.btnPrimaryText}>Continue with Phone</Text>
-              </LinearGradient>
-            </TouchableOpacity>
-
-            <TouchableOpacity style={s.btnWhite} onPress={handleGoogle} activeOpacity={0.85}>
-              <Ionicons name="logo-google" size={18} color={colors.ink} style={{ marginRight: 10 }} />
-              <Text style={s.btnWhiteText}>Continue with Google</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity style={s.btnOutline} onPress={() => router.push('/email')} activeOpacity={0.85}>
-              <Ionicons name="mail" size={18} color="#fff" style={{ marginRight: 10 }} />
-              <Text style={s.btnOutlineText}>Continue with Email</Text>
-            </TouchableOpacity>
+        <TouchableOpacity style={[styles.back, { top: insets.top + 12 }]} onPress={() => router.back()}>
+          <View style={styles.backCircle}>
+            <Text style={styles.backArrow}>‹</Text>
           </View>
-        </View>
-      </LinearGradient>
-    </ImageBackground>
+        </TouchableOpacity>
+
+        <Animated.View style={[styles.content, { paddingBottom: insets.bottom + 40 }, { opacity, transform: [{ translateY: slideY }] }]}>
+          <View style={styles.logoRow}>
+            <View style={styles.logoWrap}>
+              <View style={[styles.circle, { backgroundColor: colors.blue, left: 0 }]} />
+              <View style={[styles.circle, { backgroundColor: colors.violet, right: 0, opacity: 0.9 }]} />
+            </View>
+            <Text style={styles.appName}>Venn</Text>
+          </View>
+          <Text style={styles.title}>{title}</Text>
+          <Text style={styles.subtitle}>{subtitle}</Text>
+
+          {Platform.OS !== 'web' && (
+            <TouchableOpacity style={styles.phoneBtn} onPress={() => router.push(`/(auth)/phone?mode=${mode}`)} activeOpacity={0.9}>
+              <Text style={styles.phoneBtnIcon}>📞</Text>
+              <Text style={styles.phoneBtnText}>Continue with phone</Text>
+            </TouchableOpacity>
+          )}
+
+          {Platform.OS === 'web' && (
+            <TouchableOpacity style={styles.phoneBtn} onPress={() => router.push(`/(auth)/phone?mode=${mode}`)} activeOpacity={0.9}>
+              <Text style={styles.phoneBtnIcon}>📞</Text>
+              <Text style={styles.phoneBtnText}>Continue with phone</Text>
+            </TouchableOpacity>
+          )}
+
+          <TouchableOpacity
+            style={styles.emailBtn}
+            onPress={() => router.push(`/(auth)/email?mode=${mode}`)}
+            activeOpacity={0.85}
+          >
+            <Text style={styles.emailBtnIcon}>✉</Text>
+            <Text style={styles.emailBtnText}>Continue with email</Text>
+          </TouchableOpacity>
+
+          {Platform.OS === 'web' && (
+            <TouchableOpacity
+              style={[styles.googleBtn, loading && styles.btnDisabled]}
+              onPress={handleGoogleSignUp}
+              disabled={loading}
+              activeOpacity={0.85}
+            >
+              <Text style={styles.googleBtnText}>{loading ? 'Signing in…' : '🔵  Continue with Google'}</Text>
+            </TouchableOpacity>
+          )}
+        </Animated.View>
+      </ImageBackground>
+    </View>
   );
 }
 
-const s = StyleSheet.create({
-  bg: { flex: 1, backgroundColor: '#0a0a14' },
-  overlay: { flex: 1, padding: 28, paddingBottom: 50, justifyContent: 'space-between' },
-  
-  topBar: { marginTop: 50 },
-  backBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(255,255,255,0.15)', alignItems: 'center', justifyContent: 'center' },
-  
-  content: { gap: 24 },
-  headline: { fontFamily: 'SpaceGrotesk_700Bold', fontSize: 36, color: '#fff', letterSpacing: -1 },
-  sub: { fontFamily: 'HankenGrotesk_400Regular', fontSize: 16, color: 'rgba(255,255,255,0.7)', lineHeight: 24 },
-  
-  btnGroup: { gap: 12, marginTop: 16 },
-  btnPrimary: { borderRadius: 50, paddingVertical: 18, alignItems: 'center', flexDirection: 'row', justifyContent: 'center' },
-  btnPrimaryText: { fontFamily: 'SpaceGrotesk_700Bold', fontSize: 16, color: '#fff' },
-  btnWhite: { backgroundColor: '#fff', borderRadius: 50, paddingVertical: 18, alignItems: 'center', flexDirection: 'row', justifyContent: 'center' },
-  btnWhiteText: { fontFamily: 'SpaceGrotesk_700Bold', fontSize: 16, color: colors.ink },
-  btnOutline: { borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.3)', borderRadius: 50, paddingVertical: 16, alignItems: 'center', flexDirection: 'row', justifyContent: 'center' },
-  btnOutlineText: { fontFamily: 'SpaceGrotesk_700Bold', fontSize: 16, color: '#fff' },
+const styles = StyleSheet.create({
+  frame: { flex: 1, ...Platform.select({ web: { height: '100dvh', overflow: 'hidden' } }) },
+  bg: { flex: 1, backgroundColor: '#111' },
+  bgImage: { width: '100%', height: '100%' },
+  overlay: { position: 'absolute', top: '30%', left: 0, right: 0, bottom: 0 },
+  back: { position: 'absolute', left: 24, zIndex: 10 },
+  backCircle: { width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.12)', alignItems: 'center', justifyContent: 'center' },
+  backArrow: { color: '#fff', fontSize: 24, lineHeight: 28, marginLeft: -2 },
+  content: { position: 'absolute', bottom: 0, left: 0, right: 0, paddingHorizontal: 28, gap: 12 },
+  logoRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 6 },
+  logoWrap: { width: 32, height: 20, position: 'relative' },
+  circle: { position: 'absolute', top: 0, width: 20, height: 20, borderRadius: 10 },
+  appName: { fontFamily: 'SpaceGrotesk_700Bold', fontSize: 17, color: '#fff' },
+  title: { fontFamily: 'SpaceGrotesk_700Bold', fontSize: 26, color: '#fff', letterSpacing: -0.8 },
+  subtitle: { fontSize: 14, color: 'rgba(255,255,255,0.55)', marginBottom: 4 },
+  phoneBtn: { backgroundColor: '#fff', borderRadius: 50, paddingVertical: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10 },
+  phoneBtnIcon: { fontSize: 18 },
+  phoneBtnText: { color: colors.ink, fontSize: 16, fontWeight: '700' },
+  emailBtn: { borderRadius: 50, paddingVertical: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.3)' },
+  emailBtnIcon: { fontSize: 16, color: '#fff' },
+  emailBtnText: { color: '#fff', fontSize: 16, fontWeight: '600' },
+  googleBtn: { borderRadius: 50, paddingVertical: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, backgroundColor: 'rgba(255,255,255,0.12)' },
+  googleBtnText: { color: '#fff', fontSize: 15, fontWeight: '600' },
+  btnDisabled: { opacity: 0.6 },
 });

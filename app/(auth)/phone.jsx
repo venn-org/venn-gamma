@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, TextInput, ActivityIndicator, Animated, Platform } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors } from '../../lib/theme';
@@ -9,23 +9,36 @@ import { setupRecaptcha, sendPhoneOtp, verifyPhoneOtp, ensureProfile } from '../
 export default function PhoneScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { mode } = useLocalSearchParams(); // 'signin' or 'signup'
   
   const [step, setStep] = useState('phone'); // 'phone' | 'otp'
   
   const [phone, setPhone] = useState('');
-  const [code, setCode] = useState('');
+  const [otp, setOtp] = useState(['', '', '', '', '', '']);
+  const inputs = useRef([]);
+  
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [confirmationResult, setConfirmationResult] = useState(null);
+  const [spamWarning, setSpamWarning] = useState('');
   
   const [cooldown, setCooldown] = useState(0);
-  const shakeAnim = useRef(new Animated.Value(0)).current;
+  const slideY = useRef(new Animated.Value(50)).current;
+  const opacity = useRef(new Animated.Value(0)).current;
+  const shakeX = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     if (Platform.OS === 'web') {
       setupRecaptcha('recaptcha-container');
     }
   }, []);
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(opacity, { toValue: 1, duration: 400, useNativeDriver: true }),
+      Animated.spring(slideY, { toValue: 0, friction: 8, tension: 50, useNativeDriver: true })
+    ]).start();
+  }, [step]);
 
   useEffect(() => {
     let timer;
@@ -36,12 +49,12 @@ export default function PhoneScreen() {
   }, [cooldown]);
 
   const shake = () => {
-    shakeAnim.setValue(0);
+    shakeX.setValue(0);
     Animated.sequence([
-      Animated.timing(shakeAnim, { toValue: 10, duration: 50, useNativeDriver: true }),
-      Animated.timing(shakeAnim, { toValue: -10, duration: 50, useNativeDriver: true }),
-      Animated.timing(shakeAnim, { toValue: 10, duration: 50, useNativeDriver: true }),
-      Animated.timing(shakeAnim, { toValue: 0, duration: 50, useNativeDriver: true })
+      Animated.timing(shakeX, { toValue: 10, duration: 50, useNativeDriver: true }),
+      Animated.timing(shakeX, { toValue: -10, duration: 50, useNativeDriver: true }),
+      Animated.timing(shakeX, { toValue: 10, duration: 50, useNativeDriver: true }),
+      Animated.timing(shakeX, { toValue: 0, duration: 50, useNativeDriver: true })
     ]).start();
   };
 
@@ -49,19 +62,27 @@ export default function PhoneScreen() {
     if (phone.length < 10) return;
     setLoading(true);
     setError('');
+    setSpamWarning('');
     try {
       const cr = await sendPhoneOtp(phone);
       setConfirmationResult(cr);
       setStep('otp');
       setCooldown(60);
+      slideY.setValue(50);
+      opacity.setValue(0);
     } catch (e) {
-      setError(e.message);
+      if (e.message.includes('too-many-requests')) {
+        setSpamWarning('Too many attempts. Please try again later.');
+      } else {
+        setSpamWarning(e.message);
+      }
     } finally {
       setLoading(false);
     }
   };
 
   const handleVerify = async () => {
+    const code = otp.join('');
     if (code.length < 6 || !confirmationResult) return;
     setLoading(true);
     setError('');
@@ -70,126 +91,185 @@ export default function PhoneScreen() {
       await ensureProfile();
       // Auth listener routes automatically
     } catch (e) {
-      setError('Invalid code. Please try again.');
       shake();
-      setCode('');
+      setOtp(['', '', '', '', '', '']);
+      if (inputs.current[0]) inputs.current[0].focus();
     } finally {
       setLoading(false);
     }
   };
 
+  const handleChange = (v, i) => {
+    const newOtp = [...otp];
+    newOtp[i] = v;
+    setOtp(newOtp);
+    if (v && i < 5) inputs.current[i + 1].focus();
+  };
+
+  const handleKeyPress = (e, i) => {
+    if (e.nativeEvent.key === 'Backspace' && !otp[i] && i > 0) {
+      inputs.current[i - 1].focus();
+      const newOtp = [...otp];
+      newOtp[i - 1] = '';
+      setOtp(newOtp);
+    }
+  };
+
+  const complete = otp.every(d => d !== '');
+
   return (
-    <View style={[s.container, { paddingTop: insets.top }]}>
-      <View style={s.topBar}>
-        <View style={s.progressTrack}>
-          <LinearGradient colors={['#335CFF', '#8A5BFF']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={[s.progressFill, { width: step === 'phone' ? '50%' : '100%' }]} />
+    <View style={[styles.container, { paddingTop: insets.top }]}>
+      {step === 'phone' ? (
+        <View style={styles.statusBar}>
+          <Text style={styles.step}>STEP 1 OF 5</Text>
         </View>
-        <Text style={s.stepLabel}>STEP {step === 'phone' ? '1' : '2'} OF 2</Text>
+      ) : null}
+      
+      <View style={[styles.progressTrack, step === 'phone' ? {} : { marginTop: 14 }]}>
+        <LinearGradient colors={[colors.blue, colors.violet]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={[styles.progressFill, { width: '20%' }]} />
       </View>
 
-      <TouchableOpacity style={s.back} onPress={() => step === 'otp' ? setStep('phone') : router.back()}>
-        <Text style={s.backArrow}>‹</Text>
+      <TouchableOpacity style={styles.back} onPress={() => step === 'otp' ? setStep('phone') : router.back()}>
+        <Text style={styles.backArrow}>‹</Text>
       </TouchableOpacity>
 
-      <View style={s.body}>
+      <Animated.View style={[styles.body, { opacity, transform: [{ translateY: slideY }] }]}>
         {step === 'phone' ? (
           <>
-            <Text style={s.title}>What's your number?</Text>
-            <Text style={s.sub}>We'll text you a code to verify your account.</Text>
+            <Text style={styles.title}>What's your phone number?</Text>
+            <Text style={styles.subtitle}>We only use this to verify it's you. It won't appear on your profile.</Text>
 
-            <View style={s.inputRow}>
-              <View style={s.countryBox}>
-                <Text style={s.countryText}>IN +91</Text>
+            <View style={styles.inputRow}>
+              <View style={styles.countryCode}>
+                <Text style={styles.flag}>🇮🇳</Text>
+                <Text style={styles.dialCode}>+91</Text>
               </View>
               <TextInput
-                style={s.input}
-                placeholder="00000 00000"
+                style={styles.input}
+                placeholder="Phone number"
                 placeholderTextColor={colors.placeholder}
-                keyboardType="number-pad"
+                keyboardType="phone-pad"
                 maxLength={10}
                 value={phone}
-                onChangeText={setPhone}
+                onChangeText={v => setPhone(v.replace(/\D/g, ''))}
                 autoFocus
               />
             </View>
-            {error ? <Text style={s.errorText}>{error}</Text> : null}
+
+            {spamWarning ? (
+              <Text style={styles.warningText}>{spamWarning}</Text>
+            ) : (
+              <Text style={styles.hint}>Venn will send you a verification code. Standard rates may apply.</Text>
+            )}
+
+            <View style={styles.protectionRow}>
+              <Text style={styles.protectionIcon}>🛡️</Text>
+              <Text style={styles.protectionText}>Protected by reCAPTCHA · Max 5 codes per day</Text>
+            </View>
           </>
         ) : (
-          <Animated.View style={{ transform: [{ translateX: shakeAnim }] }}>
-            <Text style={s.title}>Enter your code</Text>
-            <Text style={s.sub}>Sent to +91 {phone}</Text>
+          <>
+            <View style={styles.logoRow}>
+              <View style={styles.logoWrap}>
+                <View style={[styles.circle, { backgroundColor: colors.blue, left: 0 }]} />
+                <View style={[styles.circle, { backgroundColor: colors.violet, right: 0, opacity: 0.9 }]} />
+              </View>
+            </View>
+            <Text style={styles.title}>Enter the code</Text>
+            <Text style={styles.subtitle}>Sent to +91 {phone}</Text>
 
-            <TextInput
-              style={s.otpInput}
-              placeholder="000000"
-              placeholderTextColor={colors.placeholder}
-              keyboardType="number-pad"
-              maxLength={6}
-              value={code}
-              onChangeText={setCode}
-              autoFocus
-              textAlign="center"
-            />
-            {error ? <Text style={s.errorText}>{error}</Text> : null}
-            
-            <TouchableOpacity 
-              style={{ marginTop: 20 }} 
-              onPress={handleSendCode} 
-              disabled={cooldown > 0 || loading}
-            >
-              <Text style={[s.resendText, cooldown > 0 && s.resendDisabled]}>
-                {cooldown > 0 ? `Resend code in ${cooldown}s` : 'Resend code'}
+            <Animated.View style={[styles.otpRow, { transform: [{ translateX: shakeX }] }]}>
+              {otp.map((d, i) => (
+                <TextInput
+                  key={i}
+                  ref={r => inputs.current[i] = r}
+                  style={[styles.otpBox, d && styles.otpBoxFilled]}
+                  value={d}
+                  onChangeText={v => handleChange(v, i)}
+                  onKeyPress={e => handleKeyPress(e, i)}
+                  keyboardType="number-pad"
+                  textContentType="oneTimeCode"
+                  selectTextOnFocus
+                  autoFocus={i === 0}
+                />
+              ))}
+            </Animated.View>
+
+            <TouchableOpacity onPress={() => handleSendCode()} disabled={cooldown > 0}>
+              <Text style={[styles.resend, cooldown > 0 && { color: colors.placeholder }]}>
+                {cooldown > 0 ? `RESEND CODE IN ${cooldown}S` : 'RESEND CODE'}
               </Text>
             </TouchableOpacity>
-          </Animated.View>
+          </>
         )}
-      </View>
+      </Animated.View>
 
-      <View style={[s.footer, { paddingBottom: insets.bottom + 24 }]}>
+      <View style={[styles.footer, { paddingBottom: insets.bottom + 24 }]}>
         <div id="recaptcha-container" style={{ display: 'none' }}></div>
-        <TouchableOpacity 
-          onPress={step === 'phone' ? handleSendCode : handleVerify} 
-          disabled={loading || (step === 'phone' ? phone.length < 10 : code.length < 6)}
-        >
-          <LinearGradient 
-            colors={['#335CFF', '#8A5BFF']} 
-            start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} 
-            style={[s.btn, (loading || (step === 'phone' ? phone.length < 10 : code.length < 6)) && { opacity: 0.5 }]}
+        {step === 'phone' ? (
+          <TouchableOpacity
+            id="phone-send-btn"
+            nativeID="phone-send-btn"
+            style={[styles.btn, (phone.length < 10 || !!spamWarning) && styles.btnDisabled]}
+            onPress={handleSendCode}
+            disabled={phone.length < 10 || loading || !!spamWarning}
+            activeOpacity={0.85}
           >
-            {loading ? <ActivityIndicator color="#fff" /> : <Text style={s.btnText}>Continue</Text>}
-          </LinearGradient>
-        </TouchableOpacity>
+            <Text style={styles.btnText}>{loading ? 'Sending…' : 'Continue'}</Text>
+          </TouchableOpacity>
+        ) : (
+          <TouchableOpacity
+            style={[styles.btn, !complete && styles.btnDisabled]}
+            onPress={handleVerify}
+            disabled={!complete || loading}
+            activeOpacity={0.85}
+          >
+            <LinearGradient colors={[colors.blue, colors.violet]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.gradientBtn}>
+              <Text style={styles.btnText}>{loading ? 'Verifying…' : 'Verify & sign in'}</Text>
+            </LinearGradient>
+          </TouchableOpacity>
+        )}
       </View>
     </View>
   );
 }
 
-const s = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.paper },
-  topBar: { paddingHorizontal: 28, paddingTop: 14, gap: 8 },
-  progressTrack: { height: 3, backgroundColor: 'rgba(0,0,0,0.08)', borderRadius: 2, overflow: 'hidden' },
+const styles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: colors.paper, ...Platform.select({ web: { height: '100dvh', overflow: 'hidden' } }) },
+  statusBar: { flexDirection: 'row', justifyContent: 'flex-end', paddingHorizontal: 28, paddingTop: 14 },
+  step: { fontFamily: 'SpaceMono_400Regular', fontSize: 10, color: colors.placeholder, letterSpacing: 1.2 },
+  progressTrack: { height: 3, backgroundColor: 'rgba(0,0,0,0.08)', marginHorizontal: 28, borderRadius: 2, overflow: 'hidden' },
   progressFill: { height: '100%', borderRadius: 2 },
-  stepLabel: { fontFamily: 'SpaceMono_400Regular', fontSize: 10, color: colors.placeholder, letterSpacing: 1.2, textAlign: 'right' },
-  
   back: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center', marginLeft: 16, marginTop: 4 },
   backArrow: { fontSize: 28, color: colors.ink, lineHeight: 32 },
-  
   body: { flex: 1, paddingHorizontal: 28, paddingTop: 20 },
-  title: { fontFamily: 'SpaceGrotesk_700Bold', fontSize: 28, color: colors.ink, marginBottom: 8, letterSpacing: -0.5 },
-  sub: { fontFamily: 'HankenGrotesk_400Regular', fontSize: 15, color: colors.slate, lineHeight: 22, marginBottom: 32 },
+  title: { fontFamily: 'SpaceGrotesk_700Bold', fontSize: 32, color: colors.ink, letterSpacing: -1, lineHeight: 38, marginBottom: 8 },
+  subtitle: { fontSize: 14, color: colors.slate, lineHeight: 22, marginBottom: 32 },
   
-  inputRow: { flexDirection: 'row', gap: 12 },
-  countryBox: { backgroundColor: colors.inputBg, borderRadius: 14, paddingHorizontal: 16, justifyContent: 'center' },
-  countryText: { fontFamily: 'HankenGrotesk_600SemiBold', fontSize: 16, color: colors.slate },
-  input: { flex: 1, backgroundColor: colors.inputBg, borderRadius: 14, padding: 18, fontFamily: 'SpaceMono_400Regular', fontSize: 20, color: colors.ink, letterSpacing: 2 },
+  // Phone styles
+  inputRow: { flexDirection: 'row', gap: 10, alignItems: 'center', marginBottom: 10 },
+  countryCode: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: colors.inputBg, borderRadius: 14, paddingHorizontal: 14, height: 56 },
+  flag: { fontSize: 20 },
+  dialCode: { fontSize: 16, fontWeight: '500', color: colors.ink },
+  input: { flex: 1, backgroundColor: colors.inputBg, borderRadius: 14, paddingHorizontal: 18, height: 56, fontSize: 16, color: colors.ink, borderWidth: 2, borderColor: 'transparent' },
+  hint: { fontSize: 12, color: colors.placeholder, textAlign: 'center', marginTop: 8 },
+  warningText: { fontSize: 13, color: colors.error, textAlign: 'center', marginTop: 8, fontWeight: '500' },
+  protectionRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 16, opacity: 0.6 },
+  protectionIcon: { fontSize: 12 },
+  protectionText: { fontSize: 11, color: colors.placeholder },
   
-  otpInput: { backgroundColor: colors.inputBg, borderRadius: 14, padding: 18, fontFamily: 'SpaceMono_400Regular', fontSize: 32, color: colors.ink, letterSpacing: 12 },
-  
-  errorText: { fontFamily: 'HankenGrotesk_600SemiBold', fontSize: 13, color: colors.error, marginTop: 12 },
-  resendText: { fontFamily: 'HankenGrotesk_600SemiBold', fontSize: 14, color: colors.blue, textAlign: 'center' },
-  resendDisabled: { color: colors.placeholder },
+  // OTP styles
+  logoRow: { marginBottom: 24 },
+  logoWrap: { width: 32, height: 20, position: 'relative' },
+  circle: { position: 'absolute', top: 0, width: 20, height: 20, borderRadius: 10 },
+  otpRow: { flexDirection: 'row', gap: 10, justifyContent: 'center', marginBottom: 24 },
+  otpBox: { width: 48, height: 62, borderRadius: 14, backgroundColor: colors.inputBg, borderWidth: 2, borderColor: 'transparent', fontFamily: 'SpaceGrotesk_700Bold', fontSize: 26, textAlign: 'center', color: colors.ink },
+  otpBoxFilled: { borderColor: colors.blue, backgroundColor: '#fff' },
+  resend: { fontFamily: 'SpaceMono_400Regular', fontSize: 11, letterSpacing: 1.2, color: colors.blue, textAlign: 'center' },
   
   footer: { paddingHorizontal: 28, paddingTop: 12 },
-  btn: { borderRadius: 50, paddingVertical: 18, alignItems: 'center' },
-  btnText: { fontFamily: 'SpaceGrotesk_700Bold', fontSize: 16, color: '#fff' },
+  btn: { backgroundColor: colors.ink, borderRadius: 50, overflow: 'hidden', paddingVertical: 18, alignItems: 'center' },
+  btnDisabled: { opacity: 0.32 },
+  gradientBtn: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center' },
+  btnText: { color: '#fff', fontSize: 16, fontWeight: '600' },
 });

@@ -5,8 +5,9 @@ import { mapUIPrefsToDb } from '../lib/enums';
 // Shared state object instance outside the hook so it persists across screen unmounts/mounts
 // within the onboarding flow.
 let onboardingState = {
-  name: '',
-  role: null, // 'seeking' | 'owner'
+  firstName: '',
+  lastName: '',
+  type: null, // 'seeking' | 'owner'
   birthday: null, // ISO string
   pronouns: [],
   gender: null,
@@ -20,100 +21,103 @@ let onboardingState = {
   prefs: {
     areas: [],
     budget: null,
-    flatType: [],
-    moveIn: null,
+    flatType: null,
     gender: null,
-    age: null,
-    occupation: [],
-    food: [],
-    smoking: null,
-    drinking: null,
-    pets: [],
   },
   
   // Photos
-  photos: [], // array of URIs
+  photos: {
+    profile: null,
+    flat: [null, null, null],
+  },
 };
 
 export function useOnboarding() {
-  // We use state to trigger re-renders, but initialize from the global object
   const [state, setState] = useState(onboardingState);
 
-  const updateField = useCallback((field, value) => {
-    onboardingState = { ...onboardingState, [field]: value };
+  const updateData = useCallback((newData) => {
+    onboardingState = { ...onboardingState, ...newData };
     setState(onboardingState);
   }, []);
 
-  const updateNestedField = useCallback((parent, field, value) => {
-    onboardingState = {
-      ...onboardingState,
-      [parent]: {
-        ...onboardingState[parent],
-        [field]: value
-      }
-    };
-    setState(onboardingState);
-  }, []);
-
-  const saveAll = async () => {
+  const submitData = async () => {
     const uid = getCurrentUserId();
     if (!uid) throw new Error("Not authenticated");
 
     // Upload photos if any
-    const photoUrls = [];
-    for (let i = 0; i < onboardingState.photos.length; i++) {
-      const uri = onboardingState.photos[i];
+    let profilePhotoUrl = null;
+    let flatPhotoUrls = [];
+    
+    // Upload profile photo
+    if (onboardingState.photos?.profile) {
+      const uri = onboardingState.photos.profile;
       if (uri.startsWith('http')) {
-        photoUrls.push(uri); // Already uploaded
+        profilePhotoUrl = uri;
       } else {
-        // Simple base64 upload for web (in a real app, use FormData for native)
         try {
           const res = await fetch(uri);
           const blob = await res.blob();
           const ext = uri.split('.').pop() || 'jpg';
-          const filename = `${uid}/${Date.now()}-${i}.${ext}`;
-          
+          const filename = `${uid}/profile-${Date.now()}.${ext}`;
           const { error } = await supabase.storage.from('photos').upload(filename, blob, { upsert: true });
-          if (error) throw error;
-          
-          const { data } = supabase.storage.from('photos').getPublicUrl(filename);
-          photoUrls.push(data.publicUrl);
+          if (!error) {
+            const { data } = supabase.storage.from('photos').getPublicUrl(filename);
+            profilePhotoUrl = data.publicUrl;
+          }
         } catch (e) {
-          console.error("Photo upload failed", e);
+          console.error("Profile photo upload failed", e);
+        }
+      }
+    }
+
+    // Upload flat photos
+    if (onboardingState.photos?.flat) {
+      for (let i = 0; i < onboardingState.photos.flat.length; i++) {
+        const uri = onboardingState.photos.flat[i];
+        if (!uri) continue;
+        if (uri.startsWith('http')) {
+          flatPhotoUrls.push(uri);
+        } else {
+          try {
+            const res = await fetch(uri);
+            const blob = await res.blob();
+            const ext = uri.split('.').pop() || 'jpg';
+            const filename = `${uid}/flat-${Date.now()}-${i}.${ext}`;
+            const { error } = await supabase.storage.from('photos').upload(filename, blob, { upsert: true });
+            if (!error) {
+              const { data } = supabase.storage.from('photos').getPublicUrl(filename);
+              flatPhotoUrls.push(data.publicUrl);
+            }
+          } catch (e) {
+            console.error("Flat photo upload failed", e);
+          }
         }
       }
     }
 
     // Map preferences using enums
     const dbPrefs = mapUIPrefsToDb({
-      role: onboardingState.role === 'seeking' ? '🔍 Looking for a flat' : '🏠 Have a flat / room',
-      areas: onboardingState.prefs.areas,
-      budget: onboardingState.prefs.budget,
-      flatType: onboardingState.prefs.flatType,
-      moveIn: onboardingState.prefs.moveIn,
-      gender: onboardingState.prefs.gender,
-      age: onboardingState.prefs.age,
-      occupation: onboardingState.prefs.occupation,
-      food: onboardingState.prefs.food,
-      smoking: onboardingState.prefs.smoking,
-      drinking: onboardingState.prefs.drinking,
-      pets: onboardingState.prefs.pets,
+      role: onboardingState.type === 'seeking' ? '🔍 Looking for a flat' : '🏠 Have a flat / room',
+      areas: onboardingState.prefs?.areas || [],
+      budget: onboardingState.prefs?.budget || null,
+      flatType: onboardingState.prefs?.flatType ? [onboardingState.prefs.flatType] : [], // mapUIPrefsToDb expects array
+      gender: onboardingState.prefs?.gender || null,
     });
 
     const updatePayload = {
-      name: onboardingState.name,
-      user_type: onboardingState.role,
+      name: `${onboardingState.firstName} ${onboardingState.lastName}`.trim(),
+      user_type: onboardingState.type,
       birthday: onboardingState.birthday,
       pronouns: onboardingState.pronouns,
       gender: onboardingState.gender,
       
-      drink: onboardingState.lifestyle.drink,
-      tobacco: onboardingState.lifestyle.tobacco,
-      weed: onboardingState.lifestyle.weed,
+      drink: onboardingState.lifestyle?.drink || null,
+      tobacco: onboardingState.lifestyle?.tobacco || null,
+      weed: onboardingState.lifestyle?.weed || null,
       
       ...dbPrefs,
       
-      photos: photoUrls.length > 0 ? photoUrls : null,
+      photos: profilePhotoUrl ? [profilePhotoUrl, ...flatPhotoUrls] : (flatPhotoUrls.length > 0 ? flatPhotoUrls : null),
       onboarding_done: true
     };
 
@@ -123,5 +127,5 @@ export function useOnboarding() {
     return true;
   };
 
-  return { state, updateField, updateNestedField, saveAll };
+  return { data: state, updateData, submitData };
 }
