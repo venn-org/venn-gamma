@@ -6,6 +6,7 @@ import { useRouter } from 'expo-router';
 import { supabase } from '../../lib/supabase';
 import { colors } from '../../lib/theme';
 import { getCurrentUserId } from '../../lib/auth';
+import { getBlockedIds } from '../../lib/blocks';
 
 const Avatar = ({ photo, name, size = 48, online }) => {
   const initials = name ? name.charAt(0).toUpperCase() : '?';
@@ -28,6 +29,7 @@ const Avatar = ({ photo, name, size = 48, online }) => {
 export default function MessagesScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  
   const [refreshing, setRefreshing] = useState(false);
   const [newMatches, setNewMatches] = useState([]);
   const [yourTurn, setYourTurn] = useState([]);
@@ -39,26 +41,106 @@ export default function MessagesScreen() {
     if (!uid) return;
     setRefreshing(true);
     
-    // Simplistic query for matches
-    const { data: matchesData } = await supabase
+    const blocked = await getBlockedIds(uid);
+
+    // Fetch matches with messages
+    const { data: matchesData, error } = await supabase
       .from('matches')
-      .select('id, user1_id, user2_id, profiles!user2_id(name, photos)')
-      .or(`user1_id.eq.${uid},user2_id.eq.${uid}`)
-      .limit(10);
-      
-    if (matchesData) {
-      const formatted = matchesData.map(m => ({
-        id: m.id,
-        name: m.profiles?.name || 'Match',
-        photo: Array.isArray(m.profiles?.photos) ? m.profiles.photos[0] : null,
-        lastMsg: 'Say hi!',
-        hasNewMsg: true,
-        online: false
-      }));
-      setNewMatches(formatted);
+      .select(`
+        id, user1_id, user2_id,
+        messages(id, content, sender_id, read, created_at)
+      `)
+      .or(`user1_id.eq.${uid},user2_id.eq.${uid}`);
+
+    if (error) {
+      console.error('Error fetching matches:', error);
+      setLoading(false);
+      setRefreshing(false);
+      return;
+    }
+
+    if (!matchesData || matchesData.length === 0) {
+      setNewMatches([]);
       setYourTurn([]);
       setTheirTurn([]);
+      setLoading(false);
+      setRefreshing(false);
+      return;
     }
+
+    // Determine the "other" user for each match
+    const otherUserIds = [];
+    const validMatches = [];
+    
+    matchesData.forEach(m => {
+      const otherId = m.user1_id === uid ? m.user2_id : m.user1_id;
+      if (!blocked.has(otherId)) {
+        otherUserIds.push(otherId);
+        validMatches.push({ ...m, otherId });
+      }
+    });
+
+    if (otherUserIds.length === 0) {
+      setNewMatches([]);
+      setYourTurn([]);
+      setTheirTurn([]);
+      setLoading(false);
+      setRefreshing(false);
+      return;
+    }
+
+    // Fetch profiles for the other users
+    const { data: profilesData } = await supabase
+      .from('profiles')
+      .select('id, name, photos')
+      .in('id', otherUserIds);
+
+    const profileMap = {};
+    if (profilesData) {
+      profilesData.forEach(p => {
+        profileMap[p.id] = p;
+      });
+    }
+
+    const _newMatches = [];
+    const _yourTurn = [];
+    const _theirTurn = [];
+
+    validMatches.forEach(m => {
+      const profile = profileMap[m.otherId];
+      if (!profile) return; // shouldn't happen, but safe
+
+      const msgs = m.messages || [];
+      msgs.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+      
+      const lastMsg = msgs.length > 0 ? msgs[msgs.length - 1] : null;
+
+      const matchObj = {
+        id: m.id,
+        name: profile.name || 'User',
+        photo: Array.isArray(profile.photos) ? profile.photos[0] : null,
+        lastMsg: lastMsg ? lastMsg.content : 'Say hi!',
+        hasNewMsg: lastMsg ? (!lastMsg.read && lastMsg.sender_id !== uid) : true,
+        online: false, // mock
+        lastActivity: lastMsg ? new Date(lastMsg.created_at).getTime() : 0,
+      };
+
+      if (!lastMsg) {
+        _newMatches.push(matchObj);
+      } else if (lastMsg.sender_id !== uid) {
+        _yourTurn.push(matchObj);
+      } else {
+        _theirTurn.push(matchObj);
+      }
+    });
+
+    // Sort by recent activity
+    _yourTurn.sort((a, b) => b.lastActivity - a.lastActivity);
+    _theirTurn.sort((a, b) => b.lastActivity - a.lastActivity);
+
+    setNewMatches(_newMatches);
+    setYourTurn(_yourTurn);
+    setTheirTurn(_theirTurn);
     
     setLoading(false);
     setRefreshing(false);
@@ -71,7 +153,9 @@ export default function MessagesScreen() {
   const isEmpty = newMatches.length === 0 && yourTurn.length === 0 && theirTurn.length === 0;
 
   const openChat = (m) => {
-    // Navigate to chat
+    // Chat implementation excluded from Phase 3 per instructions.
+    // We can just log or alert for now.
+    console.log(`Navigate to chat: ${m.id}`);
   };
 
   return (
@@ -80,7 +164,6 @@ export default function MessagesScreen() {
         <Text style={s.title}>Messages</Text>
         <TouchableOpacity style={s.bellBtn} activeOpacity={0.8} onPress={() => router.push('/(tabs)/notifications')}>
           <Ionicons name="notifications-outline" size={18} color={colors.ink} />
-          {/* Unread indicator mocked as hidden */}
         </TouchableOpacity>
       </View>
 

@@ -1,10 +1,15 @@
 import { useState, useEffect } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Image, Dimensions } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Image, Dimensions, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { supabase } from '../../lib/supabase';
 import { colors } from '../../lib/theme';
 import { getCurrentUserId } from '../../lib/auth';
+import { getBlockedIds } from '../../lib/blocks';
+import { mapDbPrefsToUI, mapUIPrefsToDb, toDb } from '../../lib/enums';
+import PreferencesSheet from '../../components/PreferencesSheet';
+import MatchCelebration from '../../components/MatchCelebration';
+import { useRouter } from 'expo-router';
 
 const { width: SCREEN_W } = Dimensions.get('window');
 
@@ -16,34 +21,134 @@ const FILTER_CHIPS = [
 
 export default function FeedScreen() {
   const insets = useSafeAreaInsets();
+  const router = useRouter();
+
   const [profiles, setProfiles] = useState([]);
   const [currentIndex, setCurrentIndex] = useState(0);
+  
+  const [prefsVisible, setPrefsVisible] = useState(false);
+  const [userPrefs, setUserPrefs] = useState(null);
+
+  // Match celebration state
+  const [matchData, setMatchData] = useState(null); // { name, photo, matchId }
 
   useEffect(() => {
+    fetchMyPrefs();
     fetchFeed();
+
+    const uid = getCurrentUserId();
+    if (!uid) return;
+
+    // Listen for new matches in real-time
+    const matchSub = supabase
+      .channel('feed_matches')
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'matches' },
+        (payload) => {
+          const { user1_id, user2_id, id } = payload.new;
+          if (user1_id === uid || user2_id === uid) {
+            const otherId = user1_id === uid ? user2_id : user1_id;
+            // Fetch their details to show celebration
+            supabase.from('profiles').select('name, photos').eq('id', otherId).single().then(({ data }) => {
+              if (data) {
+                setMatchData({
+                  name: data.name,
+                  photo: data.photos?.[0] || null,
+                  matchId: id
+                });
+              }
+            });
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(matchSub);
+    };
   }, []);
 
-  const fetchFeed = async () => {
+  const fetchMyPrefs = async () => {
+    const uid = getCurrentUserId();
+    if (!uid) return;
+    const { data } = await supabase.from('profiles').select('*').eq('id', uid).single();
+    if (data) {
+      setUserPrefs(mapDbPrefsToUI(data));
+    }
+  };
+
+  const handleSavePrefs = async (newPrefs) => {
+    const uid = getCurrentUserId();
+    if (!uid) return;
+    setUserPrefs(newPrefs);
+    const updates = mapUIPrefsToDb(newPrefs);
+    await supabase.from('profiles').update(updates).eq('id', uid);
+    // Refresh feed based on new prefs
+    fetchFeed(newPrefs);
+  };
+
+  const fetchFeed = async (currentPrefs = userPrefs) => {
     const uid = getCurrentUserId();
     if (!uid) return;
     
-    // Simplistic feed query: everyone except current user
-    const { data } = await supabase
+    setCurrentIndex(0);
+    const blocked = await getBlockedIds(uid);
+
+    let query = supabase
       .from('profiles')
       .select('*')
       .neq('id', uid)
-      .limit(20);
-      
-    if (data) setProfiles(data);
-  };
+      .eq('paused', false)
+      .order('last_active_at', { ascending: false }); // simple ranking
 
-  const handlePass = () => setCurrentIndex(i => i + 1);
-  const handleLike = () => setCurrentIndex(i => i + 1); 
+    // Apply basic filters if preferences exist
+    if (currentPrefs?.role) {
+      const dbRole = toDb('pref_role', currentPrefs.role);
+      // If I'm seeking, show me owners. If I'm owner, show me seeking.
+      const targetRole = dbRole === 'seeking' ? 'owner' : 'seeking';
+      query = query.eq('user_type', targetRole);
+    }
+    
+    // Note: A full matching algorithm would filter on budget and areas here using postgres overlaps logic.
+    // For now we do a simple query.
+    
+    const { data } = await query.limit(30);
+    if (data) {
+      // Filter out blocked users locally
+      const filtered = data.filter(p => !blocked.has(p.id));
+      setProfiles(filtered);
+    }
+  };
 
   const currentProfile = profiles[currentIndex];
 
+  const handlePass = () => {
+    setCurrentIndex(i => i + 1);
+  };
+
+  const handleLike = async () => {
+    const uid = getCurrentUserId();
+    if (!uid || !currentProfile) return;
+
+    const targetId = currentProfile.id;
+    setCurrentIndex(i => i + 1);
+
+    // Insert like. The backend trigger will automatically create a match if mutual.
+    const { error } = await supabase.from('likes').insert({
+      from_user_id: uid,
+      to_user_id: targetId
+    });
+
+    if (error && error.code !== '23505') { // Ignore unique constraint if already liked
+      console.error('Like failed', error);
+      Alert.alert('Error', 'Failed to send like');
+    }
+  };
+
   return (
     <View style={[s.screen, { paddingTop: insets.top + 12 }]}>
+      
       {/* Top bar */}
       <View style={s.topBar}>
         <View style={s.logoRow}>
@@ -58,7 +163,7 @@ export default function FeedScreen() {
             <Ionicons name="heart" size={12} color="#22C55E" />
             <Text style={s.likesPillText}>∞ likes left</Text>
           </View>
-          <TouchableOpacity style={s.filterIconBtn} activeOpacity={0.8}>
+          <TouchableOpacity style={s.filterIconBtn} activeOpacity={0.8} onPress={() => setPrefsVisible(true)}>
             <Ionicons name="options-outline" size={18} color={colors.ink} />
           </TouchableOpacity>
         </View>
@@ -67,7 +172,7 @@ export default function FeedScreen() {
       {/* Filter chips */}
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.filterScroll} contentContainerStyle={s.filterRow}>
         {FILTER_CHIPS.map(chip => (
-          <TouchableOpacity key={chip.key} style={s.filterChip} activeOpacity={0.8}>
+          <TouchableOpacity key={chip.key} style={s.filterChip} activeOpacity={0.8} onPress={() => setPrefsVisible(true)}>
             <Text style={s.filterChipText}>{chip.label}</Text>
             <Ionicons name="chevron-down" size={12} color={colors.ink} style={{ marginLeft: 2 }} />
           </TouchableOpacity>
@@ -79,7 +184,7 @@ export default function FeedScreen() {
         {!currentProfile ? (
           <View style={s.empty}>
             <Text style={s.emptyText}>No more profiles found.</Text>
-            <TouchableOpacity style={[s.refreshBtn, { marginTop: 16 }]} onPress={fetchFeed}>
+            <TouchableOpacity style={[s.refreshBtn, { marginTop: 16 }]} onPress={() => fetchFeed()}>
               <Text style={s.refreshBtnText}>Refresh Feed</Text>
             </TouchableOpacity>
           </View>
@@ -90,11 +195,13 @@ export default function FeedScreen() {
               <View>
                 <View style={s.nameRow}>
                   <Text style={s.name}>{currentProfile.name}</Text>
-                  <View style={s.verifiedBadge}>
-                    <Ionicons name="checkmark" size={12} color="#fff" />
-                  </View>
+                  {currentProfile.verified && (
+                    <View style={s.verifiedBadge}>
+                      <Ionicons name="checkmark" size={12} color="#fff" />
+                    </View>
+                  )}
                   <View style={[s.overlapPill, { backgroundColor: colors.violet, marginLeft: 6 }]}>
-                    <Text style={s.overlapText}>Seeking</Text>
+                    <Text style={s.overlapText}>{currentProfile.user_type === 'owner' ? 'Has a flat' : 'Seeking'}</Text>
                   </View>
                 </View>
                 <View style={s.statusRow}>
@@ -107,7 +214,7 @@ export default function FeedScreen() {
                 <TouchableOpacity style={s.navBtn} onPress={handlePass}>
                   <Ionicons name="close" size={18} color={colors.ink} />
                 </TouchableOpacity>
-                <TouchableOpacity style={s.navBtn} onPress={handlePass}>
+                <TouchableOpacity style={s.navBtn} onPress={() => {}}>
                   <Ionicons name="ellipsis-horizontal" size={18} color={colors.ink} />
                 </TouchableOpacity>
               </View>
@@ -133,7 +240,7 @@ export default function FeedScreen() {
                 <View style={s.infoRow}>
                   <View style={s.infoItem}>
                     <Ionicons name="calendar-outline" size={16} color="#9AA0B2" />
-                    <Text style={s.infoItemText}>24</Text>
+                    <Text style={s.infoItemText}>{currentProfile.age || 24}</Text>
                   </View>
                   <View style={s.infoDivider} />
                   <View style={[s.infoItem, { paddingLeft: 12 }]}>
@@ -145,52 +252,61 @@ export default function FeedScreen() {
                 <View style={s.infoRow}>
                   <View style={s.infoItem}>
                     <Ionicons name="location-outline" size={16} color="#9AA0B2" />
-                    <Text style={s.infoItemText}>London</Text>
+                    <Text style={s.infoItemText}>{currentProfile.location || 'London'}</Text>
                   </View>
                   <View style={s.infoDivider} />
                   <View style={[s.infoItem, { paddingLeft: 12 }]}>
                     <Ionicons name="cash-outline" size={16} color="#9AA0B2" />
-                    <Text style={s.infoItemText}>£{currentProfile.budget || '1200'}/mo</Text>
+                    <Text style={s.infoItemText}>£{currentProfile.budget_max || currentProfile.budget || '1200'}/mo</Text>
                   </View>
                 </View>
               </View>
 
-              {/* Prompt White */}
-              <View style={s.promptWhite}>
-                <Text style={s.promptQ}>A random fact I love is</Text>
-                <Text style={s.promptA}>The first oranges weren't orange</Text>
-                <TouchableOpacity style={s.promptHeartGray} activeOpacity={0.9} onPress={handleLike}>
-                  <Ionicons name="heart" size={20} color="#C0C5D0" />
-                </TouchableOpacity>
-              </View>
+              {/* Prompts and Flat photos... */}
+              {Array.isArray(currentProfile.prompts) && currentProfile.prompts.map((p, i) => (
+                <View key={i} style={i % 2 === 0 ? s.promptWhite : [s.promptAccent, { backgroundColor: '#F3EEFF' }]}>
+                  <Text style={i % 2 === 0 ? s.promptQ : s.promptAccentQ}>{p.q}</Text>
+                  <Text style={s.promptA}>{p.a}</Text>
+                  <TouchableOpacity style={i % 2 === 0 ? s.promptHeartGray : s.promptHeartViolet} activeOpacity={0.9} onPress={handleLike}>
+                    <Ionicons name="heart" size={20} color={i % 2 === 0 ? "#C0C5D0" : colors.violet} />
+                  </TouchableOpacity>
+                </View>
+              ))}
 
-              {/* Flat Photo (Mocked if empty) */}
-              <View style={s.flatPhotoWrap}>
-                 {currentProfile.photos?.[1] ? (
+              {/* Flat Photo Fallback (if they have > 1 photo) */}
+              {currentProfile.photos?.[1] && (
+                <View style={s.flatPhotoWrap}>
                   <Image source={{ uri: currentProfile.photos[1] }} style={s.flatPhoto} resizeMode="cover" />
-                ) : (
-                  <View style={[s.flatPhoto, s.photoPlaceholder]}>
-                    <Text style={{color: '#9AA0B2'}}>No Flat Photo</Text>
+                  <View style={s.flatLabel}>
+                    <Text style={s.flatLabelText}>Living Room</Text>
                   </View>
-                )}
-                <View style={s.flatLabel}>
-                  <Text style={s.flatLabelText}>Living Room</Text>
                 </View>
-              </View>
-
-              {/* Prompt Accent */}
-              <View style={[s.promptAccent, { backgroundColor: '#F3EEFF' }]}>
-                <Text style={s.promptAccentQ}>I'm looking for a flatmate who</Text>
-                <Text style={s.promptA}>Doesn't mind my 3 pet rocks</Text>
-                <TouchableOpacity style={s.promptHeartViolet} activeOpacity={0.9} onPress={handleLike}>
-                  <Ionicons name="heart" size={20} color={colors.violet} />
-                </TouchableOpacity>
-              </View>
+              )}
 
             </ScrollView>
           </View>
         )}
       </View>
+
+      <PreferencesSheet
+        visible={prefsVisible}
+        prefs={userPrefs}
+        onClose={() => setPrefsVisible(false)}
+        onSave={handleSavePrefs}
+      />
+
+      {matchData && (
+        <MatchCelebration
+          visible={!!matchData}
+          matchedName={matchData.name}
+          matchedPhoto={matchData.photo}
+          onDismiss={() => setMatchData(null)}
+          onChat={() => {
+            setMatchData(null);
+            router.push('/(tabs)/messages');
+          }}
+        />
+      )}
     </View>
   );
 }
@@ -232,7 +348,7 @@ const s = StyleSheet.create({
   refreshBtn: { backgroundColor: colors.ink, borderRadius: 50, paddingHorizontal: 26, paddingVertical: 12 },
   refreshBtnText: { fontFamily: 'HankenGrotesk_600SemiBold', fontSize: 14, color: '#fff' },
 
-  // Card Styles matching blueprint
+  // Card Styles
   cardOuter: { backgroundColor: '#F2F3F7' },
   cardHeader: {
     flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between',

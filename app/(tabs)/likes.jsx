@@ -1,38 +1,44 @@
 import { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Image, Dimensions, RefreshControl } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Image, Dimensions, RefreshControl, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { supabase } from '../../lib/supabase';
 import { colors } from '../../lib/theme';
 import { getCurrentUserId } from '../../lib/auth';
+import ProfileViewSheet from '../../components/ProfileViewSheet';
+import MatchCelebration from '../../components/MatchCelebration';
+import { useRouter } from 'expo-router';
 
 const { width } = Dimensions.get('window');
 const CARD_W = (width - 32 - 12) / 2;
 
 export default function LikesScreen() {
   const insets = useSafeAreaInsets();
+  const router = useRouter();
+  
   const [likes, setLikes] = useState([]);
   const [refreshing, setRefreshing] = useState(false);
+  const [selectedLike, setSelectedLike] = useState(null);
+  const [matchData, setMatchData] = useState(null);
 
   const fetchLikes = async () => {
     const uid = getCurrentUserId();
     if (!uid) return;
     setRefreshing(true);
     
-    // Simplistic query for who liked the current user
+    // Fetch who liked the current user along with their full profile
     const { data } = await supabase
       .from('likes')
-      .select('id, created_at, from_user_id, profiles!from_user_id(name, photos)')
+      .select('id, created_at, from_user_id, profiles!from_user_id(*)')
       .eq('to_user_id', uid)
       .order('created_at', { ascending: false });
       
     if (data) {
       setLikes(data.map(l => ({
-        id: l.id,
+        likeId: l.id,
         userId: l.from_user_id,
-        name: l.profiles?.name || 'Someone',
-        photo: Array.isArray(l.profiles?.photos) ? l.profiles.photos[0] : null
-      })));
+        profile: l.profiles // The full profile row
+      })).filter(l => l.profile)); // ensure profile exists
     }
     setRefreshing(false);
   };
@@ -40,6 +46,43 @@ export default function LikesScreen() {
   useEffect(() => {
     fetchLikes();
   }, []);
+
+  const handlePass = async () => {
+    if (!selectedLike) return;
+    const { likeId } = selectedLike;
+    setSelectedLike(null);
+    setLikes(prev => prev.filter(l => l.likeId !== likeId));
+
+    // Delete the like from DB
+    await supabase.from('likes').delete().eq('id', likeId);
+  };
+
+  const handleLikeBack = async () => {
+    const uid = getCurrentUserId();
+    if (!uid || !selectedLike) return;
+
+    const targetId = selectedLike.userId;
+    const profile = selectedLike.profile;
+    
+    setSelectedLike(null);
+    setLikes(prev => prev.filter(l => l.userId !== targetId));
+
+    // Insert like back
+    const { error } = await supabase.from('likes').insert({
+      from_user_id: uid,
+      to_user_id: targetId
+    });
+
+    if (error && error.code !== '23505') {
+      Alert.alert('Error', 'Failed to match');
+    } else {
+      // Due to trg_mutual_like, this created a match! Show celebration.
+      setMatchData({
+        name: profile.name,
+        photo: profile.photos?.[0]
+      });
+    }
+  };
 
   return (
     <View style={[s.screen, { paddingTop: insets.top + 12 }]}>
@@ -66,11 +109,11 @@ export default function LikesScreen() {
             contentContainerStyle={s.grid}
             refreshControl={<RefreshControl refreshing={refreshing} onRefresh={fetchLikes} tintColor={colors.blue} />}
           >
-            {likes.map((like) => (
-              <TouchableOpacity key={like.id} style={s.likeCard} activeOpacity={0.85}>
+            {likes.map((l) => (
+              <TouchableOpacity key={l.likeId} style={s.likeCard} activeOpacity={0.85} onPress={() => setSelectedLike(l)}>
                 <View style={s.likePhotoWrap}>
-                  {like.photo ? (
-                    <Image source={{ uri: like.photo }} style={s.likePhoto} resizeMode="cover" />
+                  {l.profile?.photos?.[0] ? (
+                    <Image source={{ uri: l.profile.photos[0] }} style={s.likePhoto} resizeMode="cover" />
                   ) : (
                     <View style={[s.likePhoto, s.likePhotoPlaceholder]}>
                       <Ionicons name="person" size={32} color={colors.mist} />
@@ -78,13 +121,34 @@ export default function LikesScreen() {
                   )}
                 </View>
                 <View style={s.likeInfo}>
-                  <Text style={s.likeName}>{like.name}</Text>
+                  <Text style={s.likeName}>{l.profile?.name}</Text>
                   <Text style={s.likeTime}>Liked you</Text>
                 </View>
               </TouchableOpacity>
             ))}
           </ScrollView>
         </View>
+      )}
+
+      <ProfileViewSheet
+        visible={!!selectedLike}
+        profile={selectedLike?.profile}
+        onClose={() => setSelectedLike(null)}
+        onPass={handlePass}
+        onLike={handleLikeBack}
+      />
+
+      {matchData && (
+        <MatchCelebration
+          visible={!!matchData}
+          matchedName={matchData.name}
+          matchedPhoto={matchData.photo}
+          onDismiss={() => setMatchData(null)}
+          onChat={() => {
+            setMatchData(null);
+            router.push('/(tabs)/messages');
+          }}
+        />
       )}
     </View>
   );

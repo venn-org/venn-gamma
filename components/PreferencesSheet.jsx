@@ -1,76 +1,116 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, Modal, Pressable, StyleSheet, Dimensions, Animated, KeyboardAvoidingView, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { colors } from '../../lib/theme';
+import { colors } from '../lib/theme';
+import { ENUMS } from '../lib/enums';
 
 const { height: SCREEN_H } = Dimensions.get('window');
 
-const PREF_SECTIONS = [
-  {
-    title: 'BASIC',
-    rows: [
-      { key: 'role', label: 'I am...', placeholder: 'Select your role', multi: false },
-      { key: 'budget', label: 'Budget', placeholder: 'Select budget', multi: false },
-    ]
-  },
-  {
-    title: 'PREFERENCES',
-    rows: [
-      { key: 'areas', label: 'Areas', placeholder: 'Select areas', multi: true },
-    ]
-  }
-];
+const AREAS = ['Koramangala', 'Indiranagar', 'HSR Layout', 'Whitefield', 'BTM Layout', 'Jayanagar', 'JP Nagar', 'Electronic City'];
 
-export default function PreferencesSheet({ visible, onClose }) {
+export default function PreferencesSheet({ visible, prefs, onClose, onSave }) {
   const insets = useSafeAreaInsets();
-  const [openKey, setOpenKey] = useState(null);
+  
+  // Local state for editing before saving
+  const [budget, setBudget] = useState(prefs?.budget || null);
+  const [areas, setAreas] = useState(prefs?.areas || []);
+  const [role, setRole] = useState(prefs?.role || null);
+
+  // Sync when visible changes (resetting state if they close without saving)
+  useEffect(() => {
+    if (visible && prefs) {
+      setBudget(prefs.budget);
+      setAreas(prefs.areas || []);
+      setRole(prefs.role);
+    }
+  }, [visible, prefs]);
+
+  const toggleArea = (a) => {
+    if (areas.includes(a)) {
+      setAreas(areas.filter(x => x !== a));
+    } else {
+      setAreas([...areas, a]);
+    }
+  };
+
+  const handleSave = () => {
+    onSave({ budget, areas, role });
+    onClose();
+  };
+
+  const budgets = Object.values(ENUMS.pref_budget.dbToUI);
+  const roles = Object.values(ENUMS.pref_role.dbToUI);
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <KeyboardAvoidingView style={{ flex: 1, justifyContent: 'flex-end' }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
         <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.45)' }]} />
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
-        <View style={[ps.sheet, { height: SCREEN_H * 0.72, paddingBottom: insets.bottom }]}>
-          <View style={ps.handle} />
+        
+        <View style={[pref.sheet, { paddingBottom: insets.bottom + 16 }]}>
+          <View style={pref.handle} />
           
-          <View style={ps.header}>
-            <Text style={ps.title}>Preferences</Text>
-            <TouchableOpacity style={ps.closeBtn} onPress={onClose} activeOpacity={0.7}>
+          <View style={pref.header}>
+            <Text style={pref.title}>Preferences</Text>
+            <TouchableOpacity onPress={onClose} style={pref.closeBtn} activeOpacity={0.7}>
               <Ionicons name="close" size={14} color="#14161B" />
             </TouchableOpacity>
           </View>
-          <Text style={ps.subtitle}>Set what you need — we'll show you the right matches.</Text>
-          <View style={ps.headerDivider} />
 
-          <ScrollView showsVerticalScrollIndicator={false} style={{ flex: 1 }}>
-            {PREF_SECTIONS.map(section => (
-              <View key={section.title} style={{ paddingHorizontal: 20 }}>
-                <View style={ps.sectionHeader}>
-                  <Text style={ps.sectionTitle}>{section.title}</Text>
-                  <View style={ps.sectionLine} />
-                </View>
-                {section.rows.map((row) => (
-                  <TouchableOpacity
-                    key={row.key}
-                    style={ps.prefRow}
-                    onPress={() => setOpenKey(openKey === row.key ? null : row.key)}
-                    activeOpacity={0.7}
-                  >
-                    <View style={{ flex: 1 }}>
-                      <Text style={ps.prefTitle}>{row.label}</Text>
-                      <Text style={ps.prefVal}>{row.placeholder}</Text>
-                    </View>
-                    <Ionicons name={openKey === row.key ? 'chevron-up' : 'chevron-down'} size={16} color="#9AA0B2" />
-                  </TouchableOpacity>
-                ))}
+          <ScrollView style={{ maxHeight: SCREEN_H * 0.7 }} showsVerticalScrollIndicator={false}>
+            
+            {/* ROLE */}
+            <View style={{ paddingHorizontal: 20, marginTop: 10 }}>
+              <Text style={pref.label}>I AM...</Text>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 18 }}>
+                {roles.map(r => {
+                  const on = role === r;
+                  return (
+                    <TouchableOpacity key={r} style={[pref.chip, on && pref.chipOn]} onPress={() => setRole(r)} activeOpacity={0.8}>
+                      <Text style={[pref.chipText, on && pref.chipTextOn]}>{r}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
               </View>
-            ))}
+            </View>
+
+            {/* BUDGET */}
+            <View style={{ paddingHorizontal: 20 }}>
+              <Text style={pref.label}>MONTHLY BUDGET</Text>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 18 }}>
+                {budgets.map(b => {
+                  const on = budget === b;
+                  return (
+                    <TouchableOpacity key={b} style={[pref.chip, on && pref.chipOn]} onPress={() => setBudget(b)} activeOpacity={0.8}>
+                      <Text style={[pref.chipText, on && pref.chipTextOn]}>{b}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </View>
+
+            {/* AREAS */}
+            <View style={{ paddingHorizontal: 20 }}>
+              <Text style={pref.label}>PREFERRED AREAS</Text>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 20 }}>
+                {AREAS.map(a => {
+                  const on = areas.includes(a);
+                  return (
+                    <TouchableOpacity key={a} style={[pref.chip, on && pref.chipOn]} onPress={() => toggleArea(a)} activeOpacity={0.8}>
+                      <Text style={[pref.chipText, on && pref.chipTextOn]}>{a}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </View>
+
           </ScrollView>
 
-          <View style={ps.saveFooter}>
-            <TouchableOpacity style={[ps.saveBtn, { backgroundColor: colors.blue }]} onPress={onClose}>
-              <Text style={ps.saveBtnText}>Save Preferences</Text>
+          {/* SAVE BUTTON */}
+          <View style={pref.saveFooter}>
+            <TouchableOpacity style={pref.saveBtn} onPress={handleSave}>
+              <Text style={pref.saveBtnText}>Save Preferences</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -79,21 +119,20 @@ export default function PreferencesSheet({ visible, onClose }) {
   );
 }
 
-const ps = StyleSheet.create({
-  sheet: { position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: '#fff', borderTopLeftRadius: 24, borderTopRightRadius: 24, flexDirection: 'column' },
-  handle: { width: 40, height: 4, backgroundColor: '#E6E8EE', borderRadius: 2, alignSelf: 'center', marginTop: 16, marginBottom: 16 },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, marginBottom: 4 },
-  title: { fontFamily: 'SpaceGrotesk_700Bold', fontSize: 18, fontWeight: '700', color: '#14161B' },
+const pref = StyleSheet.create({
+  sheet: { backgroundColor: '#fff', borderTopLeftRadius: 24, borderTopRightRadius: 24 },
+  handle: { width: 40, height: 4, backgroundColor: '#E6E8EE', borderRadius: 2, alignSelf: 'center', marginTop: 16, marginBottom: 20 },
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, marginBottom: 16 },
+  title: { fontFamily: 'SpaceGrotesk_700Bold', fontSize: 18, color: '#14161B' },
   closeBtn: { width: 32, height: 32, borderRadius: 16, backgroundColor: '#F2F3F7', alignItems: 'center', justifyContent: 'center' },
-  subtitle: { fontFamily: 'HankenGrotesk_400Regular', fontSize: 13, color: '#9AA0B2', paddingHorizontal: 20, marginBottom: 16 },
-  headerDivider: { height: 1, backgroundColor: '#F0F1F5', marginHorizontal: 0 },
-  sectionHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingTop: 18, paddingBottom: 8 },
-  sectionTitle: { fontFamily: 'SpaceMono_400Regular', fontSize: 10, color: '#9AA0B2', letterSpacing: 1.2, textTransform: 'uppercase' },
-  sectionLine: { flex: 1, height: 1, backgroundColor: '#F0F1F5' },
-  prefRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 14, gap: 12, borderBottomWidth: 1, borderBottomColor: '#F0F1F5' },
-  prefTitle: { fontFamily: 'HankenGrotesk_600SemiBold', fontSize: 15, fontWeight: '600', color: '#14161B', marginBottom: 2 },
-  prefVal: { fontFamily: 'HankenGrotesk_400Regular', fontSize: 13, color: '#9AA0B2' },
-  saveFooter: { paddingHorizontal: 20, paddingTop: 12, paddingBottom: 8, borderTopWidth: 1, borderTopColor: '#F0F1F5', backgroundColor: '#fff' },
-  saveBtn: { borderRadius: 50, overflow: 'hidden', paddingVertical: 16, alignItems: 'center' },
-  saveBtnText: { fontFamily: 'HankenGrotesk_700Bold', fontSize: 16, fontWeight: '700', color: '#fff' },
+  label: { fontFamily: 'SpaceMono_400Regular', fontSize: 10, letterSpacing: 1.5, color: '#9AA0B2', marginBottom: 12 },
+  
+  chip: { paddingHorizontal: 16, paddingVertical: 10, borderRadius: 50, borderWidth: 1, borderColor: '#E6E8EE', backgroundColor: '#fff' },
+  chipOn: { backgroundColor: colors.blue, borderColor: colors.blue },
+  chipText: { fontFamily: 'HankenGrotesk_600SemiBold', fontSize: 14, color: '#14161B' },
+  chipTextOn: { color: '#fff' },
+
+  saveFooter: { paddingHorizontal: 20, paddingTop: 16, borderTopWidth: 1, borderTopColor: '#F0F1F5' },
+  saveBtn: { backgroundColor: colors.ink, borderRadius: 50, paddingVertical: 16, alignItems: 'center' },
+  saveBtnText: { fontFamily: 'HankenGrotesk_700Bold', fontSize: 16, color: '#fff' },
 });

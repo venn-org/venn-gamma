@@ -1,44 +1,111 @@
-import { View, Text, TouchableOpacity, ScrollView, Modal, Pressable, StyleSheet, Image } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, Modal, Pressable, StyleSheet, Image, Dimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { colors } from '../lib/theme';
 
-export default function ProfileViewSheet({ visible, profile, onClose }) {
+const { height: SCREEN_H } = Dimensions.get('window');
+
+export default function ProfileViewSheet({ visible, profile, onClose, onPass, onLike }) {
   const insets = useSafeAreaInsets();
   if (!profile) return null;
-
-  const photo = Array.isArray(profile.photos) && profile.photos.length > 0 ? profile.photos[0] : null;
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' }}>
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
         
-        <View style={[s.sheet, { paddingTop: 20, paddingBottom: insets.bottom + 20 }]}>
+        <View style={[s.sheet, { paddingTop: 20, paddingBottom: insets.bottom + 12 }]}>
           <View style={s.handle} />
           
-          <ScrollView showsVerticalScrollIndicator={false} style={{ flexShrink: 1 }}>
-            {photo ? (
-              <Image source={{ uri: photo }} style={s.heroPhoto} resizeMode="cover" />
-            ) : (
-              <View style={[s.heroPhoto, { backgroundColor: '#1A1C24', alignItems: 'center', justifyContent: 'center' }]}>
-                <Ionicons name="person" size={60} color="#333" />
+          <ScrollView showsVerticalScrollIndicator={false} style={{ flexShrink: 1 }} contentContainerStyle={{ paddingBottom: 20 }}>
+            {/* Header matches feed card */}
+            <View style={s.cardHeader}>
+              <View>
+                <View style={s.nameRow}>
+                  <Text style={s.name}>{profile.name}</Text>
+                  <View style={s.verifiedBadge}>
+                    <Ionicons name="checkmark" size={12} color="#fff" />
+                  </View>
+                  <View style={[s.overlapPill, { backgroundColor: colors.violet, marginLeft: 6 }]}>
+                    <Text style={s.overlapText}>{profile.user_type === 'owner' ? 'Has a flat' : 'Seeking'}</Text>
+                  </View>
+                </View>
+                <View style={s.statusRow}>
+                  <Text style={s.pronouns}>{profile.pronouns?.[0] || 'they/them'}</Text>
+                  <Text style={s.dot}> • </Text>
+                  <Text style={s.active}>Active now</Text>
+                </View>
+              </View>
+            </View>
+
+            {/* Main Photo */}
+            <View style={s.photoWrap}>
+              {profile.photos?.[0] ? (
+                <Image source={{ uri: profile.photos[0] }} style={s.photo} resizeMode="cover" />
+              ) : (
+                <View style={[s.photo, s.photoPlaceholder]}>
+                  <Text style={{color: '#9AA0B2'}}>No Photo</Text>
+                </View>
+              )}
+            </View>
+
+            {/* Info Card */}
+            <View style={s.infoCard}>
+              <View style={s.infoRow}>
+                <View style={s.infoItem}>
+                  <Ionicons name="calendar-outline" size={16} color="#9AA0B2" />
+                  <Text style={s.infoItemText}>{profile.age || 24}</Text>
+                </View>
+                <View style={s.infoDivider} />
+                <View style={[s.infoItem, { paddingLeft: 12 }]}>
+                  <Ionicons name="person-outline" size={16} color="#9AA0B2" />
+                  <Text style={s.infoItemText}>{profile.gender || 'Non-binary'}</Text>
+                </View>
+              </View>
+              <View style={s.infoHorizDivider} />
+              <View style={s.infoRow}>
+                <View style={s.infoItem}>
+                  <Ionicons name="location-outline" size={16} color="#9AA0B2" />
+                  <Text style={s.infoItemText}>{profile.location || 'London'}</Text>
+                </View>
+                <View style={s.infoDivider} />
+                <View style={[s.infoItem, { paddingLeft: 12 }]}>
+                  <Ionicons name="cash-outline" size={16} color="#9AA0B2" />
+                  <Text style={s.infoItemText}>£{profile.budget || '1200'}/mo</Text>
+                </View>
+              </View>
+            </View>
+
+            {/* Flat Photo */}
+            {profile.photos?.[1] && (
+              <View style={s.flatPhotoWrap}>
+                <Image source={{ uri: profile.photos[1] }} style={s.flatPhoto} resizeMode="cover" />
+                <View style={s.flatLabel}>
+                  <Text style={s.flatLabelText}>Living Room</Text>
+                </View>
               </View>
             )}
 
-            <View style={s.infoSection}>
-              <Text style={s.name}>{profile.name || 'User'}</Text>
-              <Text style={s.role}>{profile.user_type === 'owner' ? 'Has a flat' : 'Looking for a flat'}</Text>
-            </View>
+            {/* Prompts */}
+            {Array.isArray(profile.prompts) && profile.prompts.map((p, i) => (
+              <View key={i} style={i % 2 === 0 ? s.promptWhite : [s.promptAccent, { backgroundColor: '#F3EEFF' }]}>
+                <Text style={i % 2 === 0 ? s.promptQ : s.promptAccentQ}>{p.q}</Text>
+                <Text style={s.promptA}>{p.a}</Text>
+              </View>
+            ))}
+
           </ScrollView>
 
+          {/* Action Footer */}
           <View style={s.actions}>
-            <TouchableOpacity style={[s.btn, s.btnPass]} onPress={onClose}>
-              <Ionicons name="close" size={24} color="#FF4D6A" />
+            <TouchableOpacity style={s.navBtn} onPress={() => { onClose(); onPass?.(); }}>
+              <Ionicons name="close" size={24} color={colors.ink} />
             </TouchableOpacity>
-            <TouchableOpacity style={[s.btn, s.btnLike]} onPress={onClose}>
+            <TouchableOpacity style={s.navBtnHeart} onPress={() => { onClose(); onLike?.(); }}>
               <Ionicons name="heart" size={24} color="#fff" />
             </TouchableOpacity>
           </View>
+
         </View>
       </View>
     </Modal>
@@ -46,14 +113,55 @@ export default function ProfileViewSheet({ visible, profile, onClose }) {
 }
 
 const s = StyleSheet.create({
-  sheet: { backgroundColor: '#0A0A0A', borderTopLeftRadius: 24, borderTopRightRadius: 24, maxHeight: '95%' },
-  handle: { width: 40, height: 4, backgroundColor: '#333', borderRadius: 2, alignSelf: 'center', marginBottom: 20 },
-  heroPhoto: { width: '100%', height: 400, borderRadius: 20, marginBottom: 16 },
-  infoSection: { paddingHorizontal: 16, marginBottom: 20 },
-  name: { fontFamily: 'SpaceGrotesk_700Bold', fontSize: 28, color: '#fff', marginBottom: 4 },
-  role: { fontFamily: 'HankenGrotesk_600SemiBold', fontSize: 16, color: '#9AA0B2' },
-  actions: { flexDirection: 'row', justifyContent: 'center', gap: 20, paddingTop: 16, paddingHorizontal: 20, borderTopWidth: 1, borderTopColor: '#222' },
-  btn: { width: 60, height: 60, borderRadius: 30, alignItems: 'center', justifyContent: 'center', elevation: 4 },
-  btnPass: { backgroundColor: '#222', borderWidth: 1, borderColor: '#333' },
-  btnLike: { backgroundColor: '#335CFF' },
+  sheet: { backgroundColor: '#F2F3F7', borderTopLeftRadius: 24, borderTopRightRadius: 24, maxHeight: SCREEN_H * 0.9 },
+  handle: { width: 40, height: 4, backgroundColor: '#D1D5DB', borderRadius: 2, alignSelf: 'center', marginBottom: 20 },
+  
+  cardHeader: {
+    flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between',
+    paddingHorizontal: 20, paddingBottom: 12,
+  },
+  nameRow: { flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' },
+  name: { fontFamily: 'SpaceGrotesk_700Bold', fontSize: 26, color: colors.ink, letterSpacing: -0.4 },
+  verifiedBadge: { width: 18, height: 18, borderRadius: 9, backgroundColor: colors.violet, alignItems: 'center', justifyContent: 'center' },
+  overlapPill: { borderRadius: 50, paddingHorizontal: 8, paddingVertical: 3 },
+  overlapText: { fontFamily: 'SpaceGrotesk_700Bold', fontSize: 12, color: '#fff', letterSpacing: -0.2 },
+  statusRow: { flexDirection: 'row', alignItems: 'center', marginTop: 3 },
+  pronouns: { fontFamily: 'HankenGrotesk_400Regular', fontSize: 13, color: '#9AA0B2' },
+  dot: { fontSize: 13, color: '#9AA0B2' },
+  active: { fontFamily: 'HankenGrotesk_600SemiBold', fontSize: 13, color: colors.blue },
+
+  photoWrap: { position: 'relative', borderRadius: 20, overflow: 'hidden', marginBottom: 10, height: 400, marginHorizontal: 16 },
+  photo: { width: '100%', height: '100%' },
+  photoPlaceholder: { backgroundColor: '#E6E8EE', alignItems: 'center', justifyContent: 'center' },
+
+  infoCard: { backgroundColor: '#fff', borderRadius: 20, padding: 18, marginBottom: 10, marginHorizontal: 16 },
+  infoRow: { flexDirection: 'row', alignItems: 'center' },
+  infoItem: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8 },
+  infoItemText: { fontFamily: 'HankenGrotesk_600SemiBold', fontSize: 14, color: colors.ink },
+  infoDivider: { width: 1, height: 20, backgroundColor: '#F0F0F4' },
+  infoHorizDivider: { height: 1, backgroundColor: '#F0F0F4', marginVertical: 8 },
+
+  promptWhite: { position: 'relative', backgroundColor: '#fff', borderRadius: 20, padding: 24, paddingBottom: 30, marginBottom: 10, marginHorizontal: 16 },
+  promptQ: { fontFamily: 'HankenGrotesk_600SemiBold', fontSize: 14, color: colors.slate, marginBottom: 10 },
+  promptA: { fontFamily: 'SpaceGrotesk_700Bold', fontSize: 22, color: colors.ink, letterSpacing: -0.4, lineHeight: 30 },
+  
+  promptAccent: { position: 'relative', borderRadius: 20, padding: 24, paddingBottom: 30, marginBottom: 10, marginHorizontal: 16 },
+  promptAccentQ: { fontFamily: 'HankenGrotesk_600SemiBold', fontSize: 14, color: colors.violet, marginBottom: 10 },
+
+  flatPhotoWrap: { position: 'relative', borderRadius: 20, overflow: 'hidden', marginBottom: 10, height: 280, marginHorizontal: 16 },
+  flatPhoto: { width: '100%', height: '100%' },
+  flatLabel: { position: 'absolute', bottom: 14, left: 14, backgroundColor: 'rgba(0,0,0,0.42)', borderRadius: 50, paddingHorizontal: 12, paddingVertical: 6 },
+  flatLabelText: { fontFamily: 'HankenGrotesk_600SemiBold', fontSize: 12, color: '#fff' },
+
+  actions: { flexDirection: 'row', justifyContent: 'center', gap: 20, paddingTop: 16, paddingHorizontal: 20, borderTopWidth: 1, borderTopColor: '#E6E8EE' },
+  navBtn: {
+    width: 60, height: 60, borderRadius: 30, backgroundColor: '#fff',
+    alignItems: 'center', justifyContent: 'center',
+    shadowColor: '#000', shadowOpacity: 0.10, shadowRadius: 6, shadowOffset: { width: 0, height: 1 }, elevation: 2,
+  },
+  navBtnHeart: {
+    width: 60, height: 60, borderRadius: 30, backgroundColor: colors.violet,
+    alignItems: 'center', justifyContent: 'center',
+    shadowColor: '#000', shadowOpacity: 0.15, shadowRadius: 8, shadowOffset: { width: 0, height: 2 }, elevation: 4,
+  }
 });

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, Image, StyleSheet, Switch } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, Image, StyleSheet, Switch, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -7,9 +7,11 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { supabase } from '../../lib/supabase';
 import { colors } from '../../lib/theme';
 import { getCurrentUserId, signOutUser } from '../../lib/auth';
+import { mapDbPrefsToUI, mapUIPrefsToDb } from '../../lib/enums';
+import PreferencesSheet from '../../components/PreferencesSheet';
 
 const SettingsRow = ({ icon, iconBg, iconColor, title, subtitle, subtitleColor, last, right, onPress }) => (
-  <TouchableOpacity style={[s.settingsRow, !last && s.settingsRowBorder]} onPress={onPress} activeOpacity={0.7}>
+  <TouchableOpacity style={[s.settingsRow, !last && s.settingsRowBorder]} onPress={onPress} activeOpacity={0.7} disabled={!onPress && !right}>
     <View style={[s.settingsIcon, { backgroundColor: iconBg }]}>
       <Ionicons name={icon} size={18} color={iconColor} />
     </View>
@@ -17,15 +19,18 @@ const SettingsRow = ({ icon, iconBg, iconColor, title, subtitle, subtitleColor, 
       <Text style={s.settingsTitle}>{title}</Text>
       {subtitle ? <Text style={[s.settingsSub, subtitleColor && { color: subtitleColor }]}>{subtitle}</Text> : null}
     </View>
-    {right ?? <Ionicons name="chevron-forward" size={16} color="#C0C5D0" />}
+    {right ?? (onPress ? <Ionicons name="chevron-forward" size={16} color="#C0C5D0" /> : null)}
   </TouchableOpacity>
 );
 
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  
   const [profile, setProfile] = useState(null);
   const [incognito, setIncognito] = useState(false);
+  const [prefsVisible, setPrefsVisible] = useState(false);
+  const [userPrefs, setUserPrefs] = useState(null);
 
   useEffect(() => {
     fetchProfile();
@@ -35,11 +40,50 @@ export default function ProfileScreen() {
     const uid = getCurrentUserId();
     if (!uid) return;
     const { data } = await supabase.from('profiles').select('*').eq('id', uid).single();
-    if (data) setProfile(data);
+    if (data) {
+      setProfile(data);
+      setIncognito(!!data.paused);
+      setUserPrefs(mapDbPrefsToUI(data));
+    }
+  };
+
+  const toggleIncognito = async (val) => {
+    setIncognito(val);
+    const uid = getCurrentUserId();
+    if (!uid) return;
+    await supabase.from('profiles').update({ paused: val }).eq('id', uid);
+  };
+
+  const handleSavePrefs = async (newPrefs) => {
+    const uid = getCurrentUserId();
+    if (!uid) return;
+    setUserPrefs(newPrefs);
+    const updates = mapUIPrefsToDb(newPrefs);
+    await supabase.from('profiles').update(updates).eq('id', uid);
   };
 
   const handleSignOut = async () => {
-    await signOutUser();
+    Alert.alert('Sign Out', 'Are you sure you want to sign out?', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Sign Out', style: 'destructive', onPress: async () => {
+        await signOutUser();
+        // Router will auto-redirect because of auth listener in _layout
+      }}
+    ]);
+  };
+
+  const handleDeleteAccount = () => {
+    Alert.alert('Delete Account', 'This will permanently delete your profile, matches, and chats. This action cannot be undone.', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Delete', style: 'destructive', onPress: async () => {
+        const { error } = await supabase.rpc('delete_account');
+        if (error) {
+          Alert.alert('Error', 'Failed to delete account.');
+        } else {
+          await signOutUser();
+        }
+      }}
+    ]);
   };
 
   const name = profile?.name || 'User';
@@ -84,7 +128,7 @@ export default function ProfileScreen() {
             </View>
             <Text style={s.actionText}>Edit Profile</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={s.actionBtn} activeOpacity={0.85}>
+          <TouchableOpacity style={s.actionBtn} activeOpacity={0.85} onPress={() => setPrefsVisible(true)}>
             <View style={[s.actionIcon, { backgroundColor: '#EEF0FF' }]}>
               <Ionicons name="settings" size={18} color="#335CFF" />
             </View>
@@ -103,7 +147,7 @@ export default function ProfileScreen() {
             <SettingsRow
               icon="eye-off" iconBg="#F2F3F7" iconColor="#5A6072"
               title="Incognito Mode" subtitle="Hide profile from discovery"
-              right={<Switch value={incognito} onValueChange={setIncognito} trackColor={{ true: colors.blue, false: '#E6E8EE' }} />}
+              right={<Switch value={incognito} onValueChange={toggleIncognito} trackColor={{ true: colors.blue, false: '#E6E8EE' }} />}
               last
             />
           </View>
@@ -129,11 +173,19 @@ export default function ProfileScreen() {
             <SettingsRow
               icon="trash" iconBg="#FFF0F3" iconColor="#FF4D6A"
               title="Delete Account" subtitleColor="#FF4D6A"
+              onPress={handleDeleteAccount}
               last
             />
           </View>
         </View>
       </ScrollView>
+
+      <PreferencesSheet
+        visible={prefsVisible}
+        prefs={userPrefs}
+        onClose={() => setPrefsVisible(false)}
+        onSave={handleSavePrefs}
+      />
     </View>
   );
 }
