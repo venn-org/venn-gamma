@@ -31,7 +31,7 @@ export default function ProfileViewSheet({ visible, profile, onClose, onPass, on
                   </View>
                 </View>
                 <View style={s.statusRow}>
-                  <Text style={s.pronouns}>{profile.pronouns?.[0] || 'they/them'}</Text>
+                  <Text style={s.pronouns}>{profile.pronouns?.[0] || '-'}</Text>
                   <Text style={s.dot}> • </Text>
                   <Text style={s.active}>Active now</Text>
                 </View>
@@ -54,24 +54,24 @@ export default function ProfileViewSheet({ visible, profile, onClose, onPass, on
               <View style={s.infoRow}>
                 <View style={s.infoItem}>
                   <Ionicons name="calendar-outline" size={16} color="#9AA0B2" />
-                  <Text style={s.infoItemText}>{profile.age || 24}</Text>
+                  <Text style={s.infoItemText}>{profile.age || '-'}</Text>
                 </View>
                 <View style={s.infoDivider} />
                 <View style={[s.infoItem, { paddingLeft: 12 }]}>
                   <Ionicons name="person-outline" size={16} color="#9AA0B2" />
-                  <Text style={s.infoItemText}>{profile.gender || 'Non-binary'}</Text>
+                  <Text style={s.infoItemText}>{profile.gender || '-'}</Text>
                 </View>
               </View>
               <View style={s.infoHorizDivider} />
               <View style={s.infoRow}>
                 <View style={s.infoItem}>
                   <Ionicons name="location-outline" size={16} color="#9AA0B2" />
-                  <Text style={s.infoItemText}>{profile.location || 'London'}</Text>
+                  <Text style={s.infoItemText}>{profile.location || '-'}</Text>
                 </View>
                 <View style={s.infoDivider} />
                 <View style={[s.infoItem, { paddingLeft: 12 }]}>
                   <Ionicons name="cash-outline" size={16} color="#9AA0B2" />
-                  <Text style={s.infoItemText}>£{profile.budget || '1200'}/mo</Text>
+                  <Text style={s.infoItemText}>{(profile.budget_max || profile.budget) ? `£${profile.budget_max || profile.budget}/mo` : '-'}</Text>
                 </View>
               </View>
             </View>

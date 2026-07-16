@@ -1,15 +1,15 @@
-import { useState, useEffect } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Image, Dimensions, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
+import { useEffect, useRef, useState } from 'react';
+import { Alert, Animated, Dimensions, Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { supabase } from '../../lib/supabase';
-import { colors } from '../../lib/theme';
+import MatchCelebration from '../../components/MatchCelebration';
+import PreferencesSheet from '../../components/PreferencesSheet';
 import { getCurrentUserId } from '../../lib/auth';
 import { getBlockedIds } from '../../lib/blocks';
 import { mapDbPrefsToUI, mapUIPrefsToDb, toDb } from '../../lib/enums';
-import PreferencesSheet from '../../components/PreferencesSheet';
-import MatchCelebration from '../../components/MatchCelebration';
-import { useRouter } from 'expo-router';
+import { supabase } from '../../lib/supabase';
+import { colors } from '../../lib/theme';
 
 const { width: SCREEN_W } = Dimensions.get('window');
 
@@ -25,12 +25,15 @@ export default function FeedScreen() {
 
   const [profiles, setProfiles] = useState([]);
   const [currentIndex, setCurrentIndex] = useState(0);
-  
+
   const [prefsVisible, setPrefsVisible] = useState(false);
   const [userPrefs, setUserPrefs] = useState(null);
 
   // Match celebration state
-  const [matchData, setMatchData] = useState(null); // { name, photo, matchId }
+  const [matchData, setMatchData] = useState(null);
+
+  // Animation
+  const fadeIn = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     fetchMyPrefs();
@@ -49,7 +52,6 @@ export default function FeedScreen() {
           const { user1_id, user2_id, id } = payload.new;
           if (user1_id === uid || user2_id === uid) {
             const otherId = user1_id === uid ? user2_id : user1_id;
-            // Fetch their details to show celebration
             supabase.from('profiles').select('name, photos').eq('id', otherId).single().then(({ data }) => {
               if (data) {
                 setMatchData({
@@ -69,6 +71,15 @@ export default function FeedScreen() {
     };
   }, []);
 
+  useEffect(() => {
+    fadeIn.setValue(0);
+    Animated.timing(fadeIn, {
+      toValue: 1,
+      duration: 300,
+      useNativeDriver: true,
+    }).start();
+  }, [currentIndex, profiles]);
+
   const fetchMyPrefs = async () => {
     const uid = getCurrentUserId();
     if (!uid) return;
@@ -84,14 +95,13 @@ export default function FeedScreen() {
     setUserPrefs(newPrefs);
     const updates = mapUIPrefsToDb(newPrefs);
     await supabase.from('profiles').update(updates).eq('id', uid);
-    // Refresh feed based on new prefs
     fetchFeed(newPrefs);
   };
 
   const fetchFeed = async (currentPrefs = userPrefs) => {
     const uid = getCurrentUserId();
     if (!uid) return;
-    
+
     setCurrentIndex(0);
     const blocked = await getBlockedIds(uid);
 
@@ -100,22 +110,16 @@ export default function FeedScreen() {
       .select('*')
       .neq('id', uid)
       .eq('paused', false)
-      .order('last_active_at', { ascending: false }); // simple ranking
+      .order('last_active_at', { ascending: false });
 
-    // Apply basic filters if preferences exist
     if (currentPrefs?.role) {
       const dbRole = toDb('pref_role', currentPrefs.role);
-      // If I'm seeking, show me owners. If I'm owner, show me seeking.
       const targetRole = dbRole === 'seeking' ? 'owner' : 'seeking';
       query = query.eq('user_type', targetRole);
     }
-    
-    // Note: A full matching algorithm would filter on budget and areas here using postgres overlaps logic.
-    // For now we do a simple query.
-    
+
     const { data } = await query.limit(30);
     if (data) {
-      // Filter out blocked users locally
       const filtered = data.filter(p => !blocked.has(p.id));
       setProfiles(filtered);
     }
@@ -124,7 +128,13 @@ export default function FeedScreen() {
   const currentProfile = profiles[currentIndex];
 
   const handlePass = () => {
-    setCurrentIndex(i => i + 1);
+    Animated.timing(fadeIn, {
+      toValue: 0,
+      duration: 150,
+      useNativeDriver: true,
+    }).start(() => {
+      setCurrentIndex(i => i + 1);
+    });
   };
 
   const handleLike = async () => {
@@ -132,23 +142,28 @@ export default function FeedScreen() {
     if (!uid || !currentProfile) return;
 
     const targetId = currentProfile.id;
-    setCurrentIndex(i => i + 1);
 
-    // Insert like. The backend trigger will automatically create a match if mutual.
+    Animated.timing(fadeIn, {
+      toValue: 0,
+      duration: 150,
+      useNativeDriver: true,
+    }).start(() => {
+      setCurrentIndex(i => i + 1);
+    });
+
     const { error } = await supabase.from('likes').insert({
       from_user_id: uid,
       to_user_id: targetId
     });
 
-    if (error && error.code !== '23505') { // Ignore unique constraint if already liked
-      console.error('Like failed', error);
+    if (error && error.code !== '23505') {
       Alert.alert('Error', 'Failed to send like');
     }
   };
 
   return (
     <View style={[s.screen, { paddingTop: insets.top + 12 }]}>
-      
+
       {/* Top bar */}
       <View style={s.topBar}>
         <View style={s.logoRow}>
@@ -179,6 +194,20 @@ export default function FeedScreen() {
         ))}
       </ScrollView>
 
+      {/* Banner */}
+      <View style={s.banner}>
+        <TouchableOpacity style={s.bannerClose}>
+          <Ionicons name="close" size={16} color={colors.ink} />
+        </TouchableOpacity>
+        <Text style={s.bannerTitle}>Complete your profile</Text>
+        <Text style={s.bannerSub}>Add 2 more prompts to get seen by more people</Text>
+        <TouchableOpacity style={s.bannerBtn}>
+          <Text style={s.bannerBtnText}>Add prompts</Text>
+        </TouchableOpacity>
+      </View>
+
+      <View style={[s.separator]} />
+
       {/* Feed Content */}
       <View style={[s.feedContent, { flex: 1 }]}>
         {!currentProfile ? (
@@ -189,7 +218,7 @@ export default function FeedScreen() {
             </TouchableOpacity>
           </View>
         ) : (
-          <View style={[s.cardOuter, { flex: 1 }]}>
+          <Animated.View style={[s.cardOuter, { flex: 1, opacity: fadeIn }]}>
             {/* Card Header (Fixed) */}
             <View style={s.cardHeader}>
               <View>
@@ -205,7 +234,7 @@ export default function FeedScreen() {
                   </View>
                 </View>
                 <View style={s.statusRow}>
-                  <Text style={s.pronouns}>{currentProfile.pronouns?.[0] || 'they/them'}</Text>
+                  <Text style={s.pronouns}>{currentProfile.pronouns?.[0] || '-'}</Text>
                   <Text style={s.dot}> • </Text>
                   <Text style={s.active}>Active now</Text>
                 </View>
@@ -214,7 +243,7 @@ export default function FeedScreen() {
                 <TouchableOpacity style={s.navBtn} onPress={handlePass}>
                   <Ionicons name="close" size={18} color={colors.ink} />
                 </TouchableOpacity>
-                <TouchableOpacity style={s.navBtn} onPress={() => {}}>
+                <TouchableOpacity style={s.navBtn} onPress={() => { }}>
                   <Ionicons name="ellipsis-horizontal" size={18} color={colors.ink} />
                 </TouchableOpacity>
               </View>
@@ -227,7 +256,7 @@ export default function FeedScreen() {
                   <Image source={{ uri: currentProfile.photos[0] }} style={s.photo} resizeMode="cover" />
                 ) : (
                   <View style={[s.photo, s.photoPlaceholder]}>
-                    <Text style={{color: '#9AA0B2'}}>No Photo</Text>
+                    <Text style={{ color: '#9AA0B2' }}>No Photo</Text>
                   </View>
                 )}
                 <TouchableOpacity style={s.heartBtn} activeOpacity={0.9} onPress={handleLike}>
@@ -240,51 +269,68 @@ export default function FeedScreen() {
                 <View style={s.infoRow}>
                   <View style={s.infoItem}>
                     <Ionicons name="calendar-outline" size={16} color="#9AA0B2" />
-                    <Text style={s.infoItemText}>{currentProfile.age || 24}</Text>
+                    <Text style={s.infoItemText}>{currentProfile.age || '-'}</Text>
                   </View>
                   <View style={s.infoDivider} />
                   <View style={[s.infoItem, { paddingLeft: 12 }]}>
                     <Ionicons name="person-outline" size={16} color="#9AA0B2" />
-                    <Text style={s.infoItemText}>{currentProfile.gender || 'Non-binary'}</Text>
+                    <Text style={s.infoItemText}>{currentProfile.gender || '-'}</Text>
                   </View>
                 </View>
                 <View style={s.infoHorizDivider} />
                 <View style={s.infoRow}>
                   <View style={s.infoItem}>
                     <Ionicons name="location-outline" size={16} color="#9AA0B2" />
-                    <Text style={s.infoItemText}>{currentProfile.location || 'London'}</Text>
+                    <Text style={s.infoItemText}>{currentProfile.location || '-'}</Text>
                   </View>
                   <View style={s.infoDivider} />
                   <View style={[s.infoItem, { paddingLeft: 12 }]}>
                     <Ionicons name="cash-outline" size={16} color="#9AA0B2" />
-                    <Text style={s.infoItemText}>£{currentProfile.budget_max || currentProfile.budget || '1200'}/mo</Text>
+                    <Text style={s.infoItemText}>
+                      {(currentProfile.budget_max || currentProfile.budget) ? `₹${currentProfile.budget_max || currentProfile.budget}/mo` : '-'}
+                    </Text>
                   </View>
                 </View>
               </View>
 
-              {/* Prompts and Flat photos... */}
-              {Array.isArray(currentProfile.prompts) && currentProfile.prompts.map((p, i) => (
-                <View key={i} style={i % 2 === 0 ? s.promptWhite : [s.promptAccent, { backgroundColor: '#F3EEFF' }]}>
-                  <Text style={i % 2 === 0 ? s.promptQ : s.promptAccentQ}>{p.q}</Text>
-                  <Text style={s.promptA}>{p.a}</Text>
-                  <TouchableOpacity style={i % 2 === 0 ? s.promptHeartGray : s.promptHeartViolet} activeOpacity={0.9} onPress={handleLike}>
-                    <Ionicons name="heart" size={20} color={i % 2 === 0 ? "#C0C5D0" : colors.violet} />
-                  </TouchableOpacity>
-                </View>
-              ))}
+              {/* First Prompt (White) */}
+              <View style={s.promptWhite}>
+                <Text style={s.promptQ}>{currentProfile.prompts?.[0]?.q || '-'}</Text>
+                <Text style={s.promptA}>{currentProfile.prompts?.[0]?.a || '-'}</Text>
+                <TouchableOpacity style={s.promptHeartGray} activeOpacity={0.9} onPress={handleLike}>
+                  <Ionicons name="heart" size={20} color="#C0C5D0" />
+                </TouchableOpacity>
+              </View>
 
-              {/* Flat Photo Fallback (if they have > 1 photo) */}
-              {currentProfile.photos?.[1] && (
-                <View style={s.flatPhotoWrap}>
+              {/* Flat Photo */}
+              <View style={s.flatPhotoWrap}>
+                {currentProfile.photos?.[1] ? (
                   <Image source={{ uri: currentProfile.photos[1] }} style={s.flatPhoto} resizeMode="cover" />
-                  <View style={s.flatLabel}>
-                    <Text style={s.flatLabelText}>Living Room</Text>
+                ) : (
+                  <View style={[s.flatPhoto, s.photoPlaceholder]}>
+                    <Text style={{ color: '#9AA0B2' }}>No Flat Photo</Text>
                   </View>
+                )}
+                <View style={s.flatLabel}>
+                  <Text style={s.flatLabelText}>Living Room</Text>
                 </View>
-              )}
+              </View>
+
+              {/* Second Prompt (Accent) */}
+              <View style={[s.promptAccent, { backgroundColor: '#F3EEFF' }]}>
+                <Text style={s.promptAccentQ}>{currentProfile.prompts?.[1]?.q || '-'}</Text>
+                <Text style={s.promptA}>{currentProfile.prompts?.[1]?.a || '-'}</Text>
+                <TouchableOpacity style={s.promptHeartViolet} activeOpacity={0.9} onPress={handleLike}>
+                  <Ionicons name="heart" size={20} color={colors.violet} />
+                </TouchableOpacity>
+              </View>
 
             </ScrollView>
-          </View>
+
+            <TouchableOpacity style={s.skipBtn} onPress={handlePass}>
+              <Ionicons name="close" size={24} color={colors.ink} />
+            </TouchableOpacity>
+          </Animated.View>
         )}
       </View>
 
@@ -342,13 +388,38 @@ const s = StyleSheet.create({
     elevation: 1,
   },
   filterChipText: { fontFamily: 'HankenGrotesk_600SemiBold', fontSize: 13, color: colors.ink },
-  feedContent: { paddingHorizontal: 16, paddingTop: 12, paddingBottom: 80 },
+
+  separator: { height: 1, backgroundColor: 'rgba(0,0,0,0.07)', marginHorizontal: -20 },
+
+  banner: {
+    margin: 12, backgroundColor: '#FDF5F0', borderRadius: 16,
+    padding: 14, paddingRight: 30, position: 'relative',
+  },
+  bannerClose: { position: 'absolute', top: 10, right: 10, opacity: 0.4, padding: 4 },
+  bannerTitle: { fontFamily: 'HankenGrotesk_600SemiBold', fontSize: 13, color: colors.ink, marginBottom: 2 },
+  bannerSub: { fontFamily: 'HankenGrotesk_400Regular', fontSize: 12, color: '#9AA0B2', marginBottom: 10 },
+  bannerBtn: {
+    alignSelf: 'flex-start', backgroundColor: colors.ink,
+    borderRadius: 50, paddingHorizontal: 20, paddingVertical: 9,
+  },
+  bannerBtnText: { fontFamily: 'HankenGrotesk_600SemiBold', fontSize: 13, color: '#fff' },
+
+  feedContent: { paddingHorizontal: 16, paddingTop: 12, paddingBottom: 120 },
+
+  skipBtn: {
+    position: 'absolute', left: 22, bottom: 22, // Adjusted bottom for visibility in feed
+    width: 56, height: 56, borderRadius: 28, backgroundColor: '#fff',
+    alignItems: 'center', justifyContent: 'center',
+    shadowColor: '#000', shadowOpacity: 0.14, shadowRadius: 10, shadowOffset: { width: 0, height: 3 },
+    elevation: 5,
+  },
+
   empty: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   emptyText: { fontFamily: 'HankenGrotesk_400Regular', fontSize: 14, color: colors.slate },
   refreshBtn: { backgroundColor: colors.ink, borderRadius: 50, paddingHorizontal: 26, paddingVertical: 12 },
   refreshBtnText: { fontFamily: 'HankenGrotesk_600SemiBold', fontSize: 14, color: '#fff' },
 
-  // Card Styles
+  // Card Styles matching blueprint
   cardOuter: { backgroundColor: '#F2F3F7' },
   cardHeader: {
     flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between',
@@ -363,7 +434,7 @@ const s = StyleSheet.create({
   pronouns: { fontFamily: 'HankenGrotesk_400Regular', fontSize: 13, color: '#9AA0B2' },
   dot: { fontSize: 13, color: '#9AA0B2' },
   active: { fontFamily: 'HankenGrotesk_600SemiBold', fontSize: 13, color: colors.blue },
-  
+
   navBtns: { flexDirection: 'row', gap: 8 },
   navBtn: {
     width: 36, height: 36, borderRadius: 18, backgroundColor: '#fff',
@@ -375,7 +446,7 @@ const s = StyleSheet.create({
   photoWrap: { position: 'relative', borderRadius: 20, overflow: 'hidden', marginBottom: 10, height: 400 },
   photo: { width: '100%', height: '100%' },
   photoPlaceholder: { backgroundColor: '#E6E8EE', alignItems: 'center', justifyContent: 'center' },
-  
+
   heartBtn: {
     position: 'absolute', bottom: 14, right: 14,
     width: 44, height: 44, borderRadius: 22, backgroundColor: '#fff',
@@ -395,7 +466,7 @@ const s = StyleSheet.create({
   promptQ: { fontFamily: 'HankenGrotesk_600SemiBold', fontSize: 14, color: colors.slate, marginBottom: 10 },
   promptA: { fontFamily: 'SpaceGrotesk_700Bold', fontSize: 22, color: colors.ink, letterSpacing: -0.4, lineHeight: 30 },
   promptHeartGray: { position: 'absolute', bottom: 14, right: 14, width: 44, height: 44, borderRadius: 22, backgroundColor: '#F2F3F7', alignItems: 'center', justifyContent: 'center' },
-  
+
   promptAccent: { position: 'relative', borderRadius: 20, padding: 24, paddingBottom: 60, marginBottom: 10 },
   promptAccentQ: { fontFamily: 'HankenGrotesk_600SemiBold', fontSize: 14, color: colors.violet, marginBottom: 10 },
   promptHeartViolet: {

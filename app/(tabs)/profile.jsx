@@ -122,7 +122,7 @@ export default function ProfileScreen() {
 
         {/* Action Buttons */}
         <View style={{ flexDirection: 'row', gap: 12, paddingHorizontal: 20, marginBottom: 24 }}>
-          <TouchableOpacity style={s.actionBtn} activeOpacity={0.85}>
+          <TouchableOpacity style={s.actionBtn} activeOpacity={0.85} onPress={() => Alert.alert('Coming Soon', 'Profile editing will be available in a future update.')}>
             <View style={[s.actionIcon, { backgroundColor: '#F3EEFF' }]}>
               <Ionicons name="pencil" size={18} color="#8A5BFF" />
             </View>
@@ -143,6 +143,7 @@ export default function ProfileScreen() {
             <SettingsRow
               icon="person" iconBg="#F2F3F7" iconColor="#5A6072"
               title="Basic Info" subtitle="Name, birthday, gender"
+              onPress={() => Alert.alert('Coming Soon', 'Basic info editing will be available soon.')}
             />
             <SettingsRow
               icon="eye-off" iconBg="#F2F3F7" iconColor="#5A6072"
@@ -156,9 +157,9 @@ export default function ProfileScreen() {
         <View style={s.section}>
           <Text style={s.sectionLabel}>SUPPORT & LEGAL</Text>
           <View style={s.settingsGroup}>
-            <SettingsRow icon="help-buoy" iconBg="#EEFCF3" iconColor="#22C55E" title="Help Center" />
-            <SettingsRow icon="shield-checkmark" iconBg="#EEF1FF" iconColor="#335CFF" title="Safety Center" />
-            <SettingsRow icon="document-text" iconBg="#F2F3F7" iconColor="#9AA0B2" title="Terms & Privacy" last />
+            <SettingsRow icon="help-buoy" iconBg="#EEFCF3" iconColor="#22C55E" title="Help Center" onPress={() => Alert.alert('Help Center', 'Help Center content will be available soon.')} />
+            <SettingsRow icon="shield-checkmark" iconBg="#EEF1FF" iconColor="#335CFF" title="Safety Center" onPress={() => Alert.alert('Safety Center', 'Safety Center content will be available soon.')} />
+            <SettingsRow icon="document-text" iconBg="#F2F3F7" iconColor="#9AA0B2" title="Terms & Privacy" onPress={() => Alert.alert('Terms & Privacy', 'Terms & Privacy documents will be available soon.')} last />
           </View>
         </View>
 
