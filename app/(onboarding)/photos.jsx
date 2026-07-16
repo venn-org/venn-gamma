@@ -5,7 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors } from '../../lib/theme';
-import { useOnboarding } from '../../lib/auth';
+import { useOnboarding } from '../../hooks/useOnboarding';
 import OnboardingShell from '../../components/OnboardingShell';
 
 export default function PhotosScreen() {

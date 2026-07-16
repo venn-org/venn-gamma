@@ -5,7 +5,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors } from '../../lib/theme';
-import { useOnboarding } from '../../lib/auth';
+import { useOnboarding } from '../../hooks/useOnboarding';
 
 export default function AccountTypeScreen() {
   const router = useRouter();
