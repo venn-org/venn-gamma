@@ -11,15 +11,21 @@ export default function NotificationsScreen() {
   const insets = useSafeAreaInsets();
   const { submitData } = useOnboarding();
   
-  const [enabled, setEnabled] = useState(false);
+  const [enabled, setEnabled] = useState(true);
   const [loading, setLoading] = useState(false);
 
   const finish = async () => {
     setLoading(true);
-    // In a real app we'd request push token here if enabled
+    
+    if (enabled && typeof window !== 'undefined' && 'Notification' in window) {
+      try {
+        await Notification.requestPermission();
+      } catch (e) {
+        console.log('Notification permission error:', e);
+      }
+    }
+
     await submitData();
-    // After submitData updates the profile, the auth guard in _layout 
-    // will see onboardingComplete = true and route us to /(tabs)/feed
     setLoading(false);
   };
 

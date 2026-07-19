@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react';
-import { supabase, getCurrentUserId } from '../lib';
+import { supabase } from '../lib/supabase';
+import { getCurrentUserId, notifyOnboardingComplete } from '../lib/auth';
 import { mapUIPrefsToDb } from '../lib/enums';
 
 // Shared state object instance outside the hook so it persists across screen unmounts/mounts
@@ -121,9 +122,10 @@ export function useOnboarding() {
       onboarding_done: true
     };
 
-    const { error } = await supabase.from('profiles').update(updatePayload).eq('id', uid);
+    const { error } = await supabase.from('profiles').upsert({ id: uid, ...updatePayload });
     if (error) throw error;
     
+    notifyOnboardingComplete();
     return true;
   };
 

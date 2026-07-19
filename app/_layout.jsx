@@ -5,7 +5,7 @@ import { useFonts, SpaceGrotesk_700Bold, SpaceGrotesk_600SemiBold } from '@expo-
 import { SpaceMono_400Regular } from '@expo-google-fonts/space-mono';
 import { HankenGrotesk_400Regular, HankenGrotesk_600SemiBold, HankenGrotesk_700Bold } from '@expo-google-fonts/hanken-grotesk';
 import * as SplashScreen from 'expo-splash-screen';
-import { auth, supabase, getCurrentUserId, isOnboardingComplete } from '../lib';
+import { auth, supabase, getCurrentUserId, isOnboardingComplete, subscribeOnboardingComplete } from '../lib';
 import MatchCelebration from '../components/MatchCelebration';
 
 // Prevent auto-hiding the splash screen until fonts & auth are ready
@@ -49,6 +49,12 @@ export default function RootLayout() {
       setAuthReady(true);
     });
     return () => unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    return subscribeOnboardingComplete(() => {
+      setOnboardingDone(true);
+    });
   }, []);
 
   // Hide splash when ready
