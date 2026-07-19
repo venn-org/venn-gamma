@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Switch, Platform, ImageBackground } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Switch, Platform, ImageBackground, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -25,7 +25,14 @@ export default function NotificationsScreen() {
       }
     }
 
-    await submitData();
+    try {
+      await submitData();
+    } catch (e) {
+      Alert.alert('Error', e.message || 'Something went wrong saving your profile.');
+      setLoading(false);
+      return;
+    }
+
     setLoading(false);
   };
 

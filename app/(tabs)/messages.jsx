@@ -2,7 +2,8 @@ import { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, Image, RefreshControl, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
+import { useCallback } from 'react';
 import { supabase } from '../../lib/supabase';
 import { colors } from '../../lib/theme';
 import { getCurrentUserId } from '../../lib/auth';
@@ -146,16 +147,19 @@ export default function MessagesScreen() {
     setRefreshing(false);
   };
 
-  useEffect(() => {
-    fetchMessages();
-  }, []);
+  useFocusEffect(
+    useCallback(() => {
+      fetchMessages();
+    }, [])
+  );
 
   const isEmpty = newMatches.length === 0 && yourTurn.length === 0 && theirTurn.length === 0;
 
   const openChat = (m) => {
-    // Chat implementation excluded from Phase 3 per instructions.
-    // We can just log or alert for now.
-    console.log(`Navigate to chat: ${m.id}`);
+    router.push({
+      pathname: '/chat',
+      params: { matchId: m.id, name: m.name, photo: m.photo }
+    });
   };
 
   return (
