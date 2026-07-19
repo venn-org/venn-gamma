@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
-import { Alert, Animated, Dimensions, Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Alert, Animated, Dimensions, Image, ScrollView, StyleSheet, Text, TouchableOpacity, View, Modal, Pressable } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import MatchCelebration from '../../components/MatchCelebration';
 import PreferencesSheet from '../../components/PreferencesSheet';
@@ -10,6 +10,7 @@ import { getBlockedIds } from '../../lib/blocks';
 import { mapDbPrefsToUI, mapUIPrefsToDb, toDb } from '../../lib/enums';
 import { supabase } from '../../lib/supabase';
 import { colors } from '../../lib/theme';
+import { calculateProfileCompletion } from '../../lib/profileUtils';
 
 const { width: SCREEN_W } = Dimensions.get('window');
 
@@ -28,6 +29,10 @@ export default function FeedScreen() {
 
   const [prefsVisible, setPrefsVisible] = useState(false);
   const [userPrefs, setUserPrefs] = useState(null);
+  const [myProfile, setMyProfile] = useState(null);
+
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [showBanner, setShowBanner] = useState(true);
 
   // Match celebration state
   const [matchData, setMatchData] = useState(null);
@@ -86,6 +91,7 @@ export default function FeedScreen() {
     const { data } = await supabase.from('profiles').select('*').eq('id', uid).single();
     if (data) {
       setUserPrefs(mapDbPrefsToUI(data));
+      setMyProfile(data);
     }
   };
 
@@ -161,6 +167,27 @@ export default function FeedScreen() {
     }
   };
 
+  const handleReport = () => {
+    setMenuOpen(false);
+    Alert.alert('Reported', 'Thank you for keeping Venn safe.');
+    handlePass();
+  };
+
+  const handleBlock = async () => {
+    setMenuOpen(false);
+    const uid = getCurrentUserId();
+    if (!uid || !currentProfile) return;
+
+    const { error } = await supabase.from('blocks').insert({
+      blocker_id: uid,
+      blocked_id: currentProfile.id
+    });
+
+    if (!error) {
+      handlePass();
+    }
+  };
+
   return (
     <View style={[s.screen, { paddingTop: insets.top + 12 }]}>
 
@@ -195,16 +222,18 @@ export default function FeedScreen() {
       </ScrollView>
 
       {/* Banner */}
-      <View style={s.banner}>
-        <TouchableOpacity style={s.bannerClose}>
-          <Ionicons name="close" size={16} color={colors.ink} />
-        </TouchableOpacity>
-        <Text style={s.bannerTitle}>Complete your profile</Text>
-        <Text style={s.bannerSub}>Add 2 more prompts to get seen by more people</Text>
-        <TouchableOpacity style={s.bannerBtn}>
-          <Text style={s.bannerBtnText}>Add prompts</Text>
-        </TouchableOpacity>
-      </View>
+      {showBanner && myProfile && !calculateProfileCompletion(myProfile).isComplete && (
+        <View style={s.banner}>
+          <TouchableOpacity style={s.bannerClose} onPress={() => setShowBanner(false)}>
+            <Ionicons name="close" size={16} color={colors.ink} />
+          </TouchableOpacity>
+          <Text style={s.bannerTitle}>Complete your profile</Text>
+          <Text style={s.bannerSub}>{calculateProfileCompletion(myProfile).missingText}</Text>
+          <TouchableOpacity style={s.bannerBtn} onPress={() => router.push('/(settings)/edit-profile')}>
+            <Text style={s.bannerBtnText}>Edit profile</Text>
+          </TouchableOpacity>
+        </View>
+      )}
 
       <View style={[s.separator]} />
 
@@ -218,119 +247,135 @@ export default function FeedScreen() {
             </TouchableOpacity>
           </View>
         ) : (
-          <Animated.View style={[s.cardOuter, { flex: 1, opacity: fadeIn }]}>
-            {/* Card Header (Fixed) */}
-            <View style={s.cardHeader}>
-              <View>
-                <View style={s.nameRow}>
-                  <Text style={s.name}>{currentProfile.name}</Text>
-                  {currentProfile.verified && (
-                    <View style={s.verifiedBadge}>
-                      <Ionicons name="checkmark" size={12} color="#fff" />
+          <>
+            <Animated.View style={[s.cardOuter, { flex: 1, opacity: fadeIn }]}>
+              
+              <Modal visible={menuOpen} transparent animationType="fade" onRequestClose={() => setMenuOpen(false)}>
+                <Pressable style={s.menuBackdrop} onPress={() => setMenuOpen(false)}>
+                  <View style={s.menuBox}>
+                    <TouchableOpacity style={s.menuItem} onPress={handleReport}>
+                      <Text style={s.menuItemText}>Report</Text>
+                    </TouchableOpacity>
+                    <View style={s.menuDivider} />
+                    <TouchableOpacity style={s.menuItem} onPress={handleBlock}>
+                      <Text style={s.menuItemText}>Block</Text>
+                    </TouchableOpacity>
+                  </View>
+                </Pressable>
+              </Modal>
+
+              {/* Card Header (Fixed) */}
+              <View style={s.cardHeader}>
+                <View>
+                  <View style={s.nameRow}>
+                    <Text style={s.name}>{currentProfile.name}</Text>
+                    {currentProfile.verified && (
+                      <View style={s.verifiedBadge}>
+                        <Ionicons name="checkmark" size={12} color="#fff" />
+                      </View>
+                    )}
+                    <View style={[s.overlapPill, { backgroundColor: colors.violet, marginLeft: 6 }]}>
+                      <Text style={s.overlapText}>{currentProfile.user_type === 'owner' ? 'Has a flat' : 'Seeking'}</Text>
+                    </View>
+                  </View>
+                  <View style={s.statusRow}>
+                    <Text style={s.pronouns}>{currentProfile.pronouns?.[0] || '-'}</Text>
+                    <Text style={s.dot}> • </Text>
+                    <Text style={s.active}>Active now</Text>
+                  </View>
+                </View>
+                <View style={s.navBtns}>
+                  <TouchableOpacity style={s.navBtn} onPress={handlePass}>
+                    <Ionicons name="close" size={18} color={colors.ink} />
+                  </TouchableOpacity>
+                  <TouchableOpacity style={s.navBtn} onPress={() => setMenuOpen(true)}>
+                    <Ionicons name="ellipsis-horizontal" size={18} color={colors.ink} />
+                  </TouchableOpacity>
+                </View>
+              </View>
+
+              {/* Scrollable Profile Content */}
+              <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 20 }}>
+                <View style={s.photoWrap}>
+                  {currentProfile.photos?.[0] ? (
+                    <Image source={{ uri: currentProfile.photos[0] }} style={s.photo} resizeMode="cover" />
+                  ) : (
+                    <View style={[s.photo, s.photoPlaceholder]}>
+                      <Text style={{ color: '#9AA0B2' }}>No Photo</Text>
                     </View>
                   )}
-                  <View style={[s.overlapPill, { backgroundColor: colors.violet, marginLeft: 6 }]}>
-                    <Text style={s.overlapText}>{currentProfile.user_type === 'owner' ? 'Has a flat' : 'Seeking'}</Text>
+                  <TouchableOpacity style={s.heartBtn} activeOpacity={0.9} onPress={handleLike}>
+                    <Ionicons name="heart" size={24} color={colors.violet} />
+                  </TouchableOpacity>
+                </View>
+
+                {/* Info Card */}
+                <View style={s.infoCard}>
+                  <View style={s.infoRow}>
+                    <View style={s.infoItem}>
+                      <Ionicons name="calendar-outline" size={16} color="#9AA0B2" />
+                      <Text style={s.infoItemText}>{currentProfile.age || '-'}</Text>
+                    </View>
+                    <View style={s.infoDivider} />
+                    <View style={[s.infoItem, { paddingLeft: 12 }]}>
+                      <Ionicons name="person-outline" size={16} color="#9AA0B2" />
+                      <Text style={s.infoItemText}>{currentProfile.gender || '-'}</Text>
+                    </View>
+                  </View>
+                  <View style={s.infoHorizDivider} />
+                  <View style={s.infoRow}>
+                    <View style={s.infoItem}>
+                      <Ionicons name="location-outline" size={16} color="#9AA0B2" />
+                      <Text style={s.infoItemText}>{currentProfile.location || '-'}</Text>
+                    </View>
+                    <View style={s.infoDivider} />
+                    <View style={[s.infoItem, { paddingLeft: 12 }]}>
+                      <Ionicons name="cash-outline" size={16} color="#9AA0B2" />
+                      <Text style={s.infoItemText}>
+                        {(currentProfile.budget_max || currentProfile.budget) ? `₹${currentProfile.budget_max || currentProfile.budget}/mo` : '-'}
+                      </Text>
+                    </View>
                   </View>
                 </View>
-                <View style={s.statusRow}>
-                  <Text style={s.pronouns}>{currentProfile.pronouns?.[0] || '-'}</Text>
-                  <Text style={s.dot}> • </Text>
-                  <Text style={s.active}>Active now</Text>
+
+                {/* First Prompt (White) */}
+                <View style={s.promptWhite}>
+                  <Text style={s.promptQ}>{currentProfile.prompts?.[0]?.q || '-'}</Text>
+                  <Text style={s.promptA}>{currentProfile.prompts?.[0]?.a || '-'}</Text>
+                  <TouchableOpacity style={s.promptHeartGray} activeOpacity={0.9} onPress={handleLike}>
+                    <Ionicons name="heart" size={20} color="#C0C5D0" />
+                  </TouchableOpacity>
                 </View>
-              </View>
-              <View style={s.navBtns}>
-                <TouchableOpacity style={s.navBtn} onPress={handlePass}>
-                  <Ionicons name="close" size={18} color={colors.ink} />
-                </TouchableOpacity>
-                <TouchableOpacity style={s.navBtn} onPress={() => { }}>
-                  <Ionicons name="ellipsis-horizontal" size={18} color={colors.ink} />
-                </TouchableOpacity>
-              </View>
-            </View>
 
-            {/* Scrollable Profile Content */}
-            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 20 }}>
-              <View style={s.photoWrap}>
-                {currentProfile.photos?.[0] ? (
-                  <Image source={{ uri: currentProfile.photos[0] }} style={s.photo} resizeMode="cover" />
-                ) : (
-                  <View style={[s.photo, s.photoPlaceholder]}>
-                    <Text style={{ color: '#9AA0B2' }}>No Photo</Text>
-                  </View>
-                )}
-                <TouchableOpacity style={s.heartBtn} activeOpacity={0.9} onPress={handleLike}>
-                  <Ionicons name="heart" size={24} color={colors.violet} />
-                </TouchableOpacity>
-              </View>
-
-              {/* Info Card */}
-              <View style={s.infoCard}>
-                <View style={s.infoRow}>
-                  <View style={s.infoItem}>
-                    <Ionicons name="calendar-outline" size={16} color="#9AA0B2" />
-                    <Text style={s.infoItemText}>{currentProfile.age || '-'}</Text>
-                  </View>
-                  <View style={s.infoDivider} />
-                  <View style={[s.infoItem, { paddingLeft: 12 }]}>
-                    <Ionicons name="person-outline" size={16} color="#9AA0B2" />
-                    <Text style={s.infoItemText}>{currentProfile.gender || '-'}</Text>
+                {/* Flat Photo */}
+                <View style={s.flatPhotoWrap}>
+                  {currentProfile.photos?.[1] ? (
+                    <Image source={{ uri: currentProfile.photos[1] }} style={s.flatPhoto} resizeMode="cover" />
+                  ) : (
+                    <View style={[s.flatPhoto, s.photoPlaceholder]}>
+                      <Text style={{ color: '#9AA0B2' }}>No Flat Photo</Text>
+                    </View>
+                  )}
+                  <View style={s.flatLabel}>
+                    <Text style={s.flatLabelText}>Living Room</Text>
                   </View>
                 </View>
-                <View style={s.infoHorizDivider} />
-                <View style={s.infoRow}>
-                  <View style={s.infoItem}>
-                    <Ionicons name="location-outline" size={16} color="#9AA0B2" />
-                    <Text style={s.infoItemText}>{currentProfile.location || '-'}</Text>
-                  </View>
-                  <View style={s.infoDivider} />
-                  <View style={[s.infoItem, { paddingLeft: 12 }]}>
-                    <Ionicons name="cash-outline" size={16} color="#9AA0B2" />
-                    <Text style={s.infoItemText}>
-                      {(currentProfile.budget_max || currentProfile.budget) ? `₹${currentProfile.budget_max || currentProfile.budget}/mo` : '-'}
-                    </Text>
-                  </View>
+
+                {/* Second Prompt (Accent) */}
+                <View style={[s.promptAccent, { backgroundColor: '#F3EEFF' }]}>
+                  <Text style={s.promptAccentQ}>{currentProfile.prompts?.[1]?.q || '-'}</Text>
+                  <Text style={s.promptA}>{currentProfile.prompts?.[1]?.a || '-'}</Text>
+                  <TouchableOpacity style={s.promptHeartViolet} activeOpacity={0.9} onPress={handleLike}>
+                    <Ionicons name="heart" size={20} color={colors.violet} />
+                  </TouchableOpacity>
                 </View>
-              </View>
 
-              {/* First Prompt (White) */}
-              <View style={s.promptWhite}>
-                <Text style={s.promptQ}>{currentProfile.prompts?.[0]?.q || '-'}</Text>
-                <Text style={s.promptA}>{currentProfile.prompts?.[0]?.a || '-'}</Text>
-                <TouchableOpacity style={s.promptHeartGray} activeOpacity={0.9} onPress={handleLike}>
-                  <Ionicons name="heart" size={20} color="#C0C5D0" />
-                </TouchableOpacity>
-              </View>
-
-              {/* Flat Photo */}
-              <View style={s.flatPhotoWrap}>
-                {currentProfile.photos?.[1] ? (
-                  <Image source={{ uri: currentProfile.photos[1] }} style={s.flatPhoto} resizeMode="cover" />
-                ) : (
-                  <View style={[s.flatPhoto, s.photoPlaceholder]}>
-                    <Text style={{ color: '#9AA0B2' }}>No Flat Photo</Text>
-                  </View>
-                )}
-                <View style={s.flatLabel}>
-                  <Text style={s.flatLabelText}>Living Room</Text>
-                </View>
-              </View>
-
-              {/* Second Prompt (Accent) */}
-              <View style={[s.promptAccent, { backgroundColor: '#F3EEFF' }]}>
-                <Text style={s.promptAccentQ}>{currentProfile.prompts?.[1]?.q || '-'}</Text>
-                <Text style={s.promptA}>{currentProfile.prompts?.[1]?.a || '-'}</Text>
-                <TouchableOpacity style={s.promptHeartViolet} activeOpacity={0.9} onPress={handleLike}>
-                  <Ionicons name="heart" size={20} color={colors.violet} />
-                </TouchableOpacity>
-              </View>
-
-            </ScrollView>
-
+              </ScrollView>
+            </Animated.View>
             <TouchableOpacity style={s.skipBtn} onPress={handlePass}>
               <Ionicons name="close" size={24} color={colors.ink} />
             </TouchableOpacity>
-          </Animated.View>
+          </>
         )}
       </View>
 
@@ -407,12 +452,26 @@ const s = StyleSheet.create({
   feedContent: { paddingHorizontal: 16, paddingTop: 12, paddingBottom: 120 },
 
   skipBtn: {
-    position: 'absolute', left: 22, bottom: 22, // Adjusted bottom for visibility in feed
+    position: 'absolute', left: 22, bottom: 32,
     width: 56, height: 56, borderRadius: 28, backgroundColor: '#fff',
     alignItems: 'center', justifyContent: 'center',
     shadowColor: '#000', shadowOpacity: 0.14, shadowRadius: 10, shadowOffset: { width: 0, height: 3 },
     elevation: 5,
   },
+
+  menuBackdrop: {
+    flex: 1, backgroundColor: 'rgba(0,0,0,0.3)',
+    justifyContent: 'flex-start', alignItems: 'flex-end',
+    paddingTop: 120, paddingRight: 20,
+  },
+  menuBox: {
+    backgroundColor: '#fff', borderRadius: 14, minWidth: 160,
+    shadowColor: '#000', shadowOpacity: 0.14, shadowRadius: 24, shadowOffset: { width: 0, height: 4 },
+    elevation: 8, overflow: 'hidden',
+  },
+  menuItem: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 14, paddingHorizontal: 16 },
+  menuItemText: { fontFamily: 'HankenGrotesk_400Regular', fontSize: 14, color: colors.ink },
+  menuDivider: { height: 1, backgroundColor: '#F0F1F5' },
 
   empty: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   emptyText: { fontFamily: 'HankenGrotesk_400Regular', fontSize: 14, color: colors.slate },
@@ -445,7 +504,7 @@ const s = StyleSheet.create({
 
   photoWrap: { position: 'relative', borderRadius: 20, overflow: 'hidden', marginBottom: 10, height: 400 },
   photo: { width: '100%', height: '100%' },
-  photoPlaceholder: { backgroundColor: '#E6E8EE', alignItems: 'center', justifyContent: 'center' },
+  photoPlaceholder: { backgroundColor: colors.canvas, alignItems: 'center', justifyContent: 'center' },
 
   heartBtn: {
     position: 'absolute', bottom: 14, right: 14,

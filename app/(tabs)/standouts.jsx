@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Image, Dimensions, RefreshControl } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Image, Dimensions, RefreshControl, Modal } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { supabase } from '../../lib/supabase';
@@ -17,6 +17,7 @@ export default function StandoutsScreen() {
   const [refreshing, setRefreshing] = useState(false);
   
   const [selectedProfile, setSelectedProfile] = useState(null);
+  const [showKeysModal, setShowKeysModal] = useState(false);
 
   useEffect(() => {
     fetchStandouts();
@@ -81,7 +82,7 @@ export default function StandoutsScreen() {
             <Text style={s.ownersText}>OWNERS</Text>
           </View>
         </View>
-        <TouchableOpacity style={s.keysBtn} activeOpacity={0.8}>
+        <TouchableOpacity style={s.keysBtn} activeOpacity={0.8} onPress={() => setShowKeysModal(true)}>
           <Text style={s.keysLabel}>Get Keys</Text>
         </TouchableOpacity>
       </View>
@@ -130,6 +131,21 @@ export default function StandoutsScreen() {
         onPass={handlePass}
         onLike={handleLike}
       />
+
+      <Modal visible={showKeysModal} transparent animationType="fade" onRequestClose={() => setShowKeysModal(false)}>
+        <View style={s.modalBackdrop}>
+          <View style={s.modalBox}>
+            <View style={[s.modalIcon, { backgroundColor: '#1E0F38' }]}>
+              <Ionicons name="key" size={32} color="#8A5BFF" />
+            </View>
+            <Text style={s.modalTitle}>Get Keys</Text>
+            <Text style={s.modalSub}>Coming soon! Keys will allow you to unlock standout profiles instantly.</Text>
+            <TouchableOpacity style={s.modalBtn} onPress={() => setShowKeysModal(false)}>
+              <Text style={s.modalBtnText}>Got it</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -152,5 +168,13 @@ const s = StyleSheet.create({
   photoPlaceholder: { alignItems: 'center', justifyContent: 'center', backgroundColor: '#222' },
   overlay: { position: 'absolute', bottom: 0, left: 0, right: 0, padding: 12, paddingTop: 40, backgroundColor: 'rgba(0,0,0,0.5)' },
   cardName: { fontFamily: 'SpaceGrotesk_700Bold', fontSize: 16, color: '#fff', marginBottom: 2 },
-  cardSub: { fontFamily: 'HankenGrotesk_400Regular', fontSize: 12, color: '#aaa' }
+  cardSub: { fontFamily: 'HankenGrotesk_400Regular', fontSize: 12, color: '#aaa' },
+
+  modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'center', alignItems: 'center', padding: 20 },
+  modalBox: { backgroundColor: '#fff', borderRadius: 24, padding: 24, width: '100%', maxWidth: 340, alignItems: 'center' },
+  modalIcon: { width: 64, height: 64, borderRadius: 32, alignItems: 'center', justifyContent: 'center', marginBottom: 16 },
+  modalTitle: { fontFamily: 'SpaceGrotesk_700Bold', fontSize: 22, color: '#111', marginBottom: 8, textAlign: 'center' },
+  modalSub: { fontFamily: 'HankenGrotesk_400Regular', fontSize: 15, color: '#666', textAlign: 'center', marginBottom: 24, lineHeight: 22 },
+  modalBtn: { backgroundColor: '#111', paddingVertical: 14, paddingHorizontal: 32, borderRadius: 50, width: '100%', alignItems: 'center' },
+  modalBtnText: { fontFamily: 'HankenGrotesk_700Bold', fontSize: 15, color: '#fff' },
 });

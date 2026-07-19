@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Image, Dimensions, RefreshControl, Alert } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Image, Dimensions, RefreshControl, Alert, Modal } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { supabase } from '../../lib/supabase';
@@ -20,6 +20,7 @@ export default function LikesScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [selectedLike, setSelectedLike] = useState(null);
   const [matchData, setMatchData] = useState(null);
+  const [showBoost, setShowBoost] = useState(false);
 
   const fetchLikes = async () => {
     const uid = getCurrentUserId();
@@ -88,7 +89,7 @@ export default function LikesScreen() {
     <View style={[s.screen, { paddingTop: insets.top + 12 }]}>
       <View style={s.topBar}>
         <Text style={s.title}>Likes You</Text>
-        <TouchableOpacity style={s.boostBtn} activeOpacity={0.85}>
+        <TouchableOpacity style={s.boostBtn} activeOpacity={0.85} onPress={() => setShowBoost(true)}>
           <Ionicons name="flash" size={14} color="#fff" />
           <Text style={s.boostText}>Boost</Text>
         </TouchableOpacity>
@@ -138,6 +139,21 @@ export default function LikesScreen() {
         onLike={handleLikeBack}
       />
 
+      <Modal visible={showBoost} transparent animationType="fade" onRequestClose={() => setShowBoost(false)}>
+        <View style={s.modalBackdrop}>
+          <View style={s.modalBox}>
+            <View style={s.modalIcon}>
+              <Ionicons name="flash" size={32} color="#fff" />
+            </View>
+            <Text style={s.modalTitle}>Boost your profile</Text>
+            <Text style={s.modalSub}>Coming soon! Get pushed to the top of the feed so more people see you first.</Text>
+            <TouchableOpacity style={s.modalBtn} onPress={() => setShowBoost(false)}>
+              <Text style={s.modalBtnText}>Got it</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
       {matchData && (
         <MatchCelebration
           visible={!!matchData}
@@ -173,4 +189,12 @@ const s = StyleSheet.create({
   likeInfo: { padding: 12 },
   likeName: { fontFamily: 'SpaceGrotesk_700Bold', fontSize: 15, color: colors.ink, marginBottom: 2 },
   likeTime: { fontFamily: 'HankenGrotesk_400Regular', fontSize: 12, color: '#9AA0B2' },
+
+  modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'center', alignItems: 'center', padding: 20 },
+  modalBox: { backgroundColor: '#fff', borderRadius: 24, padding: 24, width: '100%', maxWidth: 340, alignItems: 'center' },
+  modalIcon: { width: 64, height: 64, borderRadius: 32, backgroundColor: colors.blue, alignItems: 'center', justifyContent: 'center', marginBottom: 16 },
+  modalTitle: { fontFamily: 'SpaceGrotesk_700Bold', fontSize: 22, color: colors.ink, marginBottom: 8, textAlign: 'center' },
+  modalSub: { fontFamily: 'HankenGrotesk_400Regular', fontSize: 15, color: '#9AA0B2', textAlign: 'center', marginBottom: 24, lineHeight: 22 },
+  modalBtn: { backgroundColor: colors.ink, paddingVertical: 14, paddingHorizontal: 32, borderRadius: 50, width: '100%', alignItems: 'center' },
+  modalBtnText: { fontFamily: 'HankenGrotesk_700Bold', fontSize: 15, color: '#fff' },
 });
