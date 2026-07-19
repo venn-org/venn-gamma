@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
 import { getCurrentUserId, notifyOnboardingComplete } from '../lib/auth';
-import { mapUIPrefsToDb } from '../lib/enums';
+import { mapUIPrefsToDb, toDb } from '../lib/enums';
 
 // Shared state object instance outside the hook so it persists across screen unmounts/mounts
 // within the onboarding flow.
@@ -9,29 +9,21 @@ let onboardingState = {
   firstName: '',
   lastName: '',
   type: null, // 'seeking' | 'owner'
-  birthday: null, // ISO string
+  birthday: null,
   pronouns: [],
   gender: null,
-  
-  // Lifestyle + Prefs
-  lifestyle: {
-    drink: null,
-    tobacco: null,
-    weed: null,
-  },
-  prefs: {
-    areas: [],
-    budget: null,
-    flatType: null,
-    gender: null,
-  },
-  
-  // Photos
-  photos: {
-    profile: null,
-    flat: [null, null, null],
-  },
+  lifestyle: { drink: null, tobacco: null, weed: null },
+  prefs: { areas: [], budget: null, flatType: null, gender: null },
+  photos: { profile: null, flat: [null, null, null] },
 };
+
+// Restore from local storage to survive HMR during dev
+if (typeof window !== 'undefined') {
+  try {
+    const saved = window.localStorage.getItem('venn_onboarding_state');
+    if (saved) onboardingState = { ...onboardingState, ...JSON.parse(saved) };
+  } catch (e) {}
+}
 
 export function useOnboarding() {
   const [state, setState] = useState(onboardingState);
@@ -39,6 +31,9 @@ export function useOnboarding() {
   const updateData = useCallback((newData) => {
     onboardingState = { ...onboardingState, ...newData };
     setState(onboardingState);
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem('venn_onboarding_state', JSON.stringify(onboardingState));
+    }
   }, []);
 
   const submitData = async () => {
@@ -110,11 +105,15 @@ export function useOnboarding() {
       user_type: onboardingState.type,
       birthday: onboardingState.birthday,
       pronouns: onboardingState.pronouns,
-      gender: onboardingState.gender,
+      gender: toDb('gender', onboardingState.gender) || null,
       
-      drink: onboardingState.lifestyle?.drink || null,
-      tobacco: onboardingState.lifestyle?.tobacco || null,
-      weed: onboardingState.lifestyle?.weed || null,
+      drink: toDb('lifestyle', onboardingState.lifestyle?.drink) || null,
+      tobacco: toDb('lifestyle', onboardingState.lifestyle?.tobacco) || null,
+      weed: toDb('lifestyle', onboardingState.lifestyle?.weed) || null,
+      
+      areas: onboardingState.type === 'owner' ? onboardingState.prefs?.areas : null,
+      budget: onboardingState.type === 'owner' ? toDb('pref_budget', onboardingState.prefs?.budget) : null,
+      flat_type: onboardingState.type === 'owner' ? toDb('flat_type', onboardingState.prefs?.flatType) : null,
       
       ...dbPrefs,
       
@@ -126,6 +125,9 @@ export function useOnboarding() {
     if (error) throw error;
     
     notifyOnboardingComplete();
+    if (typeof window !== 'undefined') {
+      window.localStorage.removeItem('venn_onboarding_state');
+    }
     return true;
   };
 

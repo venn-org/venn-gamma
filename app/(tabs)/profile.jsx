@@ -41,7 +41,8 @@ export default function ProfileScreen() {
   const fetchProfile = async () => {
     const uid = getCurrentUserId();
     if (!uid) return;
-    const { data } = await supabase.from('profiles').select('*').eq('id', uid).single();
+    const { data, error } = await supabase.from('profiles').select('*').eq('id', uid).single();
+    if (error) console.error('fetchProfile error:', error);
     if (data) {
       setProfile(data);
       setIncognito(!!data.paused);
