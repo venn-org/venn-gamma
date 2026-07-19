@@ -90,7 +90,7 @@ export default function EditProfileScreen() {
         setTobacco(toUI('lifestyle', data.tobacco) || data.tobacco || '');
         setWeed(toUI('lifestyle', data.weed) || data.weed || '');
         
-        if (data.prompts) {
+        if (Array.isArray(data.prompts)) {
           if (data.prompts[0]) {
             setPrompt1Q(data.prompts[0].q || '');
             setPrompt1A(data.prompts[0].a || '');

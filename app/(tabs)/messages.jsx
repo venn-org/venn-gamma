@@ -36,6 +36,7 @@ export default function MessagesScreen() {
   const [yourTurn, setYourTurn] = useState([]);
   const [theirTurn, setTheirTurn] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   const fetchMessages = async () => {
     const uid = getCurrentUserId();
@@ -55,10 +56,12 @@ export default function MessagesScreen() {
 
     if (error) {
       console.error('Error fetching matches:', error);
+      setError(error.message || 'Failed to load messages');
       setLoading(false);
       setRefreshing(false);
       return;
     }
+    setError(null);
 
     if (!matchesData || matchesData.length === 0) {
       setNewMatches([]);
