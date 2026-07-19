@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from 'react';
-import { View, StyleSheet, Text, AppState, Platform } from 'react-native';
+import { View, StyleSheet, Text, AppState, Platform, LogBox } from 'react-native';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { useFonts, SpaceGrotesk_700Bold, SpaceGrotesk_600SemiBold } from '@expo-google-fonts/space-grotesk';
 import { SpaceMono_400Regular } from '@expo-google-fonts/space-mono';
@@ -7,6 +7,11 @@ import { HankenGrotesk_400Regular, HankenGrotesk_600SemiBold, HankenGrotesk_700B
 import * as SplashScreen from 'expo-splash-screen';
 import { auth, supabase, getCurrentUserId, isOnboardingComplete, subscribeOnboardingComplete } from '../lib';
 import MatchCelebration from '../components/MatchCelebration';
+
+LogBox.ignoreLogs([
+  '"shadow*" style props are deprecated',
+  'Animated: `useNativeDriver` is not supported'
+]);
 
 // Prevent auto-hiding the splash screen until fonts & auth are ready
 SplashScreen.preventAutoHideAsync();
