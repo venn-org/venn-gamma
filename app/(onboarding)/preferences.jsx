@@ -41,7 +41,7 @@ export default function PreferencesScreen() {
       }
     });
     setLoading(false);
-    router.push('/photos');
+    router.push('/(onboarding)/photos');
   };
 
   return (

@@ -54,7 +54,7 @@ export default function BirthdayScreen() {
     const bday = `${y}-${m.toString().padStart(2, '0')}-${d.toString().padStart(2, '0')}`;
     updateData({ birthday: bday });
     setLoading(false);
-    router.push('/pronouns');
+    router.push('/(onboarding)/pronouns');
   };
 
   return (

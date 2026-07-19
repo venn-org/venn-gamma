@@ -26,7 +26,7 @@ export default function PronounsScreen() {
     setLoading(true);
     updateData({ pronouns: selected });
     setLoading(false);
-    router.push('/gender');
+    router.push('/(onboarding)/gender');
   };
 
   return (

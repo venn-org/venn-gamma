@@ -19,7 +19,7 @@ export default function GenderScreen() {
     setLoading(true);
     updateData({ gender: selected });
     setLoading(false);
-    router.push('/lifestyle-prefs');
+    router.push('/(onboarding)/lifestyle');
   };
 
   return (

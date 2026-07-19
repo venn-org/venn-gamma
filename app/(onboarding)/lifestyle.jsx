@@ -30,7 +30,7 @@ export default function LifestyleScreen() {
     setLoading(true);
     updateData({ lifestyle: answers });
     setLoading(false);
-    router.push('/preferences');
+    router.push('/(onboarding)/preferences');
   };
 
   return (

@@ -20,7 +20,7 @@ export default function AccountTypeScreen() {
     setLoading(true);
     updateData({ type });
     setLoading(false);
-    router.push('/birthday');
+    router.push('/(onboarding)/birthday');
   };
 
   return (

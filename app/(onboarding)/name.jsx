@@ -20,7 +20,7 @@ export default function NameScreen() {
     setLoading(true);
     updateData({ firstName: first.trim(), lastName: last.trim() });
     setLoading(false);
-    router.push('/account-type');
+    router.push('/(onboarding)/account-type');
   };
 
   return (

@@ -48,7 +48,7 @@ export default function PhotosScreen() {
     });
     
     setUploading(false);
-    router.push('/notifications');
+    router.push('/(onboarding)/notifications');
   };
 
   const canContinue = isOwner 
