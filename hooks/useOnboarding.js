@@ -111,8 +111,8 @@ export function useOnboarding() {
       tobacco: toDb('lifestyle', onboardingState.lifestyle?.tobacco) || null,
       weed: toDb('lifestyle', onboardingState.lifestyle?.weed) || null,
       
-      areas: onboardingState.type === 'owner' ? onboardingState.prefs?.areas : null,
-      budget: onboardingState.type === 'owner' ? toDb('pref_budget', onboardingState.prefs?.budget) : null,
+      areas: onboardingState.prefs?.areas || null,
+      budget: toDb('pref_budget', onboardingState.prefs?.budget) || null,
       flat_type: onboardingState.type === 'owner' ? toDb('flat_type', onboardingState.prefs?.flatType) : null,
       
       ...dbPrefs,
