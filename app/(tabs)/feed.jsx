@@ -53,19 +53,26 @@ export default function FeedScreen() {
       .on(
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'matches' },
-        (payload) => {
-          const { user1_id, user2_id, id } = payload.new;
-          if (user1_id === uid || user2_id === uid) {
-            const otherId = user1_id === uid ? user2_id : user1_id;
-            supabase.from('profiles').select('name, photos').eq('id', otherId).single().then(({ data }) => {
+        async (payload) => {
+          try {
+            const { user1_id, user2_id, id } = payload.new;
+            if (user1_id === uid || user2_id === uid) {
+              const otherId = user1_id === uid ? user2_id : user1_id;
+              const { data, error } = await supabase.from('profiles').select('name, photos').eq('id', otherId).single();
+              if (error) {
+                console.warn('Failed to fetch match profile:', error);
+                return;
+              }
               if (data) {
                 setMatchData({
                   name: data.name,
-                  photo: data.photos?.[0] || null,
+                  photo: Array.isArray(data.photos) ? data.photos[0] || null : null,
                   matchId: id
                 });
               }
-            });
+            }
+          } catch (e) {
+            console.error('Realtime match handler error:', e);
           }
         }
       )
@@ -124,7 +131,12 @@ export default function FeedScreen() {
       query = query.eq('user_type', targetRole);
     }
 
-    const { data } = await query.limit(30);
+    const { data, error } = await query.limit(30);
+    if (error) {
+      console.error('Feed query failed:', error);
+      Alert.alert('Error', 'Failed to load profiles. Please try again.');
+      return;
+    }
     if (data) {
       const filtered = data.filter(p => !blocked.has(p.id));
       setProfiles(filtered);

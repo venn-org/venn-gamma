@@ -1,8 +1,11 @@
+import { useEffect } from 'react';
 import { Redirect } from 'expo-router';
+import { auth } from '../lib';
 
-// The root index simply redirects to the feed.
-// The auth guard in _layout.jsx will intercept this and route to /login or /name
-// if the user isn't authenticated or hasn't finished onboarding.
+// Root index defers routing to _layout.jsx auth guard to avoid redirect flicker.
+// The auth guard will route based on actual auth state once it's known.
 export default function Index() {
-  return <Redirect href="/login" />;
+  // Return nothing while auth state is being determined.
+  // _layout.jsx will handle the redirect once it has auth info.
+  return null;
 }
