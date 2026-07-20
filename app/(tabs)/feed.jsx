@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
-import { useEffect, useRef, useState } from "react";
+import { useFocusEffect, useRouter } from "expo-router";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Alert,
   Animated,
@@ -26,7 +26,7 @@ import {
   recordProfileView,
 } from "../../lib/dailyLimits";
 import { mapDbPrefsToUI, mapUIPrefsToDb, toDb, toUI } from "../../lib/enums";
-import { calculateProfileCompletion } from "../../lib/profileUtils";
+import { calculateProfileCompletion, isFeedReady } from "../../lib/profileUtils";
 import { supabase } from "../../lib/supabase";
 import { colors } from "../../lib/theme";
 
@@ -102,6 +102,13 @@ export default function FeedScreen() {
     };
   }, []);
 
+  // Keep the completion banner in sync with edits made elsewhere
+  useFocusEffect(
+    useCallback(() => {
+      fetchMyPrefs();
+    }, []),
+  );
+
   useEffect(() => {
     fadeIn.setValue(0);
     Animated.timing(fadeIn, {
@@ -155,6 +162,7 @@ export default function FeedScreen() {
       .select("*")
       .neq("id", uid)
       .eq("paused", false)
+      .eq("onboarding_done", true)
       .order("last_active_at", { ascending: false });
 
     if (currentPrefs?.role) {
@@ -173,6 +181,9 @@ export default function FeedScreen() {
       const filtered = data.filter((p) => {
         if (blocked.has(p.id)) return false;
         if (viewedToday.has(p.id)) return false;
+
+        // Skip incomplete profiles — they render as empty cards
+        if (!isFeedReady(p)) return false;
 
         // Match based on overlapping area preferences
         const myAreas = currentPrefs?.areas || [];
