@@ -41,7 +41,20 @@ export default function EditProfileScreen() {
   const [birthday, setBirthday] = useState(''); // YYYY-MM-DD
   const [gender, setGender] = useState('');
   const [pronouns, setPronouns] = useState(''); // stored as string in UI, array in DB
-  
+  const [bio, setBio] = useState('');
+  const [location, setLocation] = useState('');
+
+  // Work & Education
+  const [jobTitle, setJobTitle] = useState('');
+  const [jobCompany, setJobCompany] = useState('');
+  const [educationSchool, setEducationSchool] = useState('');
+  const [educationLevel, setEducationLevel] = useState('');
+
+  // Housing
+  const [budgetMin, setBudgetMin] = useState('');
+  const [budgetMax, setBudgetMax] = useState('');
+  const [moveInDate, setMoveInDate] = useState(''); // YYYY-MM-DD
+
   // Lifestyle
   const [drink, setDrink] = useState('');
   const [tobacco, setTobacco] = useState('');
@@ -85,7 +98,17 @@ export default function EditProfileScreen() {
           initialPronouns = data.pronouns;
         }
         setPronouns(initialPronouns);
-        
+
+        setBio(data.bio || '');
+        setLocation(data.location || '');
+        setJobTitle(data.job_title || '');
+        setJobCompany(data.job_company || '');
+        setEducationSchool(data.education_school || '');
+        setEducationLevel(data.education_level || '');
+        setBudgetMin(data.budget_min != null ? String(data.budget_min) : '');
+        setBudgetMax(data.budget_max != null ? String(data.budget_max) : '');
+        setMoveInDate(typeof data.move_in_date === 'string' ? data.move_in_date.split('T')[0] : '');
+
         setDrink(toUI('lifestyle', data.drink) || data.drink || '');
         setTobacco(toUI('lifestyle', data.tobacco) || data.tobacco || '');
         setWeed(toUI('lifestyle', data.weed) || data.weed || '');
@@ -122,6 +145,22 @@ export default function EditProfileScreen() {
       return;
     }
 
+    if (moveInDate && !/^\d{4}-\d{2}-\d{2}$/.test(moveInDate)) {
+      Alert.alert('Invalid date format', 'Please use YYYY-MM-DD for your move-in date.');
+      return;
+    }
+
+    const minVal = budgetMin.trim() ? parseInt(budgetMin, 10) : null;
+    const maxVal = budgetMax.trim() ? parseInt(budgetMax, 10) : null;
+    if ((budgetMin.trim() && Number.isNaN(minVal)) || (budgetMax.trim() && Number.isNaN(maxVal))) {
+      Alert.alert('Invalid budget', 'Budget must be a number.');
+      return;
+    }
+    if (minVal != null && maxVal != null && minVal > maxVal) {
+      Alert.alert('Invalid budget', 'Minimum budget cannot be greater than maximum.');
+      return;
+    }
+
     setSaving(true);
     try {
       const uid = getCurrentUserId();
@@ -145,6 +184,15 @@ export default function EditProfileScreen() {
         name: name.trim(),
         gender: toDb('gender', gender) || null,
         pronouns: pronouns.trim() ? pronouns.split(',').map(s => s.trim()) : [],
+        bio: bio.trim() || null,
+        location: location.trim() || null,
+        job_title: jobTitle.trim() || null,
+        job_company: jobCompany.trim() || null,
+        education_school: educationSchool.trim() || null,
+        education_level: educationLevel.trim() || null,
+        budget_min: minVal,
+        budget_max: maxVal,
+        move_in_date: moveInDate || null,
         drink: toDb('lifestyle', drink) || null,
         tobacco: toDb('lifestyle', tobacco) || null,
         weed: toDb('lifestyle', weed) || null,
@@ -220,6 +268,102 @@ export default function EditProfileScreen() {
 
                 <Text style={s.label}>Gender</Text>
                 <ChipSelector options={GENDER_OPTIONS} selected={gender} onSelect={setGender} />
+
+                <Text style={s.label}>Bio</Text>
+                <TextInput
+                  style={[s.input, s.textArea]}
+                  placeholder="A few lines about you"
+                  placeholderTextColor="#9AA0B2"
+                  value={bio}
+                  onChangeText={setBio}
+                  multiline
+                  textAlignVertical="top"
+                />
+
+                <Text style={s.label}>Location</Text>
+                <TextInput
+                  style={s.input}
+                  placeholder="e.g. Indiranagar, Bengaluru"
+                  placeholderTextColor="#9AA0B2"
+                  value={location}
+                  onChangeText={setLocation}
+                />
+              </View>
+
+              {/* Work & Education Section */}
+              <View style={s.section}>
+                <Text style={s.sectionTitle}>Work & Education</Text>
+
+                <Text style={s.label}>Job Title</Text>
+                <TextInput
+                  style={s.input}
+                  placeholder="e.g. Product Designer"
+                  placeholderTextColor="#9AA0B2"
+                  value={jobTitle}
+                  onChangeText={setJobTitle}
+                />
+
+                <Text style={s.label}>Company</Text>
+                <TextInput
+                  style={s.input}
+                  placeholder="Where you work"
+                  placeholderTextColor="#9AA0B2"
+                  value={jobCompany}
+                  onChangeText={setJobCompany}
+                />
+
+                <Text style={s.label}>School / University</Text>
+                <TextInput
+                  style={s.input}
+                  placeholder="Where you studied"
+                  placeholderTextColor="#9AA0B2"
+                  value={educationSchool}
+                  onChangeText={setEducationSchool}
+                />
+
+                <Text style={s.label}>Education Level</Text>
+                <TextInput
+                  style={s.input}
+                  placeholder="e.g. Bachelor's"
+                  placeholderTextColor="#9AA0B2"
+                  value={educationLevel}
+                  onChangeText={setEducationLevel}
+                />
+              </View>
+
+              {/* Housing Section */}
+              <View style={s.section}>
+                <Text style={s.sectionTitle}>Housing</Text>
+
+                <Text style={s.label}>Budget Min (₹ / month)</Text>
+                <TextInput
+                  style={s.input}
+                  placeholder="15000"
+                  placeholderTextColor="#9AA0B2"
+                  value={budgetMin}
+                  onChangeText={setBudgetMin}
+                  keyboardType="numeric"
+                />
+
+                <Text style={s.label}>Budget Max (₹ / month)</Text>
+                <TextInput
+                  style={s.input}
+                  placeholder="25000"
+                  placeholderTextColor="#9AA0B2"
+                  value={budgetMax}
+                  onChangeText={setBudgetMax}
+                  keyboardType="numeric"
+                />
+
+                <Text style={s.label}>Move-in Date (YYYY-MM-DD)</Text>
+                <TextInput
+                  style={s.input}
+                  placeholder="2026-09-01"
+                  placeholderTextColor="#9AA0B2"
+                  value={moveInDate}
+                  onChangeText={setMoveInDate}
+                  keyboardType="numeric"
+                />
               </View>
 
               {/* Lifestyle Section */}
