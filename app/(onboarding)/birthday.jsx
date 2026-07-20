@@ -40,7 +40,10 @@ export default function BirthdayScreen() {
       return;
     }
     
-    const age = new Date().getFullYear() - y;
+    const today = new Date();
+    let age = today.getFullYear() - y;
+    const hadBirthdayThisYear = today.getMonth() > m - 1 || (today.getMonth() === m - 1 && today.getDate() >= d);
+    if (!hadBirthdayThisYear) age--;
     if (age < 18) {
       setError('You must be 18 or older.');
       return;
