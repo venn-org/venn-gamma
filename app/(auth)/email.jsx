@@ -53,7 +53,8 @@ export default function EmailScreen() {
       slideY.setValue(50);
       opacity.setValue(0);
     } catch (e) {
-      setError(e.message);
+      console.error('sendEmailLink failed:', e);
+      setError('Failed to send the sign-in link. Please try again.');
     } finally {
       setLoading(false);
     }

@@ -36,7 +36,7 @@ export default function AccountTypeScreen() {
         <Text style={styles.stepLabel}>STEP 2 OF 9</Text>
       </View>
 
-      <TouchableOpacity style={styles.back} onPress={() => router.back()}>
+      <TouchableOpacity style={styles.back} onPress={() => router.canGoBack() ? router.back() : router.replace('/(onboarding)/name')}>
         <Text style={styles.backArrow}>‹</Text>
       </TouchableOpacity>
 

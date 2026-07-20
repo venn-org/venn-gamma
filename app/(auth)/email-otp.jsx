@@ -15,7 +15,8 @@ export default function EmailOtpScreen() {
         await ensureProfile();
         // Auth listener routes automatically
       } catch (e) {
-        setError(e.message);
+        console.error('completeEmailLink failed:', e);
+        setError('This link is invalid or has expired. Please request a new one.');
       }
     }
     if (link && email) {

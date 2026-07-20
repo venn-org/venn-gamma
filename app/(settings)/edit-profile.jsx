@@ -102,8 +102,8 @@ export default function EditProfileScreen() {
         }
       }
     } catch (e) {
-      console.log('Error fetching profile:', e);
-      Alert.alert('Fetch Error', e.message || String(e));
+      console.error('Error fetching profile:', e);
+      Alert.alert('Error', 'Failed to load your profile. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -158,7 +158,7 @@ export default function EditProfileScreen() {
       const { error } = await supabase.from('profiles').update(updatePayload).eq('id', uid);
       if (error) throw error;
       
-      router.back();
+      (router.canGoBack() ? router.back() : router.replace('/(tabs)/profile'));
     } catch (e) {
       console.log(e);
       Alert.alert('Error', 'Failed to save profile. Please try again.');
@@ -169,7 +169,7 @@ export default function EditProfileScreen() {
   return (
     <View style={[s.screen, { paddingTop: insets.top }]}>
       <View style={s.header}>
-        <TouchableOpacity style={s.backBtn} onPress={() => router.back()}>
+        <TouchableOpacity style={s.backBtn} onPress={() => (router.canGoBack() ? router.back() : router.replace('/(tabs)/profile'))}>
           <Ionicons name="chevron-back" size={24} color={colors.ink} />
         </TouchableOpacity>
         <Text style={s.title}>Edit Profile</Text>

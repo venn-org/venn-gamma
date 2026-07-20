@@ -37,7 +37,8 @@ export default function AuthMethodsScreen() {
       // Auth listener routes automatically
     } catch (e) {
       if (e.code !== 'auth/popup-closed-by-user') {
-        Alert.alert('Sign in failed', e.message);
+        console.error('signInWithGoogle failed:', e);
+        Alert.alert('Sign in failed', 'Please try again.');
       }
       setLoading(false);
     }
@@ -48,7 +49,7 @@ export default function AuthMethodsScreen() {
       <ImageBackground source={require('../../assets/images/hero.jpeg')} style={styles.bg} imageStyle={styles.bgImage} resizeMode="cover">
         <LinearGradient colors={['transparent', 'rgba(0,0,0,0.92)']} style={styles.overlay} />
 
-        <TouchableOpacity style={[styles.back, { top: insets.top + 12 }]} onPress={() => router.back()}>
+        <TouchableOpacity style={[styles.back, { top: insets.top + 12 }]} onPress={() => router.canGoBack() ? router.back() : router.replace('/login')}>
           <View style={styles.backCircle}>
             <Text style={styles.backArrow}>‹</Text>
           </View>

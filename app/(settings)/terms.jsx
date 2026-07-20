@@ -11,7 +11,7 @@ export default function TermsScreen() {
   return (
     <View style={[s.screen, { paddingTop: insets.top }]}>
       <View style={s.header}>
-        <TouchableOpacity style={s.backBtn} onPress={() => router.back()}>
+        <TouchableOpacity style={s.backBtn} onPress={() => router.canGoBack() ? router.back() : router.replace('/(tabs)/profile')}>
           <Ionicons name="chevron-back" size={24} color={colors.ink} />
         </TouchableOpacity>
         <Text style={s.title}>Terms & Privacy</Text>

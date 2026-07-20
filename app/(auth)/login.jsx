@@ -41,7 +41,8 @@ export default function LoginScreen() {
       // Auth listener in _layout will route automatically
     } catch (e) {
       if (e.code !== 'auth/popup-closed-by-user') {
-        Alert.alert('Sign in failed', e.message);
+        console.error('signInWithGoogle failed:', e);
+        Alert.alert('Sign in failed', 'Please try again.');
       }
       setLoading(false);
     }

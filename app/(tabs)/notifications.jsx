@@ -53,7 +53,7 @@ export default function NotificationsScreen() {
   return (
     <View style={[s.screen, { paddingTop: insets.top + 12 }]}>
       <View style={s.topBar}>
-        <TouchableOpacity style={s.backBtn} onPress={() => router.back()} activeOpacity={0.8}>
+        <TouchableOpacity style={s.backBtn} onPress={() => router.canGoBack() ? router.back() : router.replace('/(tabs)/feed')} activeOpacity={0.8}>
           <Ionicons name="arrow-back" size={20} color={colors.ink} />
         </TouchableOpacity>
         <Text style={s.title}>Notifications</Text>
