@@ -4,6 +4,7 @@ import { Stack, useRouter, useSegments } from 'expo-router';
 import { useFonts, SpaceGrotesk_700Bold, SpaceGrotesk_600SemiBold } from '@expo-google-fonts/space-grotesk';
 import { SpaceMono_400Regular } from '@expo-google-fonts/space-mono';
 import { HankenGrotesk_400Regular, HankenGrotesk_600SemiBold, HankenGrotesk_700Bold } from '@expo-google-fonts/hanken-grotesk';
+import { Ionicons } from '@expo/vector-icons';
 import * as SplashScreen from 'expo-splash-screen';
 import { auth, supabase, getCurrentUserId, isOnboardingComplete, subscribeOnboardingComplete } from '../lib';
 import MatchCelebration from '../components/MatchCelebration';
@@ -29,6 +30,7 @@ export default function RootLayout() {
     HankenGrotesk_400Regular,
     HankenGrotesk_600SemiBold,
     HankenGrotesk_700Bold,
+    ...Ionicons.font,
   });
 
   const [authReady, setAuthReady] = useState(false);
