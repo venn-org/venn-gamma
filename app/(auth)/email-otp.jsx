@@ -11,7 +11,7 @@ export default function EmailOtpScreen() {
   useEffect(() => {
     async function verify() {
       try {
-        await completeEmailLink(email, link);
+        await completeEmailLink(link);
         await ensureProfile();
         // Auth listener routes automatically
       } catch (e) {
