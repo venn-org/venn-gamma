@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, Image, StyleSheet, Switch, Alert, Platform } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, Image, StyleSheet, Switch, Alert, Platform, Modal, Pressable, ActivityIndicator, Dimensions } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter, useFocusEffect } from 'expo-router';
@@ -10,7 +11,11 @@ import { colors } from '../../lib/theme';
 import { getCurrentUserId, signOutUser } from '../../lib/auth';
 import { mapDbPrefsToUI, mapUIPrefsToDb } from '../../lib/enums';
 import { calculateProfileCompletion } from '../../lib/profileUtils';
+import { uploadPhoto, setPhotoAt, removePhotoAt, MAX_PHOTOS } from '../../lib/photos';
 import PreferencesSheet from '../../components/PreferencesSheet';
+
+// 3 across, matching the blueprint's photo grid
+const PHOTO_SLOT = (Dimensions.get('window').width - 40 - 16) / 3;
 
 const SettingsRow = ({ icon, iconBg, iconColor, title, titleColor, subtitle, subtitleColor, last, right, onPress }) => (
   <TouchableOpacity style={[s.settingsRow, !last && s.settingsRowBorder]} onPress={onPress} activeOpacity={0.7} disabled={!onPress && !right}>
@@ -34,6 +39,10 @@ export default function ProfileScreen() {
   const [prefsVisible, setPrefsVisible] = useState(false);
   const [userPrefs, setUserPrefs] = useState(null);
 
+  // Photo editing
+  const [uploadingIndex, setUploadingIndex] = useState(null);
+  const [pendingPhoto, setPendingPhoto] = useState(null); // { index, uri, isReplace }
+
   // Refetch on focus so completion % reflects edits made in edit-profile
   useFocusEffect(
     useCallback(() => {
@@ -51,6 +60,67 @@ export default function ProfileScreen() {
       setIncognito(!!data.paused);
       setUserPrefs(mapDbPrefsToUI(data));
     }
+  };
+
+  const photos = profile?.photos || [];
+
+  const pickPhoto = async (index) => {
+    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!perm.granted) {
+      Alert.alert('Permission needed', 'Allow photo access to update your pictures.');
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: index === 0 ? [1, 1] : [4, 3],
+      quality: 0.8,
+    });
+    if (result.canceled || !result.assets?.length) return;
+
+    // Always confirm before the photo actually changes
+    setPendingPhoto({ index, uri: result.assets[0].uri, isReplace: !!photos[index] });
+  };
+
+  const confirmPhoto = async () => {
+    if (!pendingPhoto) return;
+    const { index, uri } = pendingPhoto;
+    setPendingPhoto(null);
+
+    const uid = getCurrentUserId();
+    if (!uid) return;
+    setUploadingIndex(index);
+
+    try {
+      const url = await uploadPhoto(uid, uri, index === 0 ? 'profile' : `flat-${index}`);
+      const nextPhotos = setPhotoAt(photos, index, url);
+      const { error } = await supabase.from('profiles').update({ photos: nextPhotos }).eq('id', uid);
+      if (error) throw error;
+      setProfile((p) => ({ ...p, photos: nextPhotos }));
+    } catch (e) {
+      console.error('Photo upload failed:', e);
+      Alert.alert('Error', 'Failed to update photo. Please try again.');
+    } finally {
+      setUploadingIndex(null);
+    }
+  };
+
+  const handleRemovePhoto = (index) => {
+    Alert.alert('Remove photo', 'Remove this photo from your profile?', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Remove', style: 'destructive', onPress: async () => {
+        const uid = getCurrentUserId();
+        if (!uid) return;
+        const nextPhotos = removePhotoAt(photos, index);
+        const { error } = await supabase.from('profiles').update({ photos: nextPhotos }).eq('id', uid);
+        if (error) {
+          Alert.alert('Error', 'Failed to remove photo.');
+          return;
+        }
+        setProfile((p) => ({ ...p, photos: nextPhotos }));
+      }}
+    ]);
   };
 
   const toggleIncognito = async (val) => {
@@ -122,7 +192,7 @@ export default function ProfileScreen() {
               <Circle cx={size/2} cy={size/2} r={radius} stroke="#EEF0FF" strokeWidth={strokeWidth} fill="transparent" />
               <Circle cx={size/2} cy={size/2} r={radius} stroke="#335CFF" strokeWidth={strokeWidth} fill="transparent" strokeDasharray={circumference} strokeDashoffset={strokeDashoffset} strokeLinecap="round" />
             </Svg>
-            <TouchableOpacity activeOpacity={0.8} style={{ width: 72, height: 72, position: 'relative' }}>
+            <TouchableOpacity activeOpacity={0.8} style={{ width: 72, height: 72, position: 'relative' }} onPress={() => pickPhoto(0)}>
               {photo ? (
                 <Image source={{ uri: photo }} style={{ position: 'absolute', inset: 0, borderRadius: 36 }} resizeMode="cover" />
               ) : (
@@ -136,6 +206,11 @@ export default function ProfileScreen() {
               <View style={{ position: 'absolute', bottom: 0, right: 0, width: 22, height: 22, borderRadius: 11, backgroundColor: colors.blue, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#fff' }}>
                 <Ionicons name="camera" size={12} color="#fff" />
               </View>
+              {uploadingIndex === 0 && (
+                <View style={s.avatarUploading}>
+                  <ActivityIndicator size="small" color="#fff" />
+                </View>
+              )}
             </TouchableOpacity>
           </View>
           <View style={{ flex: 1, marginLeft: 6 }}>
@@ -162,6 +237,45 @@ export default function ProfileScreen() {
             </View>
             <Text style={s.actionText}>Preferences</Text>
           </TouchableOpacity>
+        </View>
+
+        {/* Photos */}
+        <View style={s.section}>
+          <View style={s.photoHeader}>
+            <Text style={s.sectionLabel}>PHOTOS</Text>
+            <Text style={s.photoHint}>tap to edit · hold to remove</Text>
+          </View>
+          <View style={s.photoGrid}>
+            {Array.from({ length: MAX_PHOTOS }).map((_, i) => (
+              <TouchableOpacity
+                key={i}
+                style={s.photoSlot}
+                activeOpacity={0.8}
+                onPress={() => pickPhoto(i)}
+                onLongPress={() => photos[i] && handleRemovePhoto(i)}
+              >
+                {photos[i] ? (
+                  <>
+                    <Image source={{ uri: photos[i] }} style={s.photoSlotImg} resizeMode="cover" />
+                    {i === 0 && (
+                      <View style={s.photoBadge}>
+                        <Text style={s.photoBadgeText}>Main</Text>
+                      </View>
+                    )}
+                  </>
+                ) : uploadingIndex === i ? (
+                  <ActivityIndicator size="small" color={colors.blue} />
+                ) : (
+                  <Ionicons name="add" size={24} color="#C0C5D0" />
+                )}
+                {uploadingIndex === i && photos[i] && (
+                  <View style={s.photoSlotUploading}>
+                    <ActivityIndicator size="small" color="#fff" />
+                  </View>
+                )}
+              </TouchableOpacity>
+            ))}
+          </View>
         </View>
 
         {/* Settings Sections */}
@@ -199,6 +313,35 @@ export default function ProfileScreen() {
         </View>
       </ScrollView>
 
+      {/* Confirm before a photo actually changes */}
+      <Modal visible={!!pendingPhoto} transparent animationType="fade" onRequestClose={() => setPendingPhoto(null)}>
+        <Pressable style={s.confirmBackdrop} onPress={() => setPendingPhoto(null)}>
+          <Pressable style={s.confirmBox} onPress={() => {}}>
+            <Text style={s.confirmTitle}>
+              {pendingPhoto?.index === 0
+                ? (pendingPhoto?.isReplace ? 'Change profile photo?' : 'Set profile photo?')
+                : (pendingPhoto?.isReplace ? 'Replace this photo?' : 'Add this photo?')}
+            </Text>
+            <Text style={s.confirmSub}>
+              {pendingPhoto?.index === 0
+                ? 'This is the first thing people see in the feed.'
+                : 'This will be shown on your profile.'}
+            </Text>
+            {pendingPhoto && (
+              <Image source={{ uri: pendingPhoto.uri }} style={s.confirmPreview} resizeMode="cover" />
+            )}
+            <View style={s.confirmActions}>
+              <TouchableOpacity style={[s.confirmBtn, s.confirmCancel]} onPress={() => setPendingPhoto(null)}>
+                <Text style={s.confirmCancelText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[s.confirmBtn, s.confirmOk]} onPress={confirmPhoto}>
+                <Text style={s.confirmOkText}>Confirm</Text>
+              </TouchableOpacity>
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
       <PreferencesSheet
         visible={prefsVisible}
         prefs={userPrefs}
@@ -223,6 +366,29 @@ const s = StyleSheet.create({
   actionBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: '#fff', paddingVertical: 12, paddingHorizontal: 16, borderRadius: 16, shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 6, shadowOffset: { width: 0, height: 2 }, elevation: 2 },
   actionIcon: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
   actionText: { fontFamily: 'HankenGrotesk_700Bold', fontSize: 14, color: colors.ink },
+
+  avatarUploading: { position: 'absolute', inset: 0, borderRadius: 36, backgroundColor: 'rgba(0,0,0,0.45)', alignItems: 'center', justifyContent: 'center' },
+
+  photoHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 },
+  photoHint: { fontFamily: 'HankenGrotesk_400Regular', fontSize: 12, color: '#9AA0B2' },
+  photoGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  photoSlot: { width: PHOTO_SLOT, height: PHOTO_SLOT, borderRadius: 14, backgroundColor: '#fff', borderWidth: 1, borderColor: '#EDEEF2', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
+  photoSlotImg: { ...StyleSheet.absoluteFillObject, borderRadius: 14 },
+  photoSlotUploading: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.45)', alignItems: 'center', justifyContent: 'center' },
+  photoBadge: { position: 'absolute', bottom: 6, left: 6, backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: 50, paddingHorizontal: 8, paddingVertical: 3 },
+  photoBadgeText: { fontFamily: 'HankenGrotesk_600SemiBold', fontSize: 10, color: '#fff' },
+
+  confirmBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', alignItems: 'center', justifyContent: 'center', padding: 30 },
+  confirmBox: { width: '100%', maxWidth: 340, backgroundColor: '#fff', borderRadius: 20, padding: 20 },
+  confirmTitle: { fontFamily: 'SpaceGrotesk_700Bold', fontSize: 18, color: colors.ink, marginBottom: 4 },
+  confirmSub: { fontFamily: 'HankenGrotesk_400Regular', fontSize: 13, color: '#9AA0B2', marginBottom: 16 },
+  confirmPreview: { width: '100%', height: 200, borderRadius: 14, marginBottom: 18, backgroundColor: colors.canvas },
+  confirmActions: { flexDirection: 'row', gap: 10 },
+  confirmBtn: { flex: 1, borderRadius: 50, paddingVertical: 12, alignItems: 'center' },
+  confirmCancel: { backgroundColor: '#F2F3F7' },
+  confirmCancelText: { fontFamily: 'HankenGrotesk_600SemiBold', fontSize: 14, color: colors.ink },
+  confirmOk: { backgroundColor: colors.blue },
+  confirmOkText: { fontFamily: 'HankenGrotesk_600SemiBold', fontSize: 14, color: '#fff' },
 
   section: { paddingHorizontal: 20, marginBottom: 24 },
   sectionLabel: { fontFamily: 'SpaceMono_400Regular', fontSize: 10, letterSpacing: 1.5, color: '#9AA0B2', marginBottom: 10 },
