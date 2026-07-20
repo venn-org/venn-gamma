@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
-import { useEffect, useRef, useState } from "react";
+import { useFocusEffect, useRouter } from "expo-router";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Alert,
   Animated,
@@ -25,8 +25,8 @@ import {
   getTodayViewedProfileIds,
   recordProfileView,
 } from "../../lib/dailyLimits";
-import { mapDbPrefsToUI, mapUIPrefsToDb, toDb } from "../../lib/enums";
-import { calculateProfileCompletion } from "../../lib/profileUtils";
+import { mapDbPrefsToUI, mapUIPrefsToDb, toDb, toUI } from "../../lib/enums";
+import { calculateProfileCompletion, isFeedReady } from "../../lib/profileUtils";
 import { supabase } from "../../lib/supabase";
 import { colors } from "../../lib/theme";
 
@@ -64,7 +64,6 @@ export default function FeedScreen() {
     if (uid) {
       getRemainingLikes(uid).then(setRemainingLikes);
     }
-    fetchMyPrefs();
     fetchFeed();
     if (!uid) return;
 
@@ -101,6 +100,13 @@ export default function FeedScreen() {
       supabase.removeChannel(matchSub);
     };
   }, []);
+
+  // Keep the completion banner in sync with edits made elsewhere
+  useFocusEffect(
+    useCallback(() => {
+      fetchMyPrefs();
+    }, []),
+  );
 
   useEffect(() => {
     fadeIn.setValue(0);
@@ -155,6 +161,7 @@ export default function FeedScreen() {
       .select("*")
       .neq("id", uid)
       .eq("paused", false)
+      .eq("onboarding_done", true)
       .order("last_active_at", { ascending: false });
 
     if (currentPrefs?.role) {
@@ -173,6 +180,9 @@ export default function FeedScreen() {
       const filtered = data.filter((p) => {
         if (blocked.has(p.id)) return false;
         if (viewedToday.has(p.id)) return false;
+
+        // Skip incomplete profiles — they render as empty cards
+        if (!isFeedReady(p)) return false;
 
         // Match based on overlapping area preferences
         const myAreas = currentPrefs?.areas || [];
@@ -382,27 +392,29 @@ export default function FeedScreen() {
         ) : (
           <>
             <Animated.View style={[s.cardOuter, { flex: 1, opacity: fadeIn }]}>
-              <Modal
-                visible={menuOpen}
-                transparent
-                animationType="fade"
-                onRequestClose={() => setMenuOpen(false)}
-              >
-                <Pressable
-                  style={s.menuBackdrop}
-                  onPress={() => setMenuOpen(false)}
+              {menuOpen && (
+                <Modal
+                  visible
+                  transparent
+                  animationType="fade"
+                  onRequestClose={() => setMenuOpen(false)}
                 >
-                  <View style={s.menuBox}>
-                    <TouchableOpacity style={s.menuItem} onPress={handleReport}>
-                      <Text style={s.menuItemText}>Report</Text>
-                    </TouchableOpacity>
-                    <View style={s.menuDivider} />
-                    <TouchableOpacity style={s.menuItem} onPress={handleBlock}>
-                      <Text style={s.menuItemText}>Block</Text>
-                    </TouchableOpacity>
-                  </View>
-                </Pressable>
-              </Modal>
+                  <Pressable
+                    style={s.menuBackdrop}
+                    onPress={() => setMenuOpen(false)}
+                  >
+                    <View style={s.menuBox}>
+                      <TouchableOpacity style={s.menuItem} onPress={handleReport}>
+                        <Text style={s.menuItemText}>Report</Text>
+                      </TouchableOpacity>
+                      <View style={s.menuDivider} />
+                      <TouchableOpacity style={s.menuItem} onPress={handleBlock}>
+                        <Text style={s.menuItemText}>Block</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </Pressable>
+                </Modal>
+              )}
 
               {/* Card Header (Fixed) */}
               <View style={s.cardHeader}>
@@ -454,8 +466,9 @@ export default function FeedScreen() {
 
               {/* Scrollable Profile Content */}
               <ScrollView
+                style={{ flex: 1 }}
                 showsVerticalScrollIndicator={false}
-                contentContainerStyle={{ paddingBottom: 20 }}
+                contentContainerStyle={{ paddingBottom: 110 }}
               >
                 <View style={s.photoWrap}>
                   {currentProfile.photos?.[0] ? (
@@ -499,7 +512,7 @@ export default function FeedScreen() {
                         color="#9AA0B2"
                       />
                       <Text style={s.infoItemText}>
-                        {currentProfile.gender || "-"}
+                        {toUI("gender", currentProfile.gender) || "-"}
                       </Text>
                     </View>
                   </View>
@@ -519,9 +532,11 @@ export default function FeedScreen() {
                     <View style={[s.infoItem, { paddingLeft: 12 }]}>
                       <Ionicons name="cash-outline" size={16} color="#9AA0B2" />
                       <Text style={s.infoItemText}>
-                        {currentProfile.budget_max || currentProfile.budget
-                          ? `₹${currentProfile.budget_max || currentProfile.budget}/mo`
-                          : "-"}
+                        {currentProfile.budget_max
+                          ? `₹${currentProfile.budget_max}/mo`
+                          : currentProfile.budget
+                            ? toUI("pref_budget", currentProfile.budget)
+                            : "-"}
                       </Text>
                     </View>
                   </View>
@@ -743,7 +758,7 @@ const s = StyleSheet.create({
     color: "#fff",
   },
 
-  feedContent: { paddingHorizontal: 16, paddingTop: 12, paddingBottom: 120 },
+  feedContent: { paddingHorizontal: 16, paddingTop: 12 },
 
   skipBtn: {
     position: "absolute",

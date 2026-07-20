@@ -4,7 +4,7 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors } from '../../lib/theme';
-import { setupRecaptcha, sendPhoneOtp, verifyPhoneOtp, ensureProfile } from '../../lib/auth';
+import { setupRecaptcha, clearRecaptcha, sendPhoneOtp, verifyPhoneOtp, ensureProfile } from '../../lib/auth';
 
 export default function PhoneScreen() {
   const router = useRouter();
@@ -31,6 +31,9 @@ export default function PhoneScreen() {
     if (Platform.OS === 'web') {
       setupRecaptcha('recaptcha-container');
     }
+    return () => {
+      if (Platform.OS === 'web') clearRecaptcha();
+    };
   }, []);
 
   useEffect(() => {
@@ -71,10 +74,19 @@ export default function PhoneScreen() {
       slideY.setValue(50);
       opacity.setValue(0);
     } catch (e) {
-      if (e.message.includes('too-many-requests')) {
-        setSpamWarning('Too many attempts. Please try again later.');
+      console.error('sendPhoneOtp failed:', e);
+      if (e.code) {
+        // Raw Firebase error (has an error code) — never show its message to the user.
+        if (e.code.includes('too-many-requests')) {
+          setSpamWarning('Too many attempts. Please try again later.');
+        } else if (e.code.includes('operation-not-allowed')) {
+          setSpamWarning('Phone sign-in is currently unavailable. Please use email instead.');
+        } else {
+          setSpamWarning('Failed to send code. Please try again.');
+        }
       } else {
-        setSpamWarning(e.message);
+        // Our own validation/spam-protection errors are already user-friendly.
+        setSpamWarning(e.message || 'Failed to send code. Please try again.');
       }
     } finally {
       setLoading(false);
@@ -129,7 +141,7 @@ export default function PhoneScreen() {
         <LinearGradient colors={[colors.blue, colors.violet]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={[styles.progressFill, { width: '20%' }]} />
       </View>
 
-      <TouchableOpacity style={styles.back} onPress={() => step === 'otp' ? setStep('phone') : router.back()}>
+      <TouchableOpacity style={styles.back} onPress={() => step === 'otp' ? setStep('phone') : (router.canGoBack() ? router.back() : router.replace('/login'))}>
         <Text style={styles.backArrow}>‹</Text>
       </TouchableOpacity>
 

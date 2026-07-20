@@ -28,7 +28,8 @@ export default function NotificationsScreen() {
     try {
       await submitData();
     } catch (e) {
-      Alert.alert('Error', e.message || 'Something went wrong saving your profile.');
+      console.error('submitData failed:', e);
+      Alert.alert('Error', 'Something went wrong saving your profile. Please try again.');
       setLoading(false);
       return;
     }

@@ -56,7 +56,7 @@ export default function MessagesScreen() {
 
     if (error) {
       console.error('Error fetching matches:', error);
-      setError(error.message || 'Failed to load messages');
+      setError('Failed to load messages. Please try again.');
       setLoading(false);
       setRefreshing(false);
       return;
