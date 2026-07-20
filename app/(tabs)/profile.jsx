@@ -1,8 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useCallback } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, Image, StyleSheet, Switch, Alert, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import Svg, { Circle } from 'react-native-svg';
 import { supabase } from '../../lib/supabase';
@@ -34,9 +34,12 @@ export default function ProfileScreen() {
   const [prefsVisible, setPrefsVisible] = useState(false);
   const [userPrefs, setUserPrefs] = useState(null);
 
-  useEffect(() => {
-    fetchProfile();
-  }, []);
+  // Refetch on focus so completion % reflects edits made in edit-profile
+  useFocusEffect(
+    useCallback(() => {
+      fetchProfile();
+    }, [])
+  );
 
   const fetchProfile = async () => {
     const uid = getCurrentUserId();

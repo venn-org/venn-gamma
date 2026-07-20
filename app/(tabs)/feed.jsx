@@ -64,7 +64,6 @@ export default function FeedScreen() {
     if (uid) {
       getRemainingLikes(uid).then(setRemainingLikes);
     }
-    fetchMyPrefs();
     fetchFeed();
     if (!uid) return;
 
