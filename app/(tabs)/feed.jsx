@@ -33,7 +33,6 @@ import { colors } from "../../lib/theme";
 const { width: SCREEN_W } = Dimensions.get("window");
 
 const FILTER_CHIPS = [
-  { key: "role", label: "Role" },
   { key: "budget", label: "Budget" },
   { key: "areas", label: "Areas" },
 ];
@@ -605,6 +604,7 @@ export default function FeedScreen() {
       <PreferencesSheet
         visible={prefsVisible}
         prefs={userPrefs}
+        city={myProfile?.city}
         onClose={() => setPrefsVisible(false)}
         onSave={handleSavePrefs}
       />

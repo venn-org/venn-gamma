@@ -1,0 +1,33 @@
+{
+  "cities": [
+    { "id": "delhi", "name": "Delhi NCR", "country": "India" },
+    { "id": "bangalore", "name": "Bengaluru", "country": "India" },
+    { "id": "mumbai", "name": "Mumbai", "country": "India" }
+  ],
+  "zonesByCity": {
+    "delhi": [
+      { "id": "south-delhi", "name": "South Delhi", "lat": 28.5244, "lng": 77.1855, "radiusKm": 8 },
+      { "id": "gurgaon", "name": "Gurgaon", "lat": 28.4595, "lng": 77.0266, "radiusKm": 12 },
+      { "id": "noida", "name": "Noida", "lat": 28.5921, "lng": 77.3707, "radiusKm": 10 },
+      { "id": "east-delhi", "name": "East Delhi", "lat": 28.6328, "lng": 77.3045, "radiusKm": 10 },
+      { "id": "west-delhi", "name": "West Delhi", "lat": 28.6692, "lng": 77.0411, "radiusKm": 10 },
+      { "id": "north-delhi", "name": "North Delhi", "lat": 28.7547, "lng": 77.2301, "radiusKm": 10 }
+    ],
+    "bangalore": [
+      { "id": "koramangala", "name": "Koramangala", "lat": 12.9352, "lng": 77.6245, "radiusKm": 6 },
+      { "id": "indiranagar", "name": "Indiranagar", "lat": 13.0347, "lng": 77.6410, "radiusKm": 6 },
+      { "id": "whitefield", "name": "Whitefield", "lat": 12.9698, "lng": 77.7499, "radiusKm": 8 },
+      { "id": "jp-nagar", "name": "JP Nagar", "lat": 12.9352, "lng": 77.5945, "radiusKm": 6 },
+      { "id": "hsr-layout", "name": "HSR Layout", "lat": 12.9250, "lng": 77.6245, "radiusKm": 6 },
+      { "id": "bellandur", "name": "Bellandur", "lat": 12.9698, "lng": 77.6854, "radiusKm": 6 }
+    ],
+    "mumbai": [
+      { "id": "andheri", "name": "Andheri", "lat": 19.1197, "lng": 72.8468, "radiusKm": 8 },
+      { "id": "bandra", "name": "Bandra", "lat": 19.0596, "lng": 72.8295, "radiusKm": 6 },
+      { "id": "powai", "name": "Powai", "lat": 19.1176, "lng": 72.9060, "radiusKm": 6 },
+      { "id": "dadar", "name": "Dadar", "lat": 19.0178, "lng": 72.8478, "radiusKm": 6 },
+      { "id": "thane", "name": "Thane", "lat": 19.2183, "lng": 72.9781, "radiusKm": 12 },
+      { "id": "navi-mumbai", "name": "Navi Mumbai", "lat": 19.0330, "lng": 73.0297, "radiusKm": 14 }
+    ]
+  }
+}

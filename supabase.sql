@@ -14,31 +14,31 @@ CREATE TABLE public.profiles (
   budget_min integer,
   budget_max integer,
   move_in_date date,
-  photos text[],
+  photos ARRAY,
   created_at timestamp with time zone DEFAULT now(),
-  pronouns text[],
-  gender text,
-  drink text,
-  tobacco text,
-  areas text[],
-  budget text,
+  pronouns ARRAY,
+  gender USER-DEFINED,
+  drink USER-DEFINED,
+  tobacco USER-DEFINED,
+  areas ARRAY,
+  budget USER-DEFINED,
   onboarding_done boolean DEFAULT false,
   birthday date,
-  weed text,
-  preferred_areas text[],
-  user_type text,
-  pref_move_in text,
-  pref_gender text,
-  pref_age text,
-  pref_occupation text[],
-  pref_food text[],
-  pref_smoking text,
-  pref_drinking text,
-  pref_pets text[],
-  pref_role text,
-  pref_areas text[],
-  pref_budget text,
-  pref_flat_type text[],
+  weed USER-DEFINED,
+  preferred_areas ARRAY,
+  user_type USER-DEFINED,
+  pref_move_in USER-DEFINED,
+  pref_gender USER-DEFINED,
+  pref_age USER-DEFINED,
+  pref_occupation ARRAY,
+  pref_food ARRAY,
+  pref_smoking USER-DEFINED,
+  pref_drinking USER-DEFINED,
+  pref_pets ARRAY,
+  pref_role USER-DEFINED,
+  pref_areas ARRAY,
+  pref_budget USER-DEFINED,
+  pref_flat_type ARRAY,
   job_company text,
   job_title text,
   education_school text,
@@ -46,7 +46,7 @@ CREATE TABLE public.profiles (
   prompts jsonb DEFAULT '[]'::jsonb,
   verified boolean NOT NULL DEFAULT false,
   last_active_at timestamp with time zone,
-  flat_type text,
+  flat_type USER-DEFINED,
   paused boolean NOT NULL DEFAULT false,
   is_admin boolean NOT NULL DEFAULT false,
   CONSTRAINT profiles_pkey PRIMARY KEY (id)
@@ -58,8 +58,7 @@ CREATE TABLE public.matches (
   created_at timestamp with time zone DEFAULT now(),
   CONSTRAINT matches_pkey PRIMARY KEY (id),
   CONSTRAINT matches_user1_id_fkey FOREIGN KEY (user1_id) REFERENCES public.profiles(id),
-  CONSTRAINT matches_user2_id_fkey FOREIGN KEY (user2_id) REFERENCES public.profiles(id),
-  CONSTRAINT matches_user1_user2_unique UNIQUE (user1_id, user2_id)
+  CONSTRAINT matches_user2_id_fkey FOREIGN KEY (user2_id) REFERENCES public.profiles(id)
 );
 CREATE TABLE public.messages (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
@@ -80,8 +79,7 @@ CREATE TABLE public.likes (
   created_at timestamp with time zone NOT NULL DEFAULT now(),
   CONSTRAINT likes_pkey PRIMARY KEY (id),
   CONSTRAINT likes_from_user_id_fkey FOREIGN KEY (from_user_id) REFERENCES public.profiles(id),
-  CONSTRAINT likes_to_user_id_fkey FOREIGN KEY (to_user_id) REFERENCES public.profiles(id),
-  CONSTRAINT likes_from_to_unique UNIQUE (from_user_id, to_user_id)
+  CONSTRAINT likes_to_user_id_fkey FOREIGN KEY (to_user_id) REFERENCES public.profiles(id)
 );
 CREATE TABLE public.reports (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
@@ -146,4 +144,13 @@ CREATE TABLE public.push_subscriptions (
   created_at timestamp with time zone NOT NULL DEFAULT now(),
   CONSTRAINT push_subscriptions_pkey PRIMARY KEY (id),
   CONSTRAINT push_subscriptions_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.profiles(id)
+);
+CREATE TABLE public.profile_views (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  viewer_id text NOT NULL,
+  viewed_id text NOT NULL,
+  viewed_at timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT profile_views_pkey PRIMARY KEY (id),
+  CONSTRAINT profile_views_viewer_id_fkey FOREIGN KEY (viewer_id) REFERENCES public.profiles(id),
+  CONSTRAINT profile_views_viewed_id_fkey FOREIGN KEY (viewed_id) REFERENCES public.profiles(id)
 );

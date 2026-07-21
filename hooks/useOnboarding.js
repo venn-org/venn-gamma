@@ -9,6 +9,10 @@ let onboardingState = {
   firstName: '',
   lastName: '',
   type: null, // 'seeking' | 'owner'
+  city: null,
+  zone: null,
+  lat: null,
+  lng: null,
   birthday: null,
   pronouns: [],
   gender: null,
@@ -103,20 +107,24 @@ export function useOnboarding() {
     const updatePayload = {
       name: `${onboardingState.firstName} ${onboardingState.lastName}`.trim(),
       user_type: onboardingState.type,
+      city: onboardingState.city,
+      zone: onboardingState.zone,
+      lat: onboardingState.lat,
+      lng: onboardingState.lng,
       birthday: onboardingState.birthday,
       pronouns: onboardingState.pronouns,
       gender: toDb('gender', onboardingState.gender) || null,
-      
+
       drink: toDb('lifestyle', onboardingState.lifestyle?.drink) || null,
       tobacco: toDb('lifestyle', onboardingState.lifestyle?.tobacco) || null,
       weed: toDb('lifestyle', onboardingState.lifestyle?.weed) || null,
-      
+
       areas: onboardingState.prefs?.areas || null,
       budget: toDb('pref_budget', onboardingState.prefs?.budget) || null,
       flat_type: onboardingState.type === 'owner' ? toDb('flat_type', onboardingState.prefs?.flatType) : null,
-      
+
       ...dbPrefs,
-      
+
       photos: profilePhotoUrl ? [profilePhotoUrl, ...flatPhotoUrls] : (flatPhotoUrls.length > 0 ? flatPhotoUrls : null),
       onboarding_done: true
     };
