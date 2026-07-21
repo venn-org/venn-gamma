@@ -18,7 +18,7 @@ export default function OnboardingShell({ step, total, children, footer, slideX 
         <Text style={styles.stepLabel}>STEP {step} OF {total}</Text>
       </View>
 
-      <TouchableOpacity style={styles.back} onPress={() => router.back()}>
+      <TouchableOpacity style={styles.back} onPress={() => router.canGoBack() ? router.back() : router.replace('/(onboarding)/name')}>
         <Text style={styles.backArrow}>‹</Text>
       </TouchableOpacity>
 

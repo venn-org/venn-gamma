@@ -20,7 +20,7 @@ export default function AccountTypeScreen() {
     setLoading(true);
     updateData({ type });
     setLoading(false);
-    router.push('/(onboarding)/birthday');
+    router.push('/(onboarding)/city');
   };
 
   return (
