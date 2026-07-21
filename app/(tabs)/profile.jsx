@@ -345,6 +345,8 @@ export default function ProfileScreen() {
       <PreferencesSheet
         visible={prefsVisible}
         prefs={userPrefs}
+        city={profile?.city}
+        showRole
         onClose={() => setPrefsVisible(false)}
         onSave={handleSavePrefs}
       />
