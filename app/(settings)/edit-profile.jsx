@@ -7,9 +7,14 @@ import { supabase } from '../../lib/supabase';
 import { getCurrentUserId } from '../../lib/auth';
 import { colors } from '../../lib/theme';
 import { toUI, toDb } from '../../lib/enums';
+import { getAge } from '../../lib/age';
+import RangeSlider from '../../components/RangeSlider';
 
 const GENDER_OPTIONS = ['Woman', 'Man', 'Non-binary', 'Transgender', 'Other'];
 const LIFESTYLE_OPTIONS = ['Yes', 'Sometimes', 'No', 'Prefer not to say'];
+const BUDGET_MIN = 0;
+const BUDGET_MAX = 100000;
+const BUDGET_STEP = 1000;
 
 const ChipSelector = ({ options, selected, onSelect }) => (
   <View style={s.chipContainer}>
@@ -51,8 +56,8 @@ export default function EditProfileScreen() {
   const [educationLevel, setEducationLevel] = useState('');
 
   // Housing
-  const [budgetMin, setBudgetMin] = useState('');
-  const [budgetMax, setBudgetMax] = useState('');
+  const [budgetMin, setBudgetMin] = useState(BUDGET_MIN);
+  const [budgetMax, setBudgetMax] = useState(20000);
   const [moveInDate, setMoveInDate] = useState(''); // YYYY-MM-DD
 
   // Lifestyle
@@ -105,8 +110,8 @@ export default function EditProfileScreen() {
         setJobCompany(data.job_company || '');
         setEducationSchool(data.education_school || '');
         setEducationLevel(data.education_level || '');
-        setBudgetMin(data.budget_min != null ? String(data.budget_min) : '');
-        setBudgetMax(data.budget_max != null ? String(data.budget_max) : '');
+        setBudgetMin(data.budget_min ?? BUDGET_MIN);
+        setBudgetMax(data.budget_max ?? 20000);
         setMoveInDate(typeof data.move_in_date === 'string' ? data.move_in_date.split('T')[0] : '');
 
         setDrink(toUI('lifestyle', data.drink) || data.drink || '');
@@ -150,17 +155,6 @@ export default function EditProfileScreen() {
       return;
     }
 
-    const minVal = budgetMin.trim() ? parseInt(budgetMin, 10) : null;
-    const maxVal = budgetMax.trim() ? parseInt(budgetMax, 10) : null;
-    if ((budgetMin.trim() && Number.isNaN(minVal)) || (budgetMax.trim() && Number.isNaN(maxVal))) {
-      Alert.alert('Invalid budget', 'Budget must be a number.');
-      return;
-    }
-    if (minVal != null && maxVal != null && minVal > maxVal) {
-      Alert.alert('Invalid budget', 'Minimum budget cannot be greater than maximum.');
-      return;
-    }
-
     setSaving(true);
     try {
       const uid = getCurrentUserId();
@@ -190,8 +184,8 @@ export default function EditProfileScreen() {
         job_company: jobCompany.trim() || null,
         education_school: educationSchool.trim() || null,
         education_level: educationLevel.trim() || null,
-        budget_min: minVal,
-        budget_max: maxVal,
+        budget_min: budgetMin,
+        budget_max: budgetMax,
         move_in_date: moveInDate || null,
         drink: toDb('lifestyle', drink) || null,
         tobacco: toDb('lifestyle', tobacco) || null,
@@ -201,6 +195,7 @@ export default function EditProfileScreen() {
       
       if (isoBirthday) {
         updatePayload.birthday = isoBirthday;
+        updatePayload.age = getAge(birthday);
       }
       
       const { error } = await supabase.from('profiles').update(updatePayload).eq('id', uid);
@@ -335,24 +330,14 @@ export default function EditProfileScreen() {
               <View style={s.section}>
                 <Text style={s.sectionTitle}>Housing</Text>
 
-                <Text style={s.label}>Budget Min (₹ / month)</Text>
-                <TextInput
-                  style={s.input}
-                  placeholder="15000"
-                  placeholderTextColor="#9AA0B2"
-                  value={budgetMin}
-                  onChangeText={setBudgetMin}
-                  keyboardType="numeric"
-                />
-
-                <Text style={s.label}>Budget Max (₹ / month)</Text>
-                <TextInput
-                  style={s.input}
-                  placeholder="25000"
-                  placeholderTextColor="#9AA0B2"
-                  value={budgetMax}
-                  onChangeText={setBudgetMax}
-                  keyboardType="numeric"
+                <Text style={s.label}>Budget Range (₹ / month)</Text>
+                <RangeSlider
+                  min={BUDGET_MIN}
+                  max={BUDGET_MAX}
+                  step={BUDGET_STEP}
+                  valueMin={budgetMin}
+                  valueMax={budgetMax}
+                  onChange={(lo, hi) => { setBudgetMin(lo); setBudgetMax(hi); }}
                 />
 
                 <Text style={s.label}>Move-in Date (YYYY-MM-DD)</Text>
