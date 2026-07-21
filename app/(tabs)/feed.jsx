@@ -456,9 +456,6 @@ export default function FeedScreen() {
                   </View>
                 </View>
                 <View style={s.navBtns}>
-                  <TouchableOpacity style={s.navBtn} onPress={handlePass}>
-                    <Ionicons name="close" size={18} color={colors.ink} />
-                  </TouchableOpacity>
                   <TouchableOpacity
                     style={s.navBtn}
                     onPress={() => setMenuOpen(true)}
