@@ -1,4 +1,5 @@
-import { View, Text, TouchableOpacity, ScrollView, Modal, Pressable, StyleSheet, Image, Dimensions } from 'react-native';
+import { useRef, useEffect } from 'react';
+import { View, Text, TouchableOpacity, ScrollView, Modal, Pressable, StyleSheet, Image, Dimensions, Animated } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors } from '../lib/theme';
@@ -7,14 +8,34 @@ const { height: SCREEN_H } = Dimensions.get('window');
 
 export default function ProfileViewSheet({ visible, profile, onClose, onPass, onLike }) {
   const insets = useSafeAreaInsets();
+
+  // Manual backdrop-fade + sheet-slide (decoupled) so the backdrop doesn't
+  // ride along with the sheet's slide transform, which reads as a solid
+  // black panel growing up the screen instead of an instant dim.
+  const backdropOpacity = useRef(new Animated.Value(0)).current;
+  const sheetY = useRef(new Animated.Value(SCREEN_H)).current;
+
+  useEffect(() => {
+    if (visible) {
+      Animated.parallel([
+        Animated.timing(backdropOpacity, { toValue: 1, duration: 200, useNativeDriver: true }),
+        Animated.timing(sheetY, { toValue: 0, duration: 250, useNativeDriver: true }),
+      ]).start();
+    } else {
+      backdropOpacity.setValue(0);
+      sheetY.setValue(SCREEN_H);
+    }
+  }, [visible]);
+
   if (!profile) return null;
 
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' }}>
+    <Modal visible={visible} transparent animationType="none" onRequestClose={onClose}>
+      <View style={{ flex: 1, justifyContent: 'flex-end' }}>
+        <Animated.View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.6)', opacity: backdropOpacity }]} />
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
-        
-        <View style={[s.sheet, { paddingTop: 20, paddingBottom: insets.bottom + 12 }]}>
+
+        <Animated.View style={[s.sheet, { paddingTop: 20, paddingBottom: insets.bottom + 12, transform: [{ translateY: sheetY }] }]}>
           <View style={s.handle} />
           
           <ScrollView showsVerticalScrollIndicator={false} style={{ flexShrink: 1 }} contentContainerStyle={{ paddingBottom: 20 }}>
@@ -106,7 +127,7 @@ export default function ProfileViewSheet({ visible, profile, onClose, onPass, on
             </TouchableOpacity>
           </View>
 
-        </View>
+        </Animated.View>
       </View>
     </Modal>
   );

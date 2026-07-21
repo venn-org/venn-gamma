@@ -1,4 +1,4 @@
-import { useState, useEffect, Fragment } from 'react';
+import { useState, useEffect, useRef, Fragment } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, Modal, Pressable, StyleSheet, Dimensions, Animated, KeyboardAvoidingView, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -28,6 +28,24 @@ export default function PreferencesSheet({ visible, prefs, city, showRole = fals
     }
   }, [visible, prefs]);
 
+  // Manual backdrop-fade + sheet-slide (decoupled) so the backdrop doesn't
+  // ride along with the sheet's slide transform, which reads as a solid
+  // black panel growing up the screen instead of an instant dim.
+  const backdropOpacity = useRef(new Animated.Value(0)).current;
+  const sheetY = useRef(new Animated.Value(SCREEN_H)).current;
+
+  useEffect(() => {
+    if (visible) {
+      Animated.parallel([
+        Animated.timing(backdropOpacity, { toValue: 1, duration: 200, useNativeDriver: true }),
+        Animated.timing(sheetY, { toValue: 0, duration: 250, useNativeDriver: true }),
+      ]).start();
+    } else {
+      backdropOpacity.setValue(0);
+      sheetY.setValue(SCREEN_H);
+    }
+  }, [visible]);
+
   const toggleArea = (a) => {
     if (areas.includes(a)) {
       setAreas(areas.filter(x => x !== a));
@@ -56,12 +74,12 @@ export default function PreferencesSheet({ visible, prefs, city, showRole = fals
 
   return (
     <Fragment>
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+    <Modal visible={visible} transparent animationType="none" onRequestClose={onClose}>
       <KeyboardAvoidingView style={{ flex: 1, justifyContent: 'flex-end' }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-        <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.45)' }]} />
+        <Animated.View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.45)', opacity: backdropOpacity }]} />
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
-        
-        <View style={[pref.sheet, { paddingBottom: insets.bottom + 16 }]}>
+
+        <Animated.View style={[pref.sheet, { paddingBottom: insets.bottom + 16, transform: [{ translateY: sheetY }] }]}>
           <View style={pref.handle} />
           
           <View style={pref.header}>
@@ -130,7 +148,7 @@ export default function PreferencesSheet({ visible, prefs, city, showRole = fals
               <Text style={pref.saveBtnText}>Save Preferences</Text>
             </TouchableOpacity>
           </View>
-        </View>
+        </Animated.View>
       </KeyboardAvoidingView>
     </Modal>
 
