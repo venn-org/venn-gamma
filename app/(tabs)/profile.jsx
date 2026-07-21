@@ -42,6 +42,7 @@ export default function ProfileScreen() {
   // Photo editing
   const [uploadingIndex, setUploadingIndex] = useState(null);
   const [pendingPhoto, setPendingPhoto] = useState(null); // { index, uri, isReplace }
+  const [photoMenuIndex, setPhotoMenuIndex] = useState(null); // index whose Change/Remove menu is open
 
   // Refetch on focus so completion % reflects edits made in edit-profile
   useFocusEffect(
@@ -121,6 +122,14 @@ export default function ProfileScreen() {
         setProfile((p) => ({ ...p, photos: nextPhotos }));
       }}
     ]);
+  };
+
+  const handlePhotoSlotPress = (index) => {
+    if (photos[index]) {
+      setPhotoMenuIndex(index);
+    } else {
+      pickPhoto(index);
+    }
   };
 
   const toggleIncognito = async (val) => {
@@ -243,16 +252,14 @@ export default function ProfileScreen() {
         <View style={s.section}>
           <View style={s.photoHeader}>
             <Text style={s.sectionLabel}>PHOTOS</Text>
-            <Text style={s.photoHint}>tap to edit · hold to remove</Text>
+            <Text style={s.photoHint}>tap a photo to change or remove it</Text>
           </View>
           <View style={s.photoGrid}>
             {Array.from({ length: MAX_PHOTOS }).map((_, i) => (
-              <TouchableOpacity
+              <Pressable
                 key={i}
-                style={s.photoSlot}
-                activeOpacity={0.8}
-                onPress={() => pickPhoto(i)}
-                onLongPress={() => photos[i] && handleRemovePhoto(i)}
+                style={({ pressed }) => [s.photoSlot, pressed && { opacity: 0.8 }]}
+                onPress={() => handlePhotoSlotPress(i)}
               >
                 {photos[i] ? (
                   <>
@@ -262,6 +269,9 @@ export default function ProfileScreen() {
                         <Text style={s.photoBadgeText}>Main</Text>
                       </View>
                     )}
+                    <View style={s.photoEditBadge}>
+                      <Ionicons name="pencil" size={12} color="#fff" />
+                    </View>
                   </>
                 ) : uploadingIndex === i ? (
                   <ActivityIndicator size="small" color={colors.blue} />
@@ -273,7 +283,7 @@ export default function ProfileScreen() {
                     <ActivityIndicator size="small" color="#fff" />
                   </View>
                 )}
-              </TouchableOpacity>
+              </Pressable>
             ))}
           </View>
         </View>
@@ -342,6 +352,33 @@ export default function ProfileScreen() {
         </Pressable>
       </Modal>
 
+      {/* Change / remove menu for an existing photo */}
+      <Modal visible={photoMenuIndex !== null} transparent animationType="fade" onRequestClose={() => setPhotoMenuIndex(null)}>
+        <Pressable style={s.confirmBackdrop} onPress={() => setPhotoMenuIndex(null)}>
+          <Pressable style={s.menuSheet} onPress={() => {}}>
+            <TouchableOpacity
+              style={s.menuOption}
+              onPress={() => { const i = photoMenuIndex; setPhotoMenuIndex(null); pickPhoto(i); }}
+            >
+              <Ionicons name="image-outline" size={18} color={colors.ink} />
+              <Text style={s.menuOptionText}>Change photo</Text>
+            </TouchableOpacity>
+            <View style={s.menuDivider} />
+            <TouchableOpacity
+              style={s.menuOption}
+              onPress={() => { const i = photoMenuIndex; setPhotoMenuIndex(null); handleRemovePhoto(i); }}
+            >
+              <Ionicons name="trash-outline" size={18} color="#FF4D6A" />
+              <Text style={[s.menuOptionText, { color: '#FF4D6A' }]}>Remove photo</Text>
+            </TouchableOpacity>
+            <View style={s.menuDivider} />
+            <TouchableOpacity style={s.menuOption} onPress={() => setPhotoMenuIndex(null)}>
+              <Text style={[s.menuOptionText, { flex: 1, textAlign: 'center' }]}>Cancel</Text>
+            </TouchableOpacity>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
       <PreferencesSheet
         visible={prefsVisible}
         prefs={userPrefs}
@@ -379,6 +416,12 @@ const s = StyleSheet.create({
   photoSlotUploading: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.45)', alignItems: 'center', justifyContent: 'center' },
   photoBadge: { position: 'absolute', bottom: 6, left: 6, backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: 50, paddingHorizontal: 8, paddingVertical: 3 },
   photoBadgeText: { fontFamily: 'HankenGrotesk_600SemiBold', fontSize: 10, color: '#fff' },
+  photoEditBadge: { position: 'absolute', top: 6, right: 6, width: 22, height: 22, borderRadius: 11, backgroundColor: 'rgba(0,0,0,0.5)', alignItems: 'center', justifyContent: 'center' },
+
+  menuSheet: { width: '100%', maxWidth: 340, backgroundColor: '#fff', borderRadius: 20, overflow: 'hidden' },
+  menuOption: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 16, paddingHorizontal: 20 },
+  menuOptionText: { fontFamily: 'HankenGrotesk_600SemiBold', fontSize: 15, color: colors.ink },
+  menuDivider: { height: 1, backgroundColor: '#F0F1F5' },
 
   confirmBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', alignItems: 'center', justifyContent: 'center', padding: 30 },
   confirmBox: { width: '100%', maxWidth: 340, backgroundColor: '#fff', borderRadius: 20, padding: 20 },
