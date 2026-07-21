@@ -2,6 +2,7 @@ import { useState, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
 import { getCurrentUserId, notifyOnboardingComplete } from '../lib/auth';
 import { mapUIPrefsToDb, toDb } from '../lib/enums';
+import { getAge } from '../lib/age';
 
 // Shared state object instance outside the hook so it persists across screen unmounts/mounts
 // within the onboarding flow.
@@ -112,6 +113,7 @@ export function useOnboarding() {
       lat: onboardingState.lat,
       lng: onboardingState.lng,
       birthday: onboardingState.birthday,
+      age: getAge(onboardingState.birthday),
       pronouns: onboardingState.pronouns,
       gender: toDb('gender', onboardingState.gender) || null,
 
