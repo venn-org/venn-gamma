@@ -70,6 +70,8 @@ export default function EditProfileScreen() {
   const [prompt1A, setPrompt1A] = useState('');
   const [prompt2Q, setPrompt2Q] = useState('');
   const [prompt2A, setPrompt2A] = useState('');
+  const [prompt3Q, setPrompt3Q] = useState('');
+  const [prompt3A, setPrompt3A] = useState('');
 
   useEffect(() => {
     fetchProfile();
@@ -127,6 +129,10 @@ export default function EditProfileScreen() {
             setPrompt2Q(data.prompts[1].q || '');
             setPrompt2A(data.prompts[1].a || '');
           }
+          if (data.prompts[2]) {
+            setPrompt3Q(data.prompts[2].q || '');
+            setPrompt3A(data.prompts[2].a || '');
+          }
         }
       }
     } catch (e) {
@@ -167,7 +173,10 @@ export default function EditProfileScreen() {
       if (prompt2Q.trim() || prompt2A.trim()) {
         newPrompts.push({ q: prompt2Q.trim(), a: prompt2A.trim() });
       }
-      
+      if (prompt3Q.trim() || prompt3A.trim()) {
+        newPrompts.push({ q: prompt3Q.trim(), a: prompt3A.trim() });
+      }
+
       // Try to construct valid ISO string for birthday if provided
       let isoBirthday = null;
       if (birthday) {
@@ -409,6 +418,28 @@ export default function EditProfileScreen() {
                     placeholderTextColor="#9AA0B2"
                     value={prompt2A}
                     onChangeText={setPrompt2A}
+                    multiline
+                    textAlignVertical="top"
+                  />
+                </View>
+
+                <View style={s.promptBlock}>
+                  <Text style={s.label}>Question 3</Text>
+                  <TextInput
+                    style={s.input}
+                    placeholder="e.g. The way to win me over is..."
+                    placeholderTextColor="#9AA0B2"
+                    value={prompt3Q}
+                    onChangeText={setPrompt3Q}
+                  />
+
+                  <Text style={s.label}>Answer 3</Text>
+                  <TextInput
+                    style={[s.input, s.textArea]}
+                    placeholder="Type your answer here..."
+                    placeholderTextColor="#9AA0B2"
+                    value={prompt3A}
+                    onChangeText={setPrompt3A}
                     multiline
                     textAlignVertical="top"
                   />
