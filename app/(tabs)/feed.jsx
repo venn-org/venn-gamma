@@ -54,6 +54,10 @@ export default function FeedScreen() {
 
   // Match celebration state
   const [matchData, setMatchData] = useState(null);
+  const [likeSent, setLikeSent] = useState(null);
+  const likeSentTimer = useRef(null);
+
+  useEffect(() => () => clearTimeout(likeSentTimer.current), []);
 
   // Animation
   const fadeIn = useRef(new Animated.Value(0)).current;
@@ -255,6 +259,11 @@ export default function FeedScreen() {
     } else if (!error) {
       const remaining = await getRemainingLikes(uid);
       setRemainingLikes(remaining);
+
+      // Quick feedback loop — auto-dismisses so it doesn't block swiping
+      setLikeSent({ name: currentProfile.name, photo: currentProfile.photos?.[0] || null });
+      clearTimeout(likeSentTimer.current);
+      likeSentTimer.current = setTimeout(() => setLikeSent(null), 1500);
     }
   };
 
@@ -447,9 +456,6 @@ export default function FeedScreen() {
                   </View>
                 </View>
                 <View style={s.navBtns}>
-                  <TouchableOpacity style={s.navBtn} onPress={handlePass}>
-                    <Ionicons name="close" size={18} color={colors.ink} />
-                  </TouchableOpacity>
                   <TouchableOpacity
                     style={s.navBtn}
                     onPress={() => setMenuOpen(true)}
@@ -619,6 +625,16 @@ export default function FeedScreen() {
             setMatchData(null);
             router.push("/(tabs)/messages");
           }}
+        />
+      )}
+
+      {likeSent && (
+        <MatchCelebration
+          visible={!!likeSent}
+          mode="like"
+          matchedName={likeSent.name}
+          matchedPhoto={likeSent.photo}
+          onDismiss={() => setLikeSent(null)}
         />
       )}
     </View>

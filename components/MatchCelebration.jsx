@@ -11,7 +11,8 @@ const random = (seed) => {
   return x - Math.floor(x);
 };
 
-export default function MatchCelebration({ visible, matchedName, matchedPhoto, onDismiss, onChat }) {
+export default function MatchCelebration({ visible, mode = 'match', matchedName, matchedPhoto, onDismiss, onChat }) {
+  const isMatch = mode === 'match';
   // 30 pieces of confetti
   const pieces = Array.from({ length: 30 }).map((_, i) => ({
     x: random(i) * 100, // 0 to 100%
@@ -59,12 +60,20 @@ export default function MatchCelebration({ visible, matchedName, matchedPhoto, o
 
         {/* Card — stop propagation so tapping card doesn't dismiss */}
         <Pressable onPress={e => e.stopPropagation()} style={ms.card}>
-          <Text style={ms.eyebrow}>YOUR VENN OVERLAPS ✦</Text>
-          <Text style={ms.heading}>
-            {'You & '}<Text style={{ color: '#fff' }}>{matchedName}</Text>{'\nare a circle apart'}
-          </Text>
+          <Text style={ms.eyebrow}>{isMatch ? 'YOUR VENN OVERLAPS ✦' : 'LIKE SENT ✦'}</Text>
+          {isMatch ? (
+            <Text style={ms.heading}>
+              {'You & '}<Text style={{ color: '#fff' }}>{matchedName}</Text>{'\nare a circle apart'}
+            </Text>
+          ) : (
+            <Text style={ms.heading}>
+              {'You liked '}<Text style={{ color: '#fff' }}>{matchedName}</Text>
+            </Text>
+          )}
           <Text style={ms.sub}>
-            Lifestyle, budget and area preferences overlap — say hi and see where it goes
+            {isMatch
+              ? 'Lifestyle, budget and area preferences overlap — say hi and see where it goes'
+              : "They'll be notified — if they like you back, it's a match!"}
           </Text>
 
           {/* Avatar pair */}
@@ -88,16 +97,18 @@ export default function MatchCelebration({ visible, matchedName, matchedPhoto, o
             </View>
           </View>
 
-          {/* Send a message */}
-          <TouchableOpacity onPress={onChat} activeOpacity={0.85} style={{ width: '100%' }}>
-            <LinearGradient
-              colors={['#335CFF', '#8A5BFF']}
-              start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-              style={ms.btnPrimary}
-            >
-              <Text style={ms.btnPrimaryText}>Send a message</Text>
-            </LinearGradient>
-          </TouchableOpacity>
+          {/* Send a message — only once it's an actual match */}
+          {isMatch && (
+            <TouchableOpacity onPress={onChat} activeOpacity={0.85} style={{ width: '100%' }}>
+              <LinearGradient
+                colors={['#335CFF', '#8A5BFF']}
+                start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+                style={ms.btnPrimary}
+              >
+                <Text style={ms.btnPrimaryText}>Send a message</Text>
+              </LinearGradient>
+            </TouchableOpacity>
+          )}
         </Pressable>
       </Pressable>
     </Modal>

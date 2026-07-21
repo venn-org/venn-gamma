@@ -34,24 +34,35 @@ export default function TabsLayout() {
 
     const fetchCounts = async () => {
       try {
-        // Fetch unread likes (notifications type = 'like')
+        // Pending likes: everyone currently in your Likes queue (matches what
+        // the Likes tab itself shows — likes has no read/seen tracking yet).
         const { count: likesCount } = await supabase
-          .from('notifications')
+          .from('likes')
           .select('id', { count: 'exact', head: true })
-          .eq('user_id', uid)
-          .eq('type', 'like')
-          .eq('read', false);
-          
+          .eq('to_user_id', uid);
+
         if (!cancelled) setUnreadLikes(likesCount ?? 0);
 
-        // Fetch unread messages
-        const { count: msgCount } = await supabase
-          .from('messages')
-          .select('id', { count: 'exact', head: true })
-          .eq('to_user_id', uid)
-          .eq('read', false);
-          
-        if (!cancelled) setUnreadMessages(msgCount ?? 0);
+        // Unread messages: messages in your matches sent by the other person
+        // that you haven't read yet.
+        const { data: matches } = await supabase
+          .from('matches')
+          .select('id')
+          .or(`user1_id.eq.${uid},user2_id.eq.${uid}`);
+        const matchIds = (matches ?? []).map((m) => m.id);
+
+        let msgCount = 0;
+        if (matchIds.length > 0) {
+          const { count } = await supabase
+            .from('messages')
+            .select('id', { count: 'exact', head: true })
+            .in('match_id', matchIds)
+            .eq('read', false)
+            .neq('sender_id', uid);
+          msgCount = count ?? 0;
+        }
+
+        if (!cancelled) setUnreadMessages(msgCount);
       } catch (e) {
         console.warn('Failed to fetch tab badges:', e);
       }
@@ -61,10 +72,10 @@ export default function TabsLayout() {
 
     // Subscribe to realtime updates
     channel = supabase.channel('tab-badges')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications', filter: `user_id=eq.${uid}` }, fetchCounts)
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'notifications', filter: `user_id=eq.${uid}` }, fetchCounts)
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: `to_user_id=eq.${uid}` }, fetchCounts)
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'messages', filter: `to_user_id=eq.${uid}` }, fetchCounts)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'likes', filter: `to_user_id=eq.${uid}` }, fetchCounts)
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'likes' }, fetchCounts)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, fetchCounts)
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'messages' }, fetchCounts)
       .subscribe();
 
     return () => {
