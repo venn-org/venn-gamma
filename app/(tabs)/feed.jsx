@@ -437,13 +437,19 @@ export default function FeedScreen() {
                     <View
                       style={[
                         s.overlapPill,
-                        { backgroundColor: colors.violet, marginLeft: 6 },
+                        {
+                          backgroundColor:
+                            currentProfile.user_type === "owner"
+                              ? colors.blue
+                              : colors.violet,
+                          marginLeft: 6,
+                        },
                       ]}
                     >
                       <Text style={s.overlapText}>
                         {currentProfile.user_type === "owner"
                           ? "Has a flat"
-                          : "Seeking"}
+                          : "Looking for flat"}
                       </Text>
                     </View>
                   </View>
