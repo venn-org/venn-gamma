@@ -6,11 +6,25 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useEffect, useRef, useState } from 'react';
 import { signInWithGoogle } from '../../lib/auth';
 import { colors } from '../../lib/theme';
+import { getCookieConsent, setCookieConsent } from '../../lib/cookieConsent';
+import CookieConsentBanner from '../../components/CookieConsentBanner';
 
 export default function LoginScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const [loading, setLoading] = useState(false);
+  const [showCookieBanner, setShowCookieBanner] = useState(false);
+
+  useEffect(() => {
+    if (Platform.OS === 'web' && getCookieConsent() === null) {
+      setShowCookieBanner(true);
+    }
+  }, []);
+
+  const handleCookieDecision = (decision) => {
+    setCookieConsent(decision);
+    setShowCookieBanner(false);
+  };
 
   const topY = useRef(new Animated.Value(-20)).current;
   const topOpacity = useRef(new Animated.Value(0)).current;
@@ -110,6 +124,12 @@ export default function LoginScreen() {
           </Text>
         </Animated.View>
       </ImageBackground>
+
+      <CookieConsentBanner
+        visible={showCookieBanner}
+        onAccept={() => handleCookieDecision('accepted')}
+        onReject={() => handleCookieDecision('rejected')}
+      />
     </View>
   );
 }
