@@ -33,13 +33,24 @@ export default function LikesScreen() {
       .select('id, created_at, from_user_id, profiles!from_user_id(*)')
       .eq('to_user_id', uid)
       .order('created_at', { ascending: false });
-      
+
+    // A mutual like already turned into a match — the likes row for it is
+    // never cleaned up server-side (and RLS won't let this user delete the
+    // other person's row), so filter already-matched users out here instead.
+    const { data: existingMatches } = await supabase
+      .from('matches')
+      .select('user1_id, user2_id')
+      .or(`user1_id.eq.${uid},user2_id.eq.${uid}`);
+    const matchedUserIds = new Set(
+      (existingMatches || []).map(m => (m.user1_id === uid ? m.user2_id : m.user1_id))
+    );
+
     if (data) {
       setLikes(data.map(l => ({
         likeId: l.id,
         userId: l.from_user_id,
         profile: l.profiles // The full profile row
-      })).filter(l => l.profile)); // ensure profile exists
+      })).filter(l => l.profile && !matchedUserIds.has(l.userId)));
     }
     setRefreshing(false);
   };
