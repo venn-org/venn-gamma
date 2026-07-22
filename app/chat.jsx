@@ -20,6 +20,13 @@ export default function ChatScreen() {
   const [messages, setMessages] = useState([]);
   const [inputText, setInputText] = useState('');
   const [loading, setLoading] = useState(true);
+  const [myPhoto, setMyPhoto] = useState(null);
+
+  useEffect(() => {
+    if (!uid) return;
+    supabase.from('profiles').select('photos').eq('id', uid).single()
+      .then(({ data }) => setMyPhoto(data?.photos?.[0] ?? null));
+  }, [uid]);
 
   useEffect(() => {
     if (!matchId || !uid) return;
@@ -44,6 +51,14 @@ export default function ChatScreen() {
         if (payload.new.sender_id !== uid) {
           markAsRead();
         }
+      })
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'messages',
+        filter: `match_id=eq.${matchId}`
+      }, (payload) => {
+        setMessages(prev => prev.map(m => m.id === payload.new.id ? payload.new : m));
       })
       .subscribe();
 
@@ -94,15 +109,34 @@ export default function ChatScreen() {
 
   const renderItem = ({ item }) => {
     const isMine = item.sender_id === uid;
-    
+    const avatarUri = isMine ? myPhoto : photo;
+    const avatarInitial = isMine ? '' : name?.charAt(0);
+
+    const avatarEl = avatarUri ? (
+      <Image source={{ uri: avatarUri }} style={s.avatar} />
+    ) : (
+      <View style={[s.avatar, s.avatarFallback]}>
+        <Text style={s.avatarFallbackText}>{avatarInitial}</Text>
+      </View>
+    );
+
     return (
       <View style={[s.msgWrapper, isMine ? s.msgRight : s.msgLeft]}>
-        {!isMine && photo ? (
-          <Image source={{ uri: photo }} style={s.avatar} />
-        ) : null}
-        <View style={[s.msgBubble, isMine ? s.bubbleRight : s.bubbleLeft]}>
-          <Text style={[s.msgText, isMine ? s.textRight : s.textLeft]}>{item.content}</Text>
+        {!isMine && avatarEl}
+        <View style={isMine ? s.msgColRight : s.msgColLeft}>
+          <View style={[s.msgBubble, isMine ? s.bubbleRight : s.bubbleLeft]}>
+            <Text style={[s.msgText, isMine ? s.textRight : s.textLeft]}>{item.content}</Text>
+          </View>
+          {isMine && (
+            <Ionicons
+              name={item.read ? 'checkmark-done' : 'checkmark'}
+              size={14}
+              color={item.read ? colors.blue : '#9AA0B2'}
+              style={s.tick}
+            />
+          )}
         </View>
+        {isMine && avatarEl}
       </View>
     );
   };
@@ -132,6 +166,11 @@ export default function ChatScreen() {
       {loading ? (
         <View style={s.loading}>
           <ActivityIndicator size="small" color={colors.blue} />
+        </View>
+      ) : messages.length === 0 ? (
+        <View style={s.empty}>
+          <Text style={s.emptyTitle}>Say hi to {name} 👋</Text>
+          <Text style={s.emptyText}>You matched — break the ice and start the conversation.</Text>
         </View>
       ) : (
         <FlatList
@@ -178,20 +217,29 @@ const s = StyleSheet.create({
   headerName: { fontFamily: 'SpaceGrotesk_700Bold', fontSize: 17, color: colors.ink },
   
   loading: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  
-  listContent: { padding: 16, paddingBottom: 24, flexGrow: 1 },
+
+  empty: { flex: 1, alignItems: 'center', justifyContent: 'flex-end', paddingHorizontal: 32, paddingBottom: 24, gap: 6 },
+  emptyTitle: { fontFamily: 'SpaceGrotesk_700Bold', fontSize: 17, color: colors.ink, textAlign: 'center' },
+  emptyText: { fontFamily: 'HankenGrotesk_400Regular', fontSize: 14, color: colors.slate, textAlign: 'center', lineHeight: 20 },
+
+  listContent: { padding: 16, paddingBottom: 8, flexGrow: 1, justifyContent: 'flex-end' },
   msgWrapper: { flexDirection: 'row', marginBottom: 12, alignItems: 'flex-end' },
   msgRight: { justifyContent: 'flex-end' },
   msgLeft: { justifyContent: 'flex-start' },
-  avatar: { width: 28, height: 28, borderRadius: 14, marginRight: 8 },
-  msgBubble: { maxWidth: '75%', paddingHorizontal: 16, paddingVertical: 12, borderRadius: 20 },
+  msgColLeft: { alignItems: 'flex-start', marginLeft: 8, maxWidth: '75%' },
+  msgColRight: { alignItems: 'flex-end', marginRight: 8, maxWidth: '75%' },
+  avatar: { width: 28, height: 28, borderRadius: 14 },
+  avatarFallback: { backgroundColor: '#E2E8F0', alignItems: 'center', justifyContent: 'center' },
+  avatarFallbackText: { fontFamily: 'SpaceGrotesk_700Bold', fontSize: 12, color: '#64748B' },
+  msgBubble: { maxWidth: '100%', paddingHorizontal: 16, paddingVertical: 12, borderRadius: 20 },
   bubbleRight: { backgroundColor: colors.blue, borderBottomRightRadius: 4 },
   bubbleLeft: { backgroundColor: '#fff', borderBottomLeftRadius: 4, borderWidth: 1, borderColor: '#EDEEF2' },
   msgText: { fontFamily: 'HankenGrotesk_400Regular', fontSize: 15, lineHeight: 22 },
   textRight: { color: '#fff' },
   textLeft: { color: colors.ink },
-  
-  inputWrap: { flexDirection: 'row', alignItems: 'flex-end', gap: 12, paddingHorizontal: 16, paddingTop: 12, backgroundColor: '#fff', borderTopWidth: 1, borderTopColor: '#F0F1F5' },
+  tick: { marginTop: 3 },
+
+  inputWrap: { flexDirection: 'row', alignItems: 'flex-end', gap: 12, paddingHorizontal: 16, paddingTop: 12, paddingBottom: 12, backgroundColor: '#fff', borderTopWidth: 1, borderTopColor: '#F0F1F5' },
   input: { flex: 1, minHeight: 44, maxHeight: 120, backgroundColor: '#F2F3F7', borderRadius: 22, paddingHorizontal: 16, paddingTop: 12, paddingBottom: 12, fontFamily: 'HankenGrotesk_400Regular', fontSize: 15, color: colors.ink },
   sendBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: colors.blue, alignItems: 'center', justifyContent: 'center', marginBottom: 0 },
   sendBtnDisabled: { backgroundColor: '#D0D4DF' },
