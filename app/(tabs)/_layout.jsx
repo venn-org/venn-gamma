@@ -34,22 +34,28 @@ export default function TabsLayout() {
 
     const fetchCounts = async () => {
       try {
-        // Pending likes: everyone currently in your Likes queue (matches what
-        // the Likes tab itself shows — likes has no read/seen tracking yet).
-        const { count: likesCount } = await supabase
-          .from('likes')
-          .select('id', { count: 'exact', head: true })
-          .eq('to_user_id', uid);
-
-        if (!cancelled) setUnreadLikes(likesCount ?? 0);
-
         // Unread messages: messages in your matches sent by the other person
         // that you haven't read yet.
         const { data: matches } = await supabase
           .from('matches')
-          .select('id')
+          .select('id, user1_id, user2_id')
           .or(`user1_id.eq.${uid},user2_id.eq.${uid}`);
         const matchIds = (matches ?? []).map((m) => m.id);
+        const matchedUserIds = new Set(
+          (matches ?? []).map((m) => (m.user1_id === uid ? m.user2_id : m.user1_id))
+        );
+
+        // Pending likes: everyone currently in your Likes queue (matches what
+        // the Likes tab itself shows). A mutual like already turned into a
+        // match is never cleaned up from `likes` server-side, so exclude
+        // anyone already matched — otherwise the badge over-counts.
+        const { data: likers } = await supabase
+          .from('likes')
+          .select('from_user_id')
+          .eq('to_user_id', uid);
+        const likesCount = (likers ?? []).filter((l) => !matchedUserIds.has(l.from_user_id)).length;
+
+        if (!cancelled) setUnreadLikes(likesCount);
 
         let msgCount = 0;
         if (matchIds.length > 0) {

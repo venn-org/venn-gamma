@@ -47,8 +47,8 @@ export default function ProfileViewSheet({ visible, profile, onClose, onPass, on
                   <View style={s.verifiedBadge}>
                     <Ionicons name="checkmark" size={12} color="#fff" />
                   </View>
-                  <View style={[s.overlapPill, { backgroundColor: colors.violet, marginLeft: 6 }]}>
-                    <Text style={s.overlapText}>{profile.user_type === 'owner' ? 'Has a flat' : 'Seeking'}</Text>
+                  <View style={[s.overlapPill, { backgroundColor: profile.user_type === 'owner' ? colors.blue : colors.violet, marginLeft: 6 }]}>
+                    <Text style={s.overlapText}>{profile.user_type === 'owner' ? 'Has a flat' : 'Looking for flat'}</Text>
                   </View>
                 </View>
                 <View style={s.statusRow}>
