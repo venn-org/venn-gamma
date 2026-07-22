@@ -41,16 +41,15 @@ export default function ChatScreen() {
         table: 'messages',
         filter: `match_id=eq.${matchId}`
       }, (payload) => {
+        // own messages are added optimistically in sendMessage and reconciled there
+        if (payload.new.sender_id === uid) return;
+
         setMessages(prev => {
-          // ensure no duplicates
           if (prev.find(m => m.id === payload.new.id)) return prev;
           return [...prev, payload.new];
         });
-        
-        // mark as read if it's from the other person
-        if (payload.new.sender_id !== uid) {
-          markAsRead();
-        }
+
+        markAsRead();
       })
       .on('postgres_changes', {
         event: 'UPDATE',
@@ -92,19 +91,35 @@ export default function ChatScreen() {
   const sendMessage = async () => {
     const text = inputText.trim();
     if (!text) return;
-    
+
     setInputText('');
-    
-    const { error } = await supabase.from('messages').insert({
+
+    const tempId = `temp-${Date.now()}`;
+    const optimisticMsg = {
+      id: tempId,
+      match_id: matchId,
+      sender_id: uid,
+      content: text,
+      read: false,
+      created_at: new Date().toISOString(),
+    };
+    setMessages(prev => [...prev, optimisticMsg]);
+
+    const { data, error } = await supabase.from('messages').insert({
       match_id: matchId,
       sender_id: uid,
       content: text,
       read: false
-    });
-    
+    }).select().single();
+
     if (error) {
       console.error('Error sending message:', error);
+      setMessages(prev => prev.filter(m => m.id !== tempId));
+      setInputText(text);
+      return;
     }
+
+    setMessages(prev => prev.map(m => m.id === tempId ? data : m));
   };
 
   const renderItem = ({ item }) => {
