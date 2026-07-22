@@ -225,7 +225,7 @@ export default function ProfileScreen() {
           <View style={{ flex: 1, marginLeft: 6 }}>
             <Text style={s.profileName}>{name}</Text>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-              <Text style={s.profileRole}>{profile?.user_type === 'owner' ? 'Owner' : 'Seeking'}</Text>
+              <Text style={s.profileRole}>{profile?.user_type === 'owner' ? 'Has a flat' : 'Looking for flat'}</Text>
               <View style={s.dot} />
               <Text style={s.completionText}>{percentage}% Complete</Text>
             </View>
