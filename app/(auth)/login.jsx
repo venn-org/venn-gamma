@@ -1,19 +1,42 @@
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
-import { Alert, ImageBackground, Platform, StyleSheet, Text, TouchableOpacity, View, Animated } from 'react-native';
+import { Alert, Dimensions, ImageBackground, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TouchableOpacity, View, Animated } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useEffect, useRef, useState } from 'react';
 import { signInWithGoogle } from '../../lib/auth';
 import { colors } from '../../lib/theme';
 import { getCookieConsent, setCookieConsent } from '../../lib/cookieConsent';
 import CookieConsentBanner from '../../components/CookieConsentBanner';
+import LegalDoc from '../../components/LegalDoc';
+import { TERMS_DOC, PRIVACY_DOC, COOKIE_DOC } from '../../lib/legal';
+
+const { height: SCREEN_H } = Dimensions.get('window');
 
 export default function LoginScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const [loading, setLoading] = useState(false);
   const [showCookieBanner, setShowCookieBanner] = useState(false);
+  const [legalDoc, setLegalDoc] = useState(null);
+
+  // Manual backdrop-fade + sheet-slide (decoupled), same as ProfileViewSheet —
+  // Modal's own animationType="slide" transforms the whole subtree together,
+  // so the backdrop rides along with the sheet instead of dimming instantly.
+  const legalBackdropOpacity = useRef(new Animated.Value(0)).current;
+  const legalSheetY = useRef(new Animated.Value(SCREEN_H)).current;
+
+  useEffect(() => {
+    if (legalDoc) {
+      Animated.parallel([
+        Animated.timing(legalBackdropOpacity, { toValue: 1, duration: 200, useNativeDriver: true }),
+        Animated.timing(legalSheetY, { toValue: 0, duration: 250, useNativeDriver: true }),
+      ]).start();
+    } else {
+      legalBackdropOpacity.setValue(0);
+      legalSheetY.setValue(SCREEN_H);
+    }
+  }, [legalDoc]);
 
   useEffect(() => {
     if (Platform.OS === 'web' && getCookieConsent() === null) {
@@ -118,9 +141,9 @@ export default function LoginScreen() {
 
           <Text style={styles.legal}>
             By tapping Create account or Sign in, you agree to our{' '}
-            <Text style={styles.legalLink}>Terms</Text>. Learn how we process your data in our{' '}
-            <Text style={styles.legalLink}>Privacy Policy</Text> and{' '}
-            <Text style={styles.legalLink}>Cookies Policy</Text>.
+            <Text style={styles.legalLink} onPress={() => setLegalDoc(TERMS_DOC)}>Terms</Text>. Learn how we process your data in our{' '}
+            <Text style={styles.legalLink} onPress={() => setLegalDoc(PRIVACY_DOC)}>Privacy Policy</Text> and{' '}
+            <Text style={styles.legalLink} onPress={() => setLegalDoc(COOKIE_DOC)}>Cookies Policy</Text>.
           </Text>
         </Animated.View>
       </ImageBackground>
@@ -130,6 +153,22 @@ export default function LoginScreen() {
         onAccept={() => handleCookieDecision('accepted')}
         onReject={() => handleCookieDecision('rejected')}
       />
+
+      <Modal visible={!!legalDoc} transparent animationType="none" onRequestClose={() => setLegalDoc(null)}>
+        <View style={{ flex: 1, justifyContent: 'flex-end' }}>
+          <Animated.View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(10,10,20,0.55)', opacity: legalBackdropOpacity }]} />
+          <Pressable style={StyleSheet.absoluteFill} onPress={() => setLegalDoc(null)} />
+
+          <Animated.View style={[styles.legalCard, { transform: [{ translateY: legalSheetY }] }]}>
+            <ScrollView style={styles.legalScroll} showsVerticalScrollIndicator={false}>
+              {legalDoc && <LegalDoc doc={legalDoc} />}
+            </ScrollView>
+            <TouchableOpacity style={styles.legalCloseBtn} onPress={() => setLegalDoc(null)} activeOpacity={0.85}>
+              <Text style={styles.legalCloseBtnText}>Close</Text>
+            </TouchableOpacity>
+          </Animated.View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -165,4 +204,9 @@ const styles = StyleSheet.create({
   btnDisabled: { opacity: 0.6 },
   legal: { fontSize: 11, color: 'rgba(255,255,255,0.35)', textAlign: 'center', lineHeight: 16 },
   legalLink: { color: 'rgba(255,255,255,0.55)', textDecorationLine: 'underline' },
+
+  legalCard: { backgroundColor: '#fff', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, paddingBottom: 32, maxHeight: '85%' },
+  legalScroll: { maxHeight: 480 },
+  legalCloseBtn: { marginTop: 16, borderRadius: 50, paddingVertical: 15, alignItems: 'center', backgroundColor: colors.ink },
+  legalCloseBtnText: { fontFamily: 'HankenGrotesk_600SemiBold', fontSize: 15, color: '#fff' },
 });

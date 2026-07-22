@@ -1,9 +1,11 @@
-import { useState } from 'react';
-import { View, Text, StyleSheet, Modal, TouchableOpacity, ScrollView } from 'react-native';
+import { useState, useRef, useEffect } from 'react';
+import { View, Text, StyleSheet, Modal, TouchableOpacity, Pressable, ScrollView, Dimensions, Animated } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { colors } from '../lib/theme';
 import { COOKIE_DOC } from '../lib/legal';
 import LegalDoc from './LegalDoc';
+
+const { height: SCREEN_H } = Dimensions.get('window');
 
 // Shown once on the landing screen before the user signs up/in. Persistence
 // (so it never shows again after a decision) is handled by the caller via
@@ -11,10 +13,31 @@ import LegalDoc from './LegalDoc';
 export default function CookieConsentBanner({ visible, onAccept, onReject }) {
   const [showPolicy, setShowPolicy] = useState(false);
 
+  // Manual backdrop-fade + sheet-slide (decoupled) so the backdrop doesn't
+  // ride along with the sheet's slide transform, which reads as a solid
+  // black panel growing up the screen instead of an instant dim.
+  const backdropOpacity = useRef(new Animated.Value(0)).current;
+  const sheetY = useRef(new Animated.Value(SCREEN_H)).current;
+
+  useEffect(() => {
+    if (visible) {
+      Animated.parallel([
+        Animated.timing(backdropOpacity, { toValue: 1, duration: 200, useNativeDriver: true }),
+        Animated.timing(sheetY, { toValue: 0, duration: 250, useNativeDriver: true }),
+      ]).start();
+    } else {
+      backdropOpacity.setValue(0);
+      sheetY.setValue(SCREEN_H);
+    }
+  }, [visible]);
+
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onReject}>
-      <View style={s.overlay}>
-        <View style={s.card}>
+    <Modal visible={visible} transparent animationType="none" onRequestClose={onReject}>
+      <View style={{ flex: 1, justifyContent: 'flex-end' }}>
+        <Animated.View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(10,10,20,0.55)', opacity: backdropOpacity }]} />
+        <Pressable style={StyleSheet.absoluteFill} onPress={onReject} />
+
+        <Animated.View style={[s.card, { transform: [{ translateY: sheetY }] }]}>
           {showPolicy ? (
             <>
               <ScrollView style={s.policyScroll} showsVerticalScrollIndicator={false}>
@@ -46,14 +69,13 @@ export default function CookieConsentBanner({ visible, onAccept, onReject }) {
               </TouchableOpacity>
             </View>
           )}
-        </View>
+        </Animated.View>
       </View>
     </Modal>
   );
 }
 
 const s = StyleSheet.create({
-  overlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(10,10,20,0.55)' },
   card: { backgroundColor: '#fff', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, paddingBottom: 32, maxHeight: '80%' },
   title: { fontFamily: 'SpaceGrotesk_700Bold', fontSize: 18, color: colors.ink, marginBottom: 8 },
   body: { fontFamily: 'HankenGrotesk_400Regular', fontSize: 14, color: colors.slate, lineHeight: 21 },
