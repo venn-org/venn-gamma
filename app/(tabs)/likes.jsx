@@ -59,14 +59,21 @@ export default function LikesScreen() {
     fetchLikes();
   }, []);
 
-  const handlePass = async () => {
-    if (!selectedLike) return;
-    const { likeId } = selectedLike;
+  const handlePass = async (like) => {
+    const target = like ?? selectedLike;
+    if (!target) return;
+    const { likeId } = target;
     setSelectedLike(null);
     setLikes(prev => prev.filter(l => l.likeId !== likeId));
 
-    // Delete the like from DB
-    await supabase.from('likes').delete().eq('id', likeId);
+    // likes_delete RLS only allows the liker (from_user_id) to delete —
+    // as the recipient we go through a SECURITY DEFINER RPC instead of a
+    // direct delete, which would silently no-op under RLS.
+    const { error } = await supabase.rpc('dismiss_like', { p_like_id: likeId });
+    if (error) {
+      console.error('Failed to dismiss like:', error);
+      fetchLikes();
+    }
   };
 
   const handleLikeBack = async () => {
