@@ -107,21 +107,29 @@ export default function ProfileScreen() {
     }
   };
 
-  const handleRemovePhoto = (index) => {
-    Alert.alert('Remove photo', 'Remove this photo from your profile?', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Remove', style: 'destructive', onPress: async () => {
-        const uid = getCurrentUserId();
-        if (!uid) return;
-        const nextPhotos = removePhotoAt(photos, index);
-        const { error } = await supabase.from('profiles').update({ photos: nextPhotos }).eq('id', uid);
-        if (error) {
-          Alert.alert('Error', 'Failed to remove photo.');
-          return;
-        }
-        setProfile((p) => ({ ...p, photos: nextPhotos }));
-      }}
-    ]);
+  const handleRemovePhoto = async (index) => {
+    const doRemove = async () => {
+      const uid = getCurrentUserId();
+      if (!uid) return;
+      const nextPhotos = removePhotoAt(photos, index);
+      const { error } = await supabase.from('profiles').update({ photos: nextPhotos }).eq('id', uid);
+      if (error) {
+        Alert.alert('Error', 'Failed to remove photo.');
+        return;
+      }
+      setProfile((p) => ({ ...p, photos: nextPhotos }));
+    };
+
+    if (Platform.OS === 'web') {
+      if (window.confirm('Remove this photo from your profile?')) {
+        await doRemove();
+      }
+    } else {
+      Alert.alert('Remove photo', 'Remove this photo from your profile?', [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Remove', style: 'destructive', onPress: doRemove }
+      ]);
+    }
   };
 
   const handlePhotoSlotPress = (index) => {

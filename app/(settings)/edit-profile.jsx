@@ -11,6 +11,58 @@ import { getAge } from '../../lib/age';
 import RangeSlider from '../../components/RangeSlider';
 
 const GENDER_OPTIONS = ['Woman', 'Man', 'Non-binary', 'Transgender', 'Other'];
+
+const PROMPT_CATEGORIES = [
+  {
+    key: 'about-me',
+    label: 'About me',
+    questions: [
+      "My idea of a perfect Sunday at home",
+      "The one thing I can't live without",
+      "The last thing I binge-watched and loved",
+      "I'm the flatmate who always",
+      "Two truths and a lie about my daily routine",
+      "The dish I actually know how to cook",
+      "People would describe me as",
+      "My favourite way to wind down after work",
+      "If you looked at my Spotify, you'd see",
+      "The thing I'm currently obsessed with",
+    ],
+  },
+  {
+    key: 'living-with-me',
+    label: 'Living with me',
+    questions: [
+      "My sleep schedule in three words",
+      "My cleanliness standard is",
+      "I handle shared chores by",
+      "When it comes to guests, I",
+      "My work-from-home setup looks like",
+      "My ideal noise level at home is",
+      "I'm a morning person / night owl because",
+      "Pets at home? My take is",
+      "When it comes to splitting bills, I",
+      "I handle conflict with flatmates by",
+      "My bathroom routine takes",
+      "Cooking smells in the flat — I",
+    ],
+  },
+  {
+    key: 'my-space',
+    label: 'My space',
+    questions: [
+      "My room aesthetic is",
+      "The common spaces I use most are",
+      "The flat I'm looking for feels like",
+      "Deal-breaker for shared spaces",
+      "I keep common areas",
+      "My ideal flat has",
+      "The neighbourhood vibe I'm looking for",
+      "One thing about my space I can't compromise on",
+      "I'd describe my home energy as",
+    ],
+  },
+];
 const LIFESTYLE_OPTIONS = ['Yes', 'Sometimes', 'No', 'Prefer not to say'];
 const BUDGET_MIN = 0;
 const BUDGET_MAX = 100000;
@@ -33,6 +85,66 @@ const ChipSelector = ({ options, selected, onSelect }) => (
     })}
   </View>
 );
+
+const PROMPT_VISIBLE_COUNT = 4;
+
+const PromptPicker = ({ value, onChange }) => {
+  const initialCat = PROMPT_CATEGORIES.find(c => c.questions.includes(value))?.key || PROMPT_CATEGORIES[0].key;
+  const [activeCat, setActiveCat] = useState(initialCat);
+  const category = PROMPT_CATEGORIES.find(c => c.key === activeCat);
+
+  // Auto-expand if the saved answer's question is further down the list, so
+  // picking it never makes it appear to vanish behind "More".
+  const selectedBeyondVisible = category.questions.indexOf(value) >= PROMPT_VISIBLE_COUNT;
+  const [showAll, setShowAll] = useState(selectedBeyondVisible);
+
+  const handleCategoryChange = (key) => {
+    setActiveCat(key);
+    setShowAll(false);
+  };
+
+  const visibleQuestions = showAll ? category.questions : category.questions.slice(0, PROMPT_VISIBLE_COUNT);
+  const hiddenCount = category.questions.length - visibleQuestions.length;
+
+  return (
+    <>
+      <View style={s.categoryRow}>
+        {PROMPT_CATEGORIES.map(c => (
+          <TouchableOpacity
+            key={c.key}
+            style={[s.categoryChip, activeCat === c.key && s.categoryChipActive]}
+            onPress={() => handleCategoryChange(c.key)}
+            activeOpacity={0.8}
+          >
+            <Text style={[s.categoryChipText, activeCat === c.key && s.categoryChipTextActive]}>{c.label}</Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+      <View style={s.chipContainer}>
+        {visibleQuestions.map(q => (
+          <TouchableOpacity
+            key={q}
+            style={[s.chip, value === q && s.chipSelected]}
+            onPress={() => onChange(q)}
+            activeOpacity={0.8}
+          >
+            <Text style={[s.chipText, value === q && s.chipTextSelected]}>{q}</Text>
+          </TouchableOpacity>
+        ))}
+        {hiddenCount > 0 && (
+          <TouchableOpacity style={s.moreChip} onPress={() => setShowAll(true)} activeOpacity={0.8}>
+            <Text style={s.moreChipText}>+{hiddenCount} more</Text>
+          </TouchableOpacity>
+        )}
+        {showAll && category.questions.length > PROMPT_VISIBLE_COUNT && (
+          <TouchableOpacity style={s.moreChip} onPress={() => setShowAll(false)} activeOpacity={0.8}>
+            <Text style={s.moreChipText}>Show less</Text>
+          </TouchableOpacity>
+        )}
+      </View>
+    </>
+  );
+};
 
 export default function EditProfileScreen() {
   const router = useRouter();
@@ -381,14 +493,9 @@ export default function EditProfileScreen() {
                 
                 <View style={s.promptBlock}>
                   <Text style={s.label}>Question 1</Text>
-                  <TextInput
-                    style={s.input}
-                    placeholder="e.g. A shower thought I recently had..."
-                    placeholderTextColor="#9AA0B2"
-                    value={prompt1Q}
-                    onChangeText={setPrompt1Q}
-                  />
-                  
+                  <PromptPicker value={prompt1Q} onChange={setPrompt1Q} />
+
+
                   <Text style={s.label}>Answer 1</Text>
                   <TextInput
                     style={[s.input, s.textArea]}
@@ -403,14 +510,9 @@ export default function EditProfileScreen() {
 
                 <View style={s.promptBlock}>
                   <Text style={s.label}>Question 2</Text>
-                  <TextInput
-                    style={s.input}
-                    placeholder="e.g. My most controversial opinion is..."
-                    placeholderTextColor="#9AA0B2"
-                    value={prompt2Q}
-                    onChangeText={setPrompt2Q}
-                  />
-                  
+                  <PromptPicker value={prompt2Q} onChange={setPrompt2Q} />
+
+
                   <Text style={s.label}>Answer 2</Text>
                   <TextInput
                     style={[s.input, s.textArea]}
@@ -425,13 +527,7 @@ export default function EditProfileScreen() {
 
                 <View style={s.promptBlock}>
                   <Text style={s.label}>Question 3</Text>
-                  <TextInput
-                    style={s.input}
-                    placeholder="e.g. The way to win me over is..."
-                    placeholderTextColor="#9AA0B2"
-                    value={prompt3Q}
-                    onChangeText={setPrompt3Q}
-                  />
+                  <PromptPicker value={prompt3Q} onChange={setPrompt3Q} />
 
                   <Text style={s.label}>Answer 3</Text>
                   <TextInput
@@ -489,5 +585,14 @@ const s = StyleSheet.create({
   chip: { paddingHorizontal: 14, paddingVertical: 10, borderRadius: 50, borderWidth: 1, borderColor: '#D0D4DF', backgroundColor: '#fff' },
   chipSelected: { backgroundColor: colors.blue, borderColor: colors.blue },
   chipText: { fontFamily: 'HankenGrotesk_600SemiBold', fontSize: 13, color: '#5A6072' },
-  chipTextSelected: { color: '#fff' }
+  chipTextSelected: { color: '#fff' },
+
+  categoryRow: { flexDirection: 'row', gap: 8, marginTop: 4, marginBottom: 10 },
+  categoryChip: { paddingHorizontal: 12, paddingVertical: 7, borderRadius: 50, backgroundColor: '#F2F3F7' },
+  categoryChipActive: { backgroundColor: colors.ink },
+  categoryChipText: { fontFamily: 'HankenGrotesk_600SemiBold', fontSize: 12, color: '#5A6072' },
+  categoryChipTextActive: { color: '#fff' },
+
+  moreChip: { paddingHorizontal: 14, paddingVertical: 10, borderRadius: 50, borderWidth: 1, borderColor: '#D0D4DF', borderStyle: 'dashed', backgroundColor: 'transparent' },
+  moreChipText: { fontFamily: 'HankenGrotesk_600SemiBold', fontSize: 13, color: colors.blue },
 });

@@ -277,7 +277,6 @@ export default function ChatScreen() {
             </Text>
           </View>
         </View>
-        <View style={s.backBtn} />
       </View>
 
       {loading ? (
@@ -310,7 +309,6 @@ export default function ChatScreen() {
           placeholderTextColor="#9AA0B2"
           value={inputText}
           onChangeText={handleInputChange}
-          multiline
           maxLength={500}
         />
         <TouchableOpacity 
@@ -328,7 +326,7 @@ export default function ChatScreen() {
 
 const s = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.canvas },
-  topBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 12, paddingVertical: 12, backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#F0F1F5', zIndex: 10 },
+  topBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-start', paddingHorizontal: 12, paddingVertical: 12, backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#F0F1F5', zIndex: 10 },
   backBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
   headerInfo: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   headerAvatar: { width: 36, height: 36, borderRadius: 18 },
@@ -364,7 +362,7 @@ const s = StyleSheet.create({
   timestamp: { fontFamily: 'HankenGrotesk_400Regular', fontSize: 11, color: colors.slate },
 
   inputWrap: { flexDirection: 'row', alignItems: 'flex-end', gap: 12, paddingHorizontal: 16, paddingTop: 12, paddingBottom: 12, backgroundColor: '#fff', borderTopWidth: 1, borderTopColor: '#F0F1F5' },
-  input: { flex: 1, minHeight: 44, maxHeight: 120, backgroundColor: '#F2F3F7', borderRadius: 22, paddingHorizontal: 16, paddingTop: 12, paddingBottom: 12, fontFamily: 'HankenGrotesk_400Regular', fontSize: 15, color: colors.ink },
+  input: { flex: 1, height: 44, backgroundColor: '#F2F3F7', borderRadius: 22, paddingHorizontal: 16, fontFamily: 'HankenGrotesk_400Regular', fontSize: 15, color: colors.ink },
   sendBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: colors.blue, alignItems: 'center', justifyContent: 'center', marginBottom: 0 },
   sendBtnDisabled: { backgroundColor: '#D0D4DF' },
 });
