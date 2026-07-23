@@ -107,7 +107,7 @@ export default function RootLayout() {
     };
 
     updatePresence();
-    const interval = setInterval(updatePresence, 60000); // every minute
+    const interval = setInterval(updatePresence, 15000); // every 15s
 
     const appStateSub = AppState.addEventListener('change', nextState => {
       if (nextState === 'active') updatePresence();
