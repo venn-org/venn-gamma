@@ -424,63 +424,63 @@ export default function FeedScreen() {
                 </Modal>
               )}
 
-              {/* Card Header (Fixed) */}
-              <View style={s.cardHeader}>
-                <View>
-                  <View style={s.nameRow}>
-                    <Text style={s.name}>{currentProfile.name}</Text>
-                    {currentProfile.verified && (
-                      <View style={s.verifiedBadge}>
-                        <Ionicons name="checkmark" size={12} color="#fff" />
-                      </View>
-                    )}
-                    <View
-                      style={[
-                        s.overlapPill,
-                        {
-                          backgroundColor:
-                            currentProfile.user_type === "owner"
-                              ? colors.blue
-                              : colors.violet,
-                          marginLeft: 6,
-                        },
-                      ]}
-                    >
-                      <Text style={s.overlapText}>
-                        {currentProfile.user_type === "owner"
-                          ? "Has a flat"
-                          : "Looking for flat"}
-                      </Text>
-                    </View>
-                  </View>
-                  <View style={s.statusRow}>
-                    <Text style={s.pronouns}>
-                      {currentProfile.pronouns?.[0] || "-"}
-                    </Text>
-                    <Text style={s.dot}> • </Text>
-                    <Text style={s.active}>Active now</Text>
-                  </View>
-                </View>
-                <View style={s.navBtns}>
-                  <TouchableOpacity
-                    style={s.navBtn}
-                    onPress={() => setMenuOpen(true)}
-                  >
-                    <Ionicons
-                      name="ellipsis-horizontal"
-                      size={18}
-                      color={colors.ink}
-                    />
-                  </TouchableOpacity>
-                </View>
-              </View>
-
               {/* Scrollable Profile Content */}
               <ScrollView
                 style={{ flex: 1 }}
                 showsVerticalScrollIndicator={false}
                 contentContainerStyle={{ paddingBottom: 110 }}
               >
+                {/* Card Header */}
+                <View style={s.cardHeader}>
+                  <View>
+                    <View style={s.nameRow}>
+                      <Text style={s.name}>{currentProfile.name}</Text>
+                      {currentProfile.verified && (
+                        <View style={s.verifiedBadge}>
+                          <Ionicons name="checkmark" size={12} color="#fff" />
+                        </View>
+                      )}
+                      <View
+                        style={[
+                          s.overlapPill,
+                          {
+                            backgroundColor:
+                              currentProfile.user_type === "owner"
+                                ? colors.blue
+                                : colors.violet,
+                            marginLeft: 6,
+                          },
+                        ]}
+                      >
+                        <Text style={s.overlapText}>
+                          {currentProfile.user_type === "owner"
+                            ? "Has a flat"
+                            : "Looking for flat"}
+                        </Text>
+                      </View>
+                    </View>
+                    <View style={s.statusRow}>
+                      <Text style={s.pronouns}>
+                        {currentProfile.pronouns?.[0] || "-"}
+                      </Text>
+                      <Text style={s.dot}> • </Text>
+                      <Text style={s.active}>Active now</Text>
+                    </View>
+                  </View>
+                  <View style={s.navBtns}>
+                    <TouchableOpacity
+                      style={s.navBtn}
+                      onPress={() => setMenuOpen(true)}
+                    >
+                      <Ionicons
+                        name="ellipsis-horizontal"
+                        size={18}
+                        color={colors.ink}
+                      />
+                    </TouchableOpacity>
+                  </View>
+                </View>
+
                 <View style={s.photoWrap}>
                   {currentProfile.photos?.[0] ? (
                     <Image
