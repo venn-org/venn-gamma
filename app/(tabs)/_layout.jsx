@@ -8,6 +8,8 @@ import { supabase } from '../../lib/supabase';
 import { getCurrentUserId } from '../../lib/auth';
 import { getUnreadCount } from '../../lib/notifications';
 
+const POLL_INTERVAL_MS = 3000;
+
 const TabIcon = ({ name, size, color, count }) => (
   <View>
     <Ionicons name={name} size={size} color={color} />
@@ -84,8 +86,13 @@ export default function TabsLayout() {
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'messages' }, fetchCounts)
       .subscribe();
 
+    // Fallback poll: realtime delivery can be delayed/dropped, so periodically
+    // re-fetch to make sure the badge clears once messages are marked read.
+    const pollInterval = setInterval(fetchCounts, POLL_INTERVAL_MS);
+
     return () => {
       cancelled = true;
+      clearInterval(pollInterval);
       if (channel) supabase.removeChannel(channel);
     };
   }, [uid]);
