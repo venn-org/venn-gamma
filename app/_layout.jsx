@@ -6,7 +6,7 @@ import { SpaceMono_400Regular } from '@expo-google-fonts/space-mono';
 import { HankenGrotesk_400Regular, HankenGrotesk_600SemiBold, HankenGrotesk_700Bold } from '@expo-google-fonts/hanken-grotesk';
 import { Ionicons } from '@expo/vector-icons';
 import * as SplashScreen from 'expo-splash-screen';
-import { auth, supabase, getCurrentUserId, isOnboardingComplete, subscribeOnboardingComplete } from '../lib';
+import { auth, supabase, getCurrentUserId, ensureProfile, isOnboardingComplete, subscribeOnboardingComplete } from '../lib';
 import MatchCelebration from '../components/MatchCelebration';
 
 LogBox.ignoreLogs([
@@ -48,6 +48,11 @@ export default function RootLayout() {
       if (user) {
         // Need to force refresh token to ensure we have the 'authenticated' custom claim
         await user.getIdToken(true);
+        // Every sign-in method funnels through here, so this is the one place
+        // that's guaranteed to run regardless of which one was used (phone,
+        // email link, Google, ...) — ensureProfile() tolerates being called
+        // again for an existing row (23505), so this is safe on every login.
+        await ensureProfile();
         const done = await isOnboardingComplete();
         setOnboardingDone(done);
       } else {
