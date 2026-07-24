@@ -126,9 +126,12 @@ export default function RootLayout() {
     const uid = getCurrentUserId();
     if (!uid) return;
 
+    // `matches` is a client-facing view (active matches only); realtime
+    // (Postgres logical replication) only fires on real tables, so this has
+    // to subscribe to `matches_log`, the table matches are actually created on.
     const channel = supabase
       .channel('public:matches')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'matches' }, async (payload) => {
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'matches_log' }, async (payload) => {
         const { user1_id, user2_id, id } = payload.new;
         if (user1_id === uid || user2_id === uid) {
           const otherId = user1_id === uid ? user2_id : user1_id;

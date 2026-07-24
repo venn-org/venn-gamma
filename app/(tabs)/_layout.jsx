@@ -78,10 +78,16 @@ export default function TabsLayout() {
 
     fetchCounts();
 
-    // Subscribe to realtime updates
+    // Subscribe to realtime updates. `likes`/`matches` are client-facing views
+    // (active rows only) with INSTEAD OF triggers fanning writes into the
+    // real `likes_log`/`matches_log` tables — Postgres logical replication
+    // (which realtime is built on) only ever fires on the real tables, so
+    // the subscription has to target `likes_log`, not the `likes` view.
+    // Unliking/dismissing now soft-revokes (UPDATE revoked_at) instead of
+    // deleting the row, so this listens for UPDATE instead of DELETE.
     channel = supabase.channel('tab-badges')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'likes', filter: `to_user_id=eq.${uid}` }, fetchCounts)
-      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'likes' }, fetchCounts)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'likes_log', filter: `to_user_id=eq.${uid}` }, fetchCounts)
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'likes_log' }, fetchCounts)
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, fetchCounts)
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'messages' }, fetchCounts)
       .subscribe();

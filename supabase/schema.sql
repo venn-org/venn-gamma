@@ -1,45 +1,69 @@
 -- ============================================================================
--- Full schema redesign — drops every table/type/function except `waitlist`,
--- then rebuilds from scratch. See supabase/schema.sql for the design notes.
+-- Venn — Postgres schema (redesign)
+-- ============================================================================
+-- Snapshot of the desired end state. To apply, run the migration in
+-- supabase/migrations/ instead of this file directly.
+--
+-- Design notes (see supabase/DESIGN.md for the full write-up):
+--
+-- 1. Enum values (gender, food habit, budget bracket, ...) used to be native
+--    Postgres ENUM types. Adding/renaming/retiring an option required a
+--    schema migration (ALTER TYPE ... ADD VALUE), and values could never be
+--    removed. They're now rows in `option_values`, an admin-editable catalog
+--    table — the columns on `profiles` stay plain `text` (exactly what the
+--    client already reads/writes), validated at the application layer the
+--    same way they always were (lib/enums.js). `option_values` is the single
+--    source of truth for what's valid, its labels, and its display order —
+--    an admin panel can manage it with plain INSERT/UPDATE, no deploy.
+--
+-- 2. `profiles` is split for admin-portal manageability into three real
+--    tables — `profile_core` (identity + searchable fields), `profile_
+--    lifestyle` (drink/tobacco/weed), `profile_preferences` ("what I'm
+--    looking for") — joined by a `profiles` view so the client's existing
+--    `select('*')` / embedded joins keep working unchanged. Writes are
+--    fanned out by INSTEAD OF INSERT/UPDATE/DELETE triggers on the view.
+--    This required one small client change: `hooks/useOnboarding.js` used
+--    `.upsert()` on 'profiles', and PostgREST implements upsert as SQL
+--    `INSERT ... ON CONFLICT DO UPDATE` — which Postgres cannot run against
+--    a view (views have no index for the conflict check to target). Since
+--    `lib/auth.js`'s `ensureProfile()` already inserts a bare row right
+--    after signup, the row always exists by the time onboarding runs, so
+--    the upsert was changed to a plain `.update()` — no functional change.
+--
+-- 3. Likes / matches / blocks now keep history instead of hard-deleting on
+--    unlike / unmatch / unblock (for trust & safety review and analytics).
+--    The real tables are `likes_log`, `matches_log`, `blocks_log`, each with
+--    a soft-close column (`revoked_at` / `status`). The client still talks
+--    to plain-named `likes` / `matches` / `blocks` — those are views over
+--    the `_log` tables (`WHERE revoked_at IS NULL` / `WHERE status =
+--    'active'`) with INSTEAD OF triggers so INSERT/DELETE from the client
+--    keep working unchanged (soft-closing instead of physically deleting).
+--    This is safe from the ON CONFLICT problem above because the client
+--    never upserts these tables — only plain insert/select/delete.
+--    Every view is created WITH (security_invoker = true) so RLS on the
+--    underlying _log table is evaluated as the calling user, not the view
+--    owner — omitting this would silently bypass RLS.
+--
+-- 4. `messages`, `notifications`, `profile_views` use bigint identity PKs
+--    instead of uuid — cheaper (8 vs 16 bytes), sequential inserts avoid the
+--    random-order btree page splits uuidv4 causes, and none of these ids are
+--    used as unguessable secrets (RLS is the real access control). They are
+--    also the tables most likely to need range-partitioning by created_at
+--    once volume justifies it; a bigint PK makes that a mechanical follow-up
+--    rather than a redesign.
+--
+-- 5. Dead/broken objects from the schema's history are removed:
+--    `handle_new_user()` (a Supabase-Auth-era trigger function with no
+--    trigger wired to it — the app uses Firebase Auth and inserts the
+--    profile row client-side in lib/auth.js), and the original
+--    `is_admin(uuid)` (its signature could never have worked — profiles.id
+--    is text). `is_admin` is recreated with the correct `text` signature and
+--    is now actually used, to let trust & safety review messages/matches
+--    after a user has unmatched (see policies below). `notify_send_push()`
+--    no longer has a webhook secret hardcoded in the function body — it
+--    reads it from Supabase Vault instead.
 -- ============================================================================
 
-DROP TABLE IF EXISTS public.preregistrations CASCADE;
-DROP TABLE IF EXISTS public.push_subscriptions CASCADE;
-DROP TABLE IF EXISTS public.reports CASCADE;
-DROP TABLE IF EXISTS public.profile_views CASCADE;
-DROP TABLE IF EXISTS public.notifications CASCADE;
-DROP TABLE IF EXISTS public.messages CASCADE;
-DROP TABLE IF EXISTS public.matches CASCADE;
-DROP TABLE IF EXISTS public.likes CASCADE;
-DROP TABLE IF EXISTS public.blocks CASCADE;
-DROP TABLE IF EXISTS public.profiles CASCADE;
-
-DROP FUNCTION IF EXISTS public.create_match_on_mutual_like() CASCADE;
-DROP FUNCTION IF EXISTS public.delete_account() CASCADE;
-DROP FUNCTION IF EXISTS public.dismiss_like(uuid) CASCADE;
-DROP FUNCTION IF EXISTS public.get_blocked_pair_ids() CASCADE;
-DROP FUNCTION IF EXISTS public.handle_new_user() CASCADE;
-DROP FUNCTION IF EXISTS public.is_admin(uuid) CASCADE;
-DROP FUNCTION IF EXISTS public.notify_on_message() CASCADE;
-DROP FUNCTION IF EXISTS public.notify_send_push() CASCADE;
-DROP FUNCTION IF EXISTS public.set_updated_at() CASCADE;
-
-DROP TYPE IF EXISTS public.enum_budget CASCADE;
-DROP TYPE IF EXISTS public.enum_drinking_pref CASCADE;
-DROP TYPE IF EXISTS public.enum_flat_type CASCADE;
-DROP TYPE IF EXISTS public.enum_food_habit CASCADE;
-DROP TYPE IF EXISTS public.enum_gender CASCADE;
-DROP TYPE IF EXISTS public.enum_lifestyle CASCADE;
-DROP TYPE IF EXISTS public.enum_move_in CASCADE;
-DROP TYPE IF EXISTS public.enum_occupation CASCADE;
-DROP TYPE IF EXISTS public.enum_pets_pref CASCADE;
-DROP TYPE IF EXISTS public.enum_pref_age CASCADE;
-DROP TYPE IF EXISTS public.enum_pref_gender CASCADE;
-DROP TYPE IF EXISTS public.enum_pref_role CASCADE;
-DROP TYPE IF EXISTS public.enum_smoking_pref CASCADE;
-DROP TYPE IF EXISTS public.enum_user_type CASCADE;
-
--- `waitlist` is intentionally not touched.
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;

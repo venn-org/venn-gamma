@@ -70,12 +70,14 @@ export default function FeedScreen() {
     fetchFeed();
     if (!uid) return;
 
-    // Listen for new matches in real-time
+    // Listen for new matches in real-time. `matches` is a client-facing view
+    // (active matches only); realtime only fires on the real table matches
+    // are created on, `matches_log`.
     const matchSub = supabase
       .channel("feed_matches")
       .on(
         "postgres_changes",
-        { event: "INSERT", schema: "public", table: "matches" },
+        { event: "INSERT", schema: "public", table: "matches_log" },
         (payload) => {
           const { user1_id, user2_id, id } = payload.new;
           if (user1_id === uid || user2_id === uid) {
