@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
 import { colors } from '../../lib/theme';
-import { useOnboarding } from '../../hooks/useOnboarding';
+import { useOnboarding, totalSteps } from '../../hooks/useOnboarding';
 import OnboardingShell from '../../components/OnboardingShell';
 
 const QUESTIONS = [
@@ -30,12 +30,14 @@ export default function LifestyleScreen() {
     setLoading(true);
     updateData({ lifestyle: answers });
     setLoading(false);
-    router.push('/(onboarding)/preferences');
+    // Owners describe their flat (location + flat details); seekers set
+    // what they're looking for (areas, budget, flatmate gender).
+    router.push(data.type === 'owner' ? '/(onboarding)/location' : '/(onboarding)/seeker-preferences');
   };
 
   return (
     <OnboardingShell
-      step={6} total={9}
+      step={7} total={totalSteps(data.type)}
       footer={
         <View style={styles.footerInner}>
           <Text style={styles.visible}>Visible on profile</Text>

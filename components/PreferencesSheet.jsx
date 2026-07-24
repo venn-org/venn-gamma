@@ -1,32 +1,28 @@
-import { useState, useEffect, useRef, Fragment } from 'react';
+import { Fragment, useEffect, useRef, useState } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, Modal, Pressable, StyleSheet, Dimensions, Animated, KeyboardAvoidingView, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { colors } from '../lib/theme';
-import { ENUMS } from '../lib/enums';
-import { ZONES_BY_CITY } from '../lib/locations';
+import { useTheme, useThemedStyles } from '../lib/ThemeContext';
+import { PREF_SECTIONS, getPrefDisplay, isPrefSet, prefOptions } from '../lib/prefs';
 
 const { height: SCREEN_H } = Dimensions.get('window');
 
 export default function PreferencesSheet({ visible, prefs, city, showRole = false, only = null, onClose, onSave }) {
   const insets = useSafeAreaInsets();
+  const pref = useThemedStyles(makeStyles);
+  const { colors } = useTheme();
 
-  const zones = ZONES_BY_CITY[city] || [];
-
-  // Local state for editing before saving
-  const [budget, setBudget] = useState(prefs?.budget || null);
-  const [areas, setAreas] = useState(prefs?.areas || []);
-  const [role, setRole] = useState(prefs?.role || null);
+  const [draft, setDraft] = useState(prefs || {});
+  const [openKey, setOpenKey] = useState(only);
   const [pendingRole, setPendingRole] = useState(null);
 
-  // Sync when visible changes (resetting state if they close without saving)
+  // Reset the draft each time the sheet opens so closing without saving discards edits.
   useEffect(() => {
-    if (visible && prefs) {
-      setBudget(prefs.budget);
-      setAreas(prefs.areas || []);
-      setRole(prefs.role);
+    if (visible) {
+      setDraft(prefs || {});
+      setOpenKey(only);
     }
-  }, [visible, prefs]);
+  }, [visible, prefs, only]);
 
   // Manual backdrop-fade + sheet-slide (decoupled) so the backdrop doesn't
   // ride along with the sheet's slide transform, which reads as a solid
@@ -46,31 +42,27 @@ export default function PreferencesSheet({ visible, prefs, city, showRole = fals
     }
   }, [visible]);
 
-  const toggleArea = (a) => {
-    if (areas.includes(a)) {
-      setAreas(areas.filter(x => x !== a));
-    } else {
-      setAreas([...areas, a]);
-    }
+  const setValue = (key, value) => setDraft((d) => ({ ...d, [key]: value }));
+
+  const toggleMulti = (key, opt) => {
+    setDraft((d) => {
+      const cur = Array.isArray(d[key]) ? d[key] : [];
+      return { ...d, [key]: cur.includes(opt) ? cur.filter((x) => x !== opt) : [...cur, opt] };
+    });
   };
 
-  const requestRoleChange = (r) => {
-    if (r === role) return;
-    setPendingRole(r);
-  };
-
-  const confirmRoleChange = () => {
-    setRole(pendingRole);
-    setPendingRole(null);
-  };
+  const sections = PREF_SECTIONS.map((section) => ({
+    ...section,
+    rows: section.rows.filter((row) => {
+      if (row.roleOnly && !showRole) return false;
+      return !only || only === row.key;
+    }),
+  })).filter((section) => section.rows.length > 0);
 
   const handleSave = () => {
-    onSave({ budget, areas, role });
+    onSave(draft);
     onClose();
   };
-
-  const budgets = Object.values(ENUMS.pref_budget.dbToUI);
-  const roles = Object.values(ENUMS.pref_role.dbToUI);
 
   return (
     <Fragment>
@@ -81,72 +73,71 @@ export default function PreferencesSheet({ visible, prefs, city, showRole = fals
 
         <Animated.View style={[pref.sheet, { paddingBottom: insets.bottom + 16, transform: [{ translateY: sheetY }] }]}>
           <View style={pref.handle} />
-          
+
           <View style={pref.header}>
             <Text style={pref.title}>Preferences</Text>
             <TouchableOpacity onPress={onClose} style={pref.closeBtn} activeOpacity={0.7}>
-              <Ionicons name="close" size={14} color="#14161B" />
+              <Ionicons name="close" size={14} color={colors.ink} />
             </TouchableOpacity>
           </View>
+          <Text style={pref.subtitle}>Set what you need — we'll show you the right matches.</Text>
 
-          <ScrollView style={{ maxHeight: SCREEN_H * 0.7 }} showsVerticalScrollIndicator={false}>
-            
-            {/* ROLE */}
-            {showRole && (!only || only === 'role') && (
-              <View style={{ paddingHorizontal: 20, marginTop: 10 }}>
-                <Text style={pref.label}>I AM...</Text>
-                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 18 }}>
-                  {roles.map(r => {
-                    const on = role === r;
-                    return (
-                      <TouchableOpacity key={r} style={[pref.chip, on && pref.chipOn]} onPress={() => requestRoleChange(r)} activeOpacity={0.8}>
-                        <Text style={[pref.chipText, on && pref.chipTextOn]}>{r}</Text>
-                      </TouchableOpacity>
-                    );
-                  })}
+          <ScrollView style={{ maxHeight: SCREEN_H * 0.6 }} showsVerticalScrollIndicator={false}>
+            {sections.map((section) => (
+              <View key={section.title} style={{ paddingHorizontal: 20 }}>
+                <View style={pref.sectionHeader}>
+                  <Text style={pref.sectionTitle}>{section.title}</Text>
+                  <View style={pref.sectionLine} />
                 </View>
-              </View>
-            )}
 
-            {/* BUDGET */}
-            {(!only || only === 'budget') && (
-              <View style={{ paddingHorizontal: 20 }}>
-                <Text style={pref.label}>MONTHLY BUDGET</Text>
-                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 18 }}>
-                  {budgets.map(b => {
-                    const on = budget === b;
-                    return (
-                      <TouchableOpacity key={b} style={[pref.chip, on && pref.chipOn]} onPress={() => setBudget(b)} activeOpacity={0.8}>
-                        <Text style={[pref.chipText, on && pref.chipTextOn]}>{b}</Text>
+                {section.rows.map((row) => {
+                  const isOpen = openKey === row.key;
+                  const options = prefOptions(row, city);
+                  const set = isPrefSet(draft, row.key, row.multi);
+                  return (
+                    <View key={row.key}>
+                      <TouchableOpacity
+                        style={pref.prefRow}
+                        onPress={() => setOpenKey(isOpen ? null : row.key)}
+                        activeOpacity={0.7}
+                      >
+                        <View style={{ flex: 1 }}>
+                          <Text style={pref.prefTitle}>{row.label}</Text>
+                          <Text style={[pref.prefVal, set && pref.prefValSet]}>
+                            {getPrefDisplay(draft, row.key, row.placeholder, row.multi)}
+                          </Text>
+                        </View>
+                        <Ionicons name={isOpen ? 'chevron-up' : 'chevron-down'} size={16} color={colors.placeholder} />
                       </TouchableOpacity>
-                    );
-                  })}
-                </View>
-              </View>
-            )}
 
-            {/* AREAS */}
-            {(!only || only === 'areas') && (
-              <View style={{ paddingHorizontal: 20 }}>
-                <Text style={pref.label}>PREFERRED AREAS</Text>
-                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 20 }}>
-                  {zones.length === 0 ? (
-                    <Text style={pref.emptyZones}>No zones available for your city yet.</Text>
-                  ) : zones.map(zone => {
-                    const on = areas.includes(zone.name);
-                    return (
-                      <TouchableOpacity key={zone.id} style={[pref.chip, on && pref.chipOn]} onPress={() => toggleArea(zone.name)} activeOpacity={0.8}>
-                        <Text style={[pref.chipText, on && pref.chipTextOn]}>{zone.name}</Text>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
+                      {isOpen && (
+                        <View style={pref.optsWrap}>
+                          {options.length === 0 ? (
+                            <Text style={pref.emptyZones}>No zones available for your city yet.</Text>
+                          ) : options.map((opt) => {
+                            const on = row.multi
+                              ? (draft[row.key] || []).includes(opt)
+                              : draft[row.key] === opt;
+                            const onPress = row.multi
+                              ? () => toggleMulti(row.key, opt)
+                              : row.key === 'role'
+                                ? () => opt !== draft.role && setPendingRole(opt)
+                                : () => setValue(row.key, on ? null : opt);
+                            return (
+                              <TouchableOpacity key={opt} style={[pref.chip, on && pref.chipOn]} onPress={onPress} activeOpacity={0.8}>
+                                <Text style={[pref.chipText, on && pref.chipTextOn]}>{opt}</Text>
+                              </TouchableOpacity>
+                            );
+                          })}
+                        </View>
+                      )}
+                    </View>
+                  );
+                })}
               </View>
-            )}
-
+            ))}
           </ScrollView>
 
-          {/* SAVE BUTTON */}
           <View style={pref.saveFooter}>
             <TouchableOpacity style={pref.saveBtn} onPress={handleSave}>
               <Text style={pref.saveBtnText}>Save Preferences</Text>
@@ -166,7 +157,10 @@ export default function PreferencesSheet({ visible, prefs, city, showRole = fals
             <TouchableOpacity style={[pref.confirmBtn, pref.confirmCancel]} onPress={() => setPendingRole(null)}>
               <Text style={pref.confirmCancelText}>Cancel</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={[pref.confirmBtn, pref.confirmOk]} onPress={confirmRoleChange}>
+            <TouchableOpacity
+              style={[pref.confirmBtn, pref.confirmOk]}
+              onPress={() => { setValue('role', pendingRole); setPendingRole(null); }}
+            >
               <Text style={pref.confirmOkText}>Confirm</Text>
             </TouchableOpacity>
           </View>
@@ -177,32 +171,42 @@ export default function PreferencesSheet({ visible, prefs, city, showRole = fals
   );
 }
 
-const pref = StyleSheet.create({
-  sheet: { backgroundColor: '#fff', borderTopLeftRadius: 24, borderTopRightRadius: 24 },
-  handle: { width: 40, height: 4, backgroundColor: '#E6E8EE', borderRadius: 2, alignSelf: 'center', marginTop: 16, marginBottom: 20 },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, marginBottom: 16 },
-  title: { fontFamily: 'SpaceGrotesk_700Bold', fontSize: 18, color: '#14161B' },
-  closeBtn: { width: 32, height: 32, borderRadius: 16, backgroundColor: '#F2F3F7', alignItems: 'center', justifyContent: 'center' },
-  label: { fontFamily: 'SpaceMono_400Regular', fontSize: 10, letterSpacing: 1.5, color: '#9AA0B2', marginBottom: 12 },
-  
-  chip: { paddingHorizontal: 16, paddingVertical: 10, borderRadius: 50, borderWidth: 1, borderColor: '#E6E8EE', backgroundColor: '#fff' },
+const makeStyles = (colors) => StyleSheet.create({
+  sheet: { backgroundColor: colors.card, borderTopLeftRadius: 24, borderTopRightRadius: 24 },
+  handle: { width: 40, height: 4, backgroundColor: colors.border, borderRadius: 2, alignSelf: 'center', marginTop: 16, marginBottom: 20 },
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20 },
+  title: { fontFamily: 'SpaceGrotesk_700Bold', fontSize: 18, color: colors.ink },
+  subtitle: { fontFamily: 'HankenGrotesk_400Regular', fontSize: 13, color: colors.placeholder, paddingHorizontal: 20, marginTop: 4, marginBottom: 8 },
+  closeBtn: { width: 32, height: 32, borderRadius: 16, backgroundColor: colors.canvas, alignItems: 'center', justifyContent: 'center' },
+
+  sectionHeader: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 18, marginBottom: 4 },
+  sectionTitle: { fontFamily: 'SpaceMono_400Regular', fontSize: 10, letterSpacing: 1.5, color: colors.placeholder, textTransform: 'uppercase' },
+  sectionLine: { flex: 1, height: 1, backgroundColor: colors.border },
+
+  prefRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 14 },
+  prefTitle: { fontFamily: 'HankenGrotesk_600SemiBold', fontSize: 15, color: colors.ink },
+  prefVal: { fontFamily: 'HankenGrotesk_400Regular', fontSize: 13, color: colors.placeholder, marginTop: 2 },
+  prefValSet: { color: colors.blue },
+
+  optsWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingBottom: 16 },
+  chip: { paddingHorizontal: 16, paddingVertical: 10, borderRadius: 50, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.card },
   chipOn: { backgroundColor: colors.blue, borderColor: colors.blue },
-  chipText: { fontFamily: 'HankenGrotesk_600SemiBold', fontSize: 14, color: '#14161B' },
+  chipText: { fontFamily: 'HankenGrotesk_600SemiBold', fontSize: 14, color: colors.ink },
   chipTextOn: { color: '#fff' },
-  emptyZones: { fontFamily: 'HankenGrotesk_400Regular', fontSize: 13, color: '#9AA0B2' },
+  emptyZones: { fontFamily: 'HankenGrotesk_400Regular', fontSize: 13, color: colors.placeholder, paddingBottom: 16 },
 
   confirmBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', alignItems: 'center', justifyContent: 'center', padding: 30 },
-  confirmBox: { width: '100%', maxWidth: 340, backgroundColor: '#fff', borderRadius: 20, padding: 20 },
-  confirmTitle: { fontFamily: 'SpaceGrotesk_700Bold', fontSize: 18, color: '#14161B', marginBottom: 4 },
-  confirmSub: { fontFamily: 'HankenGrotesk_400Regular', fontSize: 13, color: '#9AA0B2', marginBottom: 18 },
+  confirmBox: { width: '100%', maxWidth: 340, backgroundColor: colors.card, borderRadius: 20, padding: 20 },
+  confirmTitle: { fontFamily: 'SpaceGrotesk_700Bold', fontSize: 18, color: colors.ink, marginBottom: 4 },
+  confirmSub: { fontFamily: 'HankenGrotesk_400Regular', fontSize: 13, color: colors.placeholder, marginBottom: 18 },
   confirmActions: { flexDirection: 'row', gap: 10 },
   confirmBtn: { flex: 1, borderRadius: 50, paddingVertical: 12, alignItems: 'center' },
-  confirmCancel: { backgroundColor: '#F2F3F7' },
-  confirmCancelText: { fontFamily: 'HankenGrotesk_600SemiBold', fontSize: 14, color: '#14161B' },
+  confirmCancel: { backgroundColor: colors.canvas },
+  confirmCancelText: { fontFamily: 'HankenGrotesk_600SemiBold', fontSize: 14, color: colors.ink },
   confirmOk: { backgroundColor: colors.blue },
   confirmOkText: { fontFamily: 'HankenGrotesk_600SemiBold', fontSize: 14, color: '#fff' },
 
-  saveFooter: { paddingHorizontal: 20, paddingTop: 16, borderTopWidth: 1, borderTopColor: '#F0F1F5' },
+  saveFooter: { paddingHorizontal: 20, paddingTop: 16, borderTopWidth: 1, borderTopColor: colors.border },
   saveBtn: { backgroundColor: colors.ink, borderRadius: 50, paddingVertical: 16, alignItems: 'center' },
   saveBtnText: { fontFamily: 'HankenGrotesk_700Bold', fontSize: 16, color: '#fff' },
 });

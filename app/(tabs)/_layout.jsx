@@ -3,18 +3,18 @@ import { Platform, View, StyleSheet, Text } from 'react-native';
 import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { colors } from '../../lib/theme';
+import { useTheme } from '../../lib/ThemeContext';
 import { supabase } from '../../lib/supabase';
 import { getCurrentUserId } from '../../lib/auth';
 import { getUnreadCount } from '../../lib/notifications';
 
 const POLL_INTERVAL_MS = 3000;
 
-const TabIcon = ({ name, size, color, count }) => (
+const TabIcon = ({ name, size, color, count, badgeRing }) => (
   <View>
     <Ionicons name={name} size={size} color={color} />
     {count > 0 && (
-      <View style={dotStyles.badge}>
+      <View style={[dotStyles.badge, { borderColor: badgeRing }]}>
         <Text style={dotStyles.badgeText}>{count > 4 ? '4+' : count}</Text>
       </View>
     )}
@@ -23,6 +23,7 @@ const TabIcon = ({ name, size, color, count }) => (
 
 export default function TabsLayout() {
   const insets = useSafeAreaInsets();
+  const { colors } = useTheme();
   const uid = getCurrentUserId();
 
   const [unreadLikes, setUnreadLikes] = useState(0);
@@ -108,10 +109,10 @@ export default function TabsLayout() {
       screenOptions={{
         headerShown: false,
         animation: 'none',
-        sceneStyle: { backgroundColor: '#FCFCFD' },
+        sceneStyle: { backgroundColor: colors.paper },
         tabBarStyle: {
-          backgroundColor: '#fff',
-          borderTopColor: '#E6E8EE',
+          backgroundColor: colors.tabBar,
+          borderTopColor: colors.tabBarBorder,
           borderTopWidth: 1,
           height: Platform.OS === 'ios' ? 56 + insets.bottom : 60,
           paddingBottom: Platform.OS === 'ios' ? insets.bottom : 6,
@@ -119,8 +120,8 @@ export default function TabsLayout() {
           elevation: 0,
           shadowOpacity: 0,
         },
-        tabBarActiveTintColor: colors.blue,
-        tabBarInactiveTintColor: '#9AA0B2',
+        tabBarActiveTintColor: colors.tabBarActive,
+        tabBarInactiveTintColor: colors.tabBarInactive,
         tabBarLabelStyle: {
           fontFamily: 'HankenGrotesk_600SemiBold',
           fontSize: 10,
@@ -161,6 +162,7 @@ export default function TabsLayout() {
               size={22}
               color={color}
               count={unreadLikes}
+              badgeRing={colors.tabBar}
             />
           ),
         }}
@@ -175,6 +177,7 @@ export default function TabsLayout() {
               size={22}
               color={color}
               count={unreadMessages}
+              badgeRing={colors.tabBar}
             />
           ),
         }}
@@ -197,7 +200,7 @@ const dotStyles = StyleSheet.create({
   badge: {
     position: 'absolute', top: -4, right: -8,
     minWidth: 16, height: 16, borderRadius: 8,
-    backgroundColor: '#FF4D6A', borderWidth: 1.5, borderColor: '#fff',
+    backgroundColor: '#FF4D6A', borderWidth: 1.5,
     alignItems: 'center', justifyContent: 'center', paddingHorizontal: 3,
   },
   badgeText: {

@@ -1,11 +1,12 @@
 import { useRef, useState } from 'react';
 import { View, Text, PanResponder, StyleSheet } from 'react-native';
-import { colors } from '../lib/theme';
+import { useTheme, useThemedStyles } from '../lib/ThemeContext';
 
 const THUMB_SIZE = 24;
 
 // Dual-thumb range slider (min/max), e.g. for a budget filter.
 export default function RangeSlider({ min, max, step = 1000, valueMin, valueMax, onChange, formatValue = (v) => `₹${v}` }) {
+  const styles = useThemedStyles(makeStyles);
   const [trackWidth, setTrackWidth] = useState(0);
 
   // Refs so the PanResponder instances (created once) always read live values.
@@ -85,19 +86,19 @@ export default function RangeSlider({ min, max, step = 1000, valueMin, valueMax,
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors) => StyleSheet.create({
   wrap: { paddingVertical: 8 },
   labelsRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 16 },
   valueText: { fontFamily: 'SpaceGrotesk_700Bold', fontSize: 16, color: colors.ink },
   track: { height: THUMB_SIZE, justifyContent: 'center' },
-  trackBg: { position: 'absolute', left: 0, right: 0, height: 4, borderRadius: 2, backgroundColor: '#E6E8EE' },
+  trackBg: { position: 'absolute', left: 0, right: 0, height: 4, borderRadius: 2, backgroundColor: colors.border },
   trackFill: { position: 'absolute', height: 4, borderRadius: 2, backgroundColor: colors.blue },
   thumb: {
     position: 'absolute',
     width: THUMB_SIZE,
     height: THUMB_SIZE,
     borderRadius: THUMB_SIZE / 2,
-    backgroundColor: '#fff',
+    backgroundColor: colors.card,
     borderWidth: 2,
     borderColor: colors.blue,
     shadowColor: '#000',

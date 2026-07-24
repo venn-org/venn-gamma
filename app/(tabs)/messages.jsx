@@ -5,11 +5,12 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useCallback } from 'react';
 import { supabase } from '../../lib/supabase';
-import { colors } from '../../lib/theme';
+import { useTheme, useThemedStyles } from '../../lib/ThemeContext';
 import { getCurrentUserId } from '../../lib/auth';
 import { getBlockedIds } from '../../lib/blocks';
 
 const Avatar = ({ photo, name, size = 48, online }) => {
+  const { colors } = useTheme();
   const initials = name ? name.charAt(0).toUpperCase() : '?';
   return (
     <View style={{ position: 'relative' }}>
@@ -21,13 +22,15 @@ const Avatar = ({ photo, name, size = 48, online }) => {
         )}
       </View>
       {online && (
-        <View style={{ position: 'absolute', bottom: 1, right: 1, width: 12, height: 12, borderRadius: 6, backgroundColor: '#22C55E', borderWidth: 2, borderColor: '#fff' }} />
+        <View style={{ position: 'absolute', bottom: 1, right: 1, width: 12, height: 12, borderRadius: 6, backgroundColor: colors.success, borderWidth: 2, borderColor: colors.card }} />
       )}
     </View>
   );
 };
 
 export default function MessagesScreen() {
+  const s = useThemedStyles(makeStyles);
+  const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const router = useRouter();
   
@@ -166,8 +169,8 @@ export default function MessagesScreen() {
   };
 
   return (
-    <View style={[s.screen, { paddingTop: insets.top + 12 }]}>
-      <View style={s.topBar}>
+    <View style={s.screen}>
+      <View style={[s.topBar, { paddingTop: insets.top + 12 }]}>
         <Text style={s.title}>Messages</Text>
         <TouchableOpacity style={s.bellBtn} activeOpacity={0.8} onPress={() => router.push('/(tabs)/notifications')}>
           <Ionicons name="notifications-outline" size={18} color={colors.ink} />
@@ -257,31 +260,33 @@ export default function MessagesScreen() {
   );
 }
 
-const s = StyleSheet.create({
+const makeStyles = (colors) => StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.canvas },
-  topBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingTop: 8, paddingBottom: 12 },
-  title: { fontFamily: 'SpaceGrotesk_700Bold', fontSize: 28, fontWeight: '800', color: colors.ink, letterSpacing: -0.03 * 28 },
-  bellBtn: { width: 38, height: 38, borderRadius: 19, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 6, shadowOffset: { width: 0, height: 1 }, elevation: 2, position: 'relative' },
+  topBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingTop: 8, paddingBottom: 12, backgroundColor: colors.header },
+  title: { fontFamily: 'SpaceGrotesk_700Bold', fontSize: 28, fontWeight: '800', color: colors.headerText, letterSpacing: -0.03 * 28 },
+  bellBtn: { width: 38, height: 38, borderRadius: 19, backgroundColor: colors.card, alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 6, shadowOffset: { width: 0, height: 1 }, elevation: 2, position: 'relative' },
   bellDot: { position: 'absolute', top: 7, right: 7, width: 8, height: 8, borderRadius: 4, backgroundColor: '#FF4D6A', borderWidth: 2, borderColor: colors.canvas },
 
   whiteCard: { flex: 1, backgroundColor: colors.canvas },
 
-  empty: { alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32, paddingTop: 80, gap: 8 },
+  // flex:1 against the ScrollView's flexGrow:1 content container, so the
+  // message centres in the viewport instead of hanging off a fixed top pad.
+  empty: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32, gap: 8 },
   emptyTitle: { fontFamily: 'SpaceGrotesk_700Bold', fontSize: 18, color: colors.ink, textAlign: 'center' },
-  emptyText: { fontFamily: 'HankenGrotesk_400Regular', fontSize: 14, color: '#9AA0B2', textAlign: 'center', lineHeight: 20 },
+  emptyText: { fontFamily: 'HankenGrotesk_400Regular', fontSize: 14, color: colors.placeholder, textAlign: 'center', lineHeight: 20 },
 
   section: { paddingHorizontal: 20, paddingTop: 18 },
   sectionHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 },
   sectionTitle: { fontFamily: 'SpaceGrotesk_700Bold', fontSize: 15, color: colors.ink },
   sectionCount: { fontFamily: 'HankenGrotesk_600SemiBold', fontSize: 12, color: colors.blue },
-  divider: { height: 1, backgroundColor: '#F0F1F5', marginTop: 6 },
+  divider: { height: 1, backgroundColor: colors.mist, marginTop: 6 },
 
   newMatchItem: { alignItems: 'center', gap: 6 },
   newMatchName: { fontFamily: 'HankenGrotesk_600SemiBold', fontSize: 11, color: colors.ink },
 
   chatRow: {
     flexDirection: 'row', alignItems: 'center', gap: 14,
-    backgroundColor: '#fff', borderRadius: 16, padding: 14, marginBottom: 10,
+    backgroundColor: colors.card, borderRadius: 16, padding: 14, marginBottom: 10,
     shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 8, shadowOffset: { width: 0, height: 2 }, elevation: 2,
   },
   chatInfo: { flex: 1, minWidth: 0 },

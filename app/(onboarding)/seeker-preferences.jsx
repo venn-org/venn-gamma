@@ -2,12 +2,13 @@ import { useState } from 'react';
 import { Text, View, TouchableOpacity, ScrollView, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
 import { colors } from '../../lib/theme';
-import { useOnboarding } from '../../hooks/useOnboarding';
+import { useOnboarding, totalSteps } from '../../hooks/useOnboarding';
 import { ZONES_BY_CITY } from '../../lib/locations';
+import { ENUMS } from '../../lib/enums';
 import OnboardingShell from '../../components/OnboardingShell';
 
-const BUDGETS = ['Under ₹10k', '₹10k–20k', '₹20k–35k', '₹35k–50k', '₹50k+'];
-const GENDERS = ['Women only', 'Men only', 'Any gender'];
+const BUDGETS = Object.values(ENUMS.pref_budget.dbToUI);
+const GENDERS = Object.values(ENUMS.pref_gender.dbToUI);
 
 export default function SeekerPreferencesScreen() {
   const router = useRouter();
@@ -30,7 +31,7 @@ export default function SeekerPreferencesScreen() {
     if (!valid) return;
     setLoading(true);
     updateData({
-      prefs: { areas, budget, flatType: null, gender: prefGender },
+      prefs: { ...data.prefs, areas, budget, flatType: null, gender: prefGender },
     });
     setLoading(false);
     router.push('/(onboarding)/photos');
@@ -38,7 +39,7 @@ export default function SeekerPreferencesScreen() {
 
   return (
     <OnboardingShell
-      step={5} total={9}
+      step={8} total={totalSteps(data.type)}
       footer={
         <TouchableOpacity
           style={[styles.btn, (!valid || loading) && styles.btnDisabled]}

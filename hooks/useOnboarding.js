@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
 import { getCurrentUserId, notifyOnboardingComplete } from '../lib/auth';
-import { mapUIPrefsToDb, toDb } from '../lib/enums';
+import { mapUIPrefsToDb, toDb, toUI } from '../lib/enums';
 import { getAge } from '../lib/age';
 
 // Shared state object instance outside the hook so it persists across screen unmounts/mounts
@@ -29,6 +29,10 @@ if (typeof window !== 'undefined') {
     if (saved) onboardingState = { ...onboardingState, ...JSON.parse(saved) };
   } catch (e) {}
 }
+
+// Owners get two extra screens (flat location + flat details) where seekers get
+// one (what they're looking for), so the two paths have different lengths.
+export const totalSteps = (type) => (type === 'owner' ? 10 : 9);
 
 export function useOnboarding() {
   const [state, setState] = useState(onboardingState);
@@ -96,13 +100,13 @@ export function useOnboarding() {
       }
     }
 
-    // Map preferences using enums
+    // Map preferences using enums. Onboarding collects a subset; the rest stay
+    // null until the user sets them from the preferences sheet.
+    const { flatType, ...rest } = onboardingState.prefs || {};
     const dbPrefs = mapUIPrefsToDb({
-      role: onboardingState.type === 'seeking' ? '🔍 Looking for a flat' : '🏠 Have a flat / room',
-      areas: onboardingState.prefs?.areas || [],
-      budget: onboardingState.prefs?.budget || null,
-      flatType: onboardingState.prefs?.flatType ? [onboardingState.prefs.flatType] : [], // mapUIPrefsToDb expects array
-      gender: onboardingState.prefs?.gender || null,
+      ...rest,
+      role: toUI('pref_role', onboardingState.type),
+      flatType: flatType ? [flatType] : [], // mapUIPrefsToDb expects an array
     });
 
     const updatePayload = {

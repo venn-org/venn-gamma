@@ -1,22 +1,27 @@
-import { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, TextInput, ScrollView, Alert, KeyboardAvoidingView, Platform, ActivityIndicator } from 'react-native';
+import { useState, useEffect, useRef } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, TextInput, ScrollView, Alert, KeyboardAvoidingView, Platform, ActivityIndicator, Modal, Pressable, Animated, Dimensions } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { supabase } from '../../lib/supabase';
 import { getCurrentUserId } from '../../lib/auth';
-import { colors } from '../../lib/theme';
+import { useTheme, useThemedStyles } from '../../lib/ThemeContext';
 import { toUI, toDb } from '../../lib/enums';
 import { getAge } from '../../lib/age';
 import { ZONES_BY_CITY } from '../../lib/locations';
 import RangeSlider from '../../components/RangeSlider';
 import Calendar from '../../components/Calendar';
 
+const { height: SCREEN_H } = Dimensions.get('window');
+
 const pad2 = (n) => String(n).padStart(2, '0');
 const toLocalDateStr = (date) => `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}`;
 const addYears = (date, years) => new Date(date.getFullYear() + years, date.getMonth(), date.getDate());
 
 const GENDER_OPTIONS = ['Woman', 'Man', 'Non-binary', 'Transgender', 'Other'];
+// Mirrors app/(onboarding)/pronouns.jsx — pick up to four.
+const PRONOUN_OPTIONS = ['She/her', 'He/him', 'They/them', 'Ze/zir', 'Ze/zan', 'Other'];
+const MAX_PRONOUNS = 4;
 
 const PROMPT_CATEGORIES = [
   {
@@ -74,7 +79,9 @@ const BUDGET_MIN = 0;
 const BUDGET_MAX = 100000;
 const BUDGET_STEP = 1000;
 
-const ChipSelector = ({ options, selected, onSelect }) => (
+const ChipSelector = ({ options, selected, onSelect }) => {
+  const s = useThemedStyles(makeStyles);
+  return (
   <View style={s.chipContainer}>
     {options.map(opt => {
       const isSelected = typeof selected === 'string' && selected.toLowerCase() === opt.toLowerCase();
@@ -90,11 +97,34 @@ const ChipSelector = ({ options, selected, onSelect }) => (
       );
     })}
   </View>
-);
+  );
+};
+
+const MultiChipSelector = ({ options, selected, onToggle }) => {
+  const s = useThemedStyles(makeStyles);
+  return (
+  <View style={s.chipContainer}>
+    {options.map(opt => {
+      const isSelected = selected.includes(opt);
+      return (
+        <TouchableOpacity
+          key={opt}
+          style={[s.chip, isSelected && s.chipSelected]}
+          onPress={() => onToggle(opt)}
+          activeOpacity={0.8}
+        >
+          <Text style={[s.chipText, isSelected && s.chipTextSelected]}>{opt}</Text>
+        </TouchableOpacity>
+      );
+    })}
+  </View>
+  );
+};
 
 const PROMPT_VISIBLE_COUNT = 4;
 
 const PromptPicker = ({ value, onChange }) => {
+  const s = useThemedStyles(makeStyles);
   const initialCat = PROMPT_CATEGORIES.find(c => c.questions.includes(value))?.key || PROMPT_CATEGORIES[0].key;
   const [activeCat, setActiveCat] = useState(initialCat);
   const category = PROMPT_CATEGORIES.find(c => c.key === activeCat);
@@ -152,7 +182,117 @@ const PromptPicker = ({ value, onChange }) => {
   );
 };
 
+const PromptSlotButton = ({ index, question, answer, onPress }) => {
+  const s = useThemedStyles(makeStyles);
+  const { colors } = useTheme();
+  const filled = !!(question || answer);
+  return (
+    <TouchableOpacity style={[s.promptSlot, filled && s.promptSlotFilled]} onPress={onPress} activeOpacity={0.8}>
+      <View style={{ flex: 1 }}>
+        {filled ? (
+          <>
+            <Text style={s.promptSlotQ} numberOfLines={2}>{question || 'No question picked'}</Text>
+            <Text style={s.promptSlotA} numberOfLines={1}>{answer || 'Add your answer'}</Text>
+          </>
+        ) : (
+          <Text style={s.promptSlotEmpty}>Add prompt {index}</Text>
+        )}
+      </View>
+      <Ionicons
+        name={filled ? 'create-outline' : 'add'}
+        size={18}
+        color={filled ? colors.blue : '#9AA0B2'}
+      />
+    </TouchableOpacity>
+  );
+};
+
+/** Editor for a single prompt slot. Drafts locally so Cancel discards edits. */
+const PromptEditorModal = ({ visible, index, question, answer, onSave, onClear, onClose }) => {
+  const s = useThemedStyles(makeStyles);
+  const { colors } = useTheme();
+  const [q, setQ] = useState(question);
+  const [a, setA] = useState(answer);
+
+  useEffect(() => {
+    if (visible) {
+      setQ(question);
+      setA(answer);
+    }
+  }, [visible, question, answer]);
+
+  // Manual backdrop-fade + sheet-slide (decoupled), same as PreferencesSheet —
+  // Modal's own animationType="slide" transforms the whole subtree together, so
+  // the backdrop rides up with the sheet instead of dimming immediately.
+  const backdropOpacity = useRef(new Animated.Value(0)).current;
+  const sheetY = useRef(new Animated.Value(SCREEN_H)).current;
+
+  useEffect(() => {
+    if (visible) {
+      Animated.parallel([
+        Animated.timing(backdropOpacity, { toValue: 1, duration: 200, useNativeDriver: true }),
+        Animated.timing(sheetY, { toValue: 0, duration: 250, useNativeDriver: true }),
+      ]).start();
+    } else {
+      backdropOpacity.setValue(0);
+      sheetY.setValue(SCREEN_H);
+    }
+  }, [visible]);
+
+  return (
+    <Modal visible={visible} transparent animationType="none" onRequestClose={onClose}>
+      <View style={{ flex: 1, justifyContent: 'flex-end' }}>
+        <Animated.View style={[s.promptBackdrop, { opacity: backdropOpacity }]} />
+        <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+          <Animated.View style={[s.promptSheet, { transform: [{ translateY: sheetY }] }]}>
+            <View style={s.promptSheetHeader}>
+              <Text style={s.promptSheetTitle}>Prompt {index}</Text>
+              <TouchableOpacity onPress={onClose} style={s.promptSheetClose} activeOpacity={0.7}>
+                <Ionicons name="close" size={16} color={colors.ink} />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 420 }}>
+              <Text style={s.label}>Question</Text>
+              <PromptPicker value={q} onChange={setQ} />
+
+              <Text style={s.label}>Answer</Text>
+              <TextInput
+                style={[s.input, s.textArea]}
+                placeholder="Type your answer here..."
+                placeholderTextColor="#9AA0B2"
+                value={a}
+                onChangeText={setA}
+                multiline
+                textAlignVertical="top"
+              />
+            </ScrollView>
+
+            <View style={s.promptSheetActions}>
+              {(question || answer) ? (
+                <TouchableOpacity style={s.promptClearBtn} onPress={onClear} activeOpacity={0.8}>
+                  <Text style={s.promptClearText}>Remove</Text>
+                </TouchableOpacity>
+              ) : null}
+              <TouchableOpacity
+                style={s.promptDoneBtn}
+                onPress={() => onSave(q, a)}
+                activeOpacity={0.85}
+              >
+                <Text style={s.promptDoneText}>Done</Text>
+              </TouchableOpacity>
+            </View>
+          </Animated.View>
+        </KeyboardAvoidingView>
+      </View>
+    </Modal>
+  );
+};
+
 export default function EditProfileScreen() {
+  const s = useThemedStyles(makeStyles);
+  const { colors } = useTheme();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   
@@ -163,7 +303,7 @@ export default function EditProfileScreen() {
   const [name, setName] = useState('');
   const [birthday, setBirthday] = useState(''); // YYYY-MM-DD
   const [gender, setGender] = useState('');
-  const [pronouns, setPronouns] = useState(''); // stored as string in UI, array in DB
+  const [pronouns, setPronouns] = useState([]);
   const [bio, setBio] = useState('');
   const [location, setLocation] = useState('');
   const [profileCity, setProfileCity] = useState(''); // read-only, just scopes the location chip options
@@ -191,6 +331,14 @@ export default function EditProfileScreen() {
   const [prompt2A, setPrompt2A] = useState('');
   const [prompt3Q, setPrompt3Q] = useState('');
   const [prompt3A, setPrompt3A] = useState('');
+  const [editingPrompt, setEditingPrompt] = useState(null); // 1 | 2 | 3 | null
+
+  const promptSlots = [
+    { q: prompt1Q, a: prompt1A, setQ: setPrompt1Q, setA: setPrompt1A },
+    { q: prompt2Q, a: prompt2A, setQ: setPrompt2Q, setA: setPrompt2A },
+    { q: prompt3Q, a: prompt3A, setQ: setPrompt3Q, setA: setPrompt3A },
+  ];
+  const editingSlot = editingPrompt ? promptSlots[editingPrompt - 1] : null;
 
   useEffect(() => {
     fetchProfile();
@@ -217,13 +365,13 @@ export default function EditProfileScreen() {
         
         setGender(toUI('gender', data.gender) || data.gender || '');
         
-        let initialPronouns = '';
         if (Array.isArray(data.pronouns)) {
-          initialPronouns = data.pronouns.join(', ');
-        } else if (typeof data.pronouns === 'string') {
-          initialPronouns = data.pronouns;
+          setPronouns(data.pronouns);
+        } else if (typeof data.pronouns === 'string' && data.pronouns.trim()) {
+          setPronouns(data.pronouns.split(',').map(p => p.trim()).filter(Boolean));
+        } else {
+          setPronouns([]);
         }
-        setPronouns(initialPronouns);
 
         setBio(data.bio || '');
         setLocation(data.location || '');
@@ -263,6 +411,14 @@ export default function EditProfileScreen() {
     }
   };
 
+  const togglePronoun = (opt) => {
+    setPronouns(prev => {
+      if (prev.includes(opt)) return prev.filter(p => p !== opt);
+      if (prev.length >= MAX_PRONOUNS) return prev;
+      return [...prev, opt];
+    });
+  };
+
   const handleSave = async () => {
     if (saving) return;
     if (!name.trim()) {
@@ -295,7 +451,7 @@ export default function EditProfileScreen() {
       const updatePayload = {
         name: name.trim(),
         gender: toDb('gender', gender) || null,
-        pronouns: pronouns.trim() ? pronouns.split(',').map(s => s.trim()) : [],
+        pronouns,
         bio: bio.trim() || null,
         location: location.trim() || null,
         job_title: jobTitle.trim() || null,
@@ -328,14 +484,14 @@ export default function EditProfileScreen() {
   };
 
   return (
-    <View style={[s.screen, { paddingTop: insets.top }]}>
-      <View style={s.header}>
+    <View style={s.screen}>
+      <View style={[s.header, { paddingTop: insets.top + 12 }]}>
         <TouchableOpacity style={s.backBtn} onPress={() => (router.canGoBack() ? router.back() : router.replace('/(tabs)/profile'))}>
-          <Ionicons name="chevron-back" size={24} color={colors.ink} />
+          <Ionicons name="chevron-back" size={24} color={colors.headerText} />
         </TouchableOpacity>
         <Text style={s.title}>Edit Profile</Text>
         <TouchableOpacity style={s.saveBtn} onPress={handleSave} disabled={saving}>
-          {saving ? <ActivityIndicator size="small" color={colors.blue} /> : <Text style={s.saveBtnText}>Save</Text>}
+          {saving ? <ActivityIndicator size="small" color={colors.headerText} /> : <Text style={s.saveBtnText}>Save</Text>}
         </TouchableOpacity>
       </View>
       
@@ -370,12 +526,10 @@ export default function EditProfileScreen() {
                 />
                 
                 <Text style={s.label}>Pronouns</Text>
-                <TextInput
-                  style={s.input}
-                  placeholder="e.g. she/her, they/them"
-                  placeholderTextColor="#9AA0B2"
-                  value={pronouns}
-                  onChangeText={setPronouns}
+                <MultiChipSelector
+                  options={PRONOUN_OPTIONS}
+                  selected={pronouns}
+                  onToggle={togglePronoun}
                 />
 
                 <Text style={s.label}>Gender</Text>
@@ -487,84 +641,84 @@ export default function EditProfileScreen() {
                 <Text style={s.sectionTitle}>Prompts</Text>
                 <Text style={s.infoText}>Prompts help your profile stand out. Choose a question and add your unique answer.</Text>
                 
-                <View style={s.promptBlock}>
-                  <Text style={s.label}>Question 1</Text>
-                  <PromptPicker value={prompt1Q} onChange={setPrompt1Q} />
-
-
-                  <Text style={s.label}>Answer 1</Text>
-                  <TextInput
-                    style={[s.input, s.textArea]}
-                    placeholder="Type your answer here..."
-                    placeholderTextColor="#9AA0B2"
-                    value={prompt1A}
-                    onChangeText={setPrompt1A}
-                    multiline
-                    textAlignVertical="top"
+                {promptSlots.map((slot, i) => (
+                  <PromptSlotButton
+                    key={i}
+                    index={i + 1}
+                    question={slot.q}
+                    answer={slot.a}
+                    onPress={() => setEditingPrompt(i + 1)}
                   />
-                </View>
-
-                <View style={s.promptBlock}>
-                  <Text style={s.label}>Question 2</Text>
-                  <PromptPicker value={prompt2Q} onChange={setPrompt2Q} />
-
-
-                  <Text style={s.label}>Answer 2</Text>
-                  <TextInput
-                    style={[s.input, s.textArea]}
-                    placeholder="Type your answer here..."
-                    placeholderTextColor="#9AA0B2"
-                    value={prompt2A}
-                    onChangeText={setPrompt2A}
-                    multiline
-                    textAlignVertical="top"
-                  />
-                </View>
-
-                <View style={s.promptBlock}>
-                  <Text style={s.label}>Question 3</Text>
-                  <PromptPicker value={prompt3Q} onChange={setPrompt3Q} />
-
-                  <Text style={s.label}>Answer 3</Text>
-                  <TextInput
-                    style={[s.input, s.textArea]}
-                    placeholder="Type your answer here..."
-                    placeholderTextColor="#9AA0B2"
-                    value={prompt3A}
-                    onChangeText={setPrompt3A}
-                    multiline
-                    textAlignVertical="top"
-                  />
-                </View>
+                ))}
               </View>
             </>
           )}
         </ScrollView>
       </KeyboardAvoidingView>
+
+      <PromptEditorModal
+        visible={editingPrompt !== null}
+        index={editingPrompt}
+        question={editingSlot?.q ?? ''}
+        answer={editingSlot?.a ?? ''}
+        onSave={(q, a) => {
+          editingSlot.setQ(q);
+          editingSlot.setA(a);
+          setEditingPrompt(null);
+        }}
+        onClear={() => {
+          editingSlot.setQ('');
+          editingSlot.setA('');
+          setEditingPrompt(null);
+        }}
+        onClose={() => setEditingPrompt(null)}
+      />
     </View>
   );
 }
 
-const s = StyleSheet.create({
+const makeStyles = (colors) => StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.canvas },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 10, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#EDEEF2', backgroundColor: '#fff' },
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 10, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: colors.border, backgroundColor: colors.header },
   backBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
-  title: { fontFamily: 'SpaceGrotesk_700Bold', fontSize: 18, color: colors.ink },
+  title: { fontFamily: 'SpaceGrotesk_700Bold', fontSize: 18, color: colors.headerText },
   saveBtn: { paddingHorizontal: 16, paddingVertical: 8 },
-  saveBtnText: { fontFamily: 'HankenGrotesk_700Bold', fontSize: 16, color: colors.blue },
+  saveBtnText: { fontFamily: 'HankenGrotesk_700Bold', fontSize: 16, color: colors.headerText },
   
   content: { flex: 1, padding: 20 },
   
-  section: { backgroundColor: '#fff', padding: 20, borderRadius: 16, marginBottom: 20, borderWidth: 1, borderColor: '#EDEEF2' },
+  section: { backgroundColor: colors.card, padding: 20, borderRadius: 16, marginBottom: 20, borderWidth: 1, borderColor: colors.border },
   sectionTitle: { fontFamily: 'SpaceGrotesk_700Bold', fontSize: 20, color: colors.ink, marginBottom: 16 },
   
-  infoText: { fontFamily: 'HankenGrotesk_400Regular', fontSize: 14, color: '#5A6072', lineHeight: 20, marginBottom: 16 },
+  infoText: { fontFamily: 'HankenGrotesk_400Regular', fontSize: 14, color: colors.slate, lineHeight: 20, marginBottom: 16 },
   
-  promptBlock: { marginBottom: 16 },
+  promptSlot: {
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    backgroundColor: colors.canvas, borderRadius: 14, padding: 16, marginBottom: 10,
+    borderWidth: 1, borderColor: colors.border, borderStyle: 'dashed',
+  },
+  promptSlotFilled: { backgroundColor: colors.card, borderStyle: 'solid', borderColor: colors.border },
+  promptSlotEmpty: { fontFamily: 'HankenGrotesk_600SemiBold', fontSize: 14, color: colors.placeholder },
+  promptSlotQ: { fontFamily: 'HankenGrotesk_600SemiBold', fontSize: 13, color: colors.slate },
+  promptSlotA: { fontFamily: 'SpaceGrotesk_700Bold', fontSize: 15, color: colors.ink, marginTop: 3 },
+
+  promptBackdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.45)' },
+  promptSheet: {
+    backgroundColor: colors.card, borderTopLeftRadius: 24, borderTopRightRadius: 24,
+    paddingHorizontal: 20, paddingBottom: 28,
+  },
+  promptSheetHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: 20 },
+  promptSheetTitle: { fontFamily: 'SpaceGrotesk_700Bold', fontSize: 18, color: colors.ink },
+  promptSheetClose: { width: 32, height: 32, borderRadius: 16, backgroundColor: colors.canvas, alignItems: 'center', justifyContent: 'center' },
+  promptSheetActions: { flexDirection: 'row', gap: 10, marginTop: 16 },
+  promptClearBtn: { borderRadius: 50, paddingVertical: 15, paddingHorizontal: 22, backgroundColor: colors.canvas },
+  promptClearText: { fontFamily: 'HankenGrotesk_600SemiBold', fontSize: 15, color: '#FF4D6A' },
+  promptDoneBtn: { flex: 1, borderRadius: 50, paddingVertical: 15, alignItems: 'center', backgroundColor: colors.ink },
+  promptDoneText: { fontFamily: 'HankenGrotesk_700Bold', fontSize: 15, color: '#fff' },
   
-  label: { fontFamily: 'HankenGrotesk_600SemiBold', fontSize: 13, color: '#5A6072', marginBottom: 8, marginTop: 12 },
+  label: { fontFamily: 'HankenGrotesk_600SemiBold', fontSize: 13, color: colors.slate, marginBottom: 8, marginTop: 12 },
   input: {
-    backgroundColor: '#F2F3F7',
+    backgroundColor: colors.canvas,
     borderRadius: 12,
     paddingHorizontal: 16,
     paddingVertical: 14,
@@ -578,17 +732,17 @@ const s = StyleSheet.create({
   },
   
   chipContainer: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 4 },
-  chip: { paddingHorizontal: 14, paddingVertical: 10, borderRadius: 50, borderWidth: 1, borderColor: '#D0D4DF', backgroundColor: '#fff' },
+  chip: { paddingHorizontal: 14, paddingVertical: 10, borderRadius: 50, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.card },
   chipSelected: { backgroundColor: colors.blue, borderColor: colors.blue },
-  chipText: { fontFamily: 'HankenGrotesk_600SemiBold', fontSize: 13, color: '#5A6072' },
+  chipText: { fontFamily: 'HankenGrotesk_600SemiBold', fontSize: 13, color: colors.slate },
   chipTextSelected: { color: '#fff' },
 
   categoryRow: { flexDirection: 'row', gap: 8, marginTop: 4, marginBottom: 10 },
-  categoryChip: { paddingHorizontal: 12, paddingVertical: 7, borderRadius: 50, backgroundColor: '#F2F3F7' },
+  categoryChip: { paddingHorizontal: 12, paddingVertical: 7, borderRadius: 50, backgroundColor: colors.canvas },
   categoryChipActive: { backgroundColor: colors.ink },
-  categoryChipText: { fontFamily: 'HankenGrotesk_600SemiBold', fontSize: 12, color: '#5A6072' },
+  categoryChipText: { fontFamily: 'HankenGrotesk_600SemiBold', fontSize: 12, color: colors.slate },
   categoryChipTextActive: { color: '#fff' },
 
-  moreChip: { paddingHorizontal: 14, paddingVertical: 10, borderRadius: 50, borderWidth: 1, borderColor: '#D0D4DF', borderStyle: 'dashed', backgroundColor: 'transparent' },
+  moreChip: { paddingHorizontal: 14, paddingVertical: 10, borderRadius: 50, borderWidth: 1, borderColor: colors.border, borderStyle: 'dashed', backgroundColor: 'transparent' },
   moreChipText: { fontFamily: 'HankenGrotesk_600SemiBold', fontSize: 13, color: colors.blue },
 });

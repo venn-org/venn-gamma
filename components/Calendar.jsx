@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Calendar as RNCalendar } from 'react-native-calendars';
-import { colors } from '../lib/theme';
+import { useTheme, useThemedStyles } from '../lib/ThemeContext';
 
 const MONTH_LABELS = [
   'January', 'February', 'March', 'April', 'May', 'June',
@@ -37,6 +37,8 @@ const shiftYear = (dateStr, delta) => {
 // tapping expands the month grid inline below it, same interaction as
 // edit-profile.jsx's PromptPicker.
 export default function Calendar({ value, onChange, minDate, maxDate, placeholder = 'Select a date' }) {
+  const s = useThemedStyles(makeStyles);
+  const { colors } = useTheme();
   const [expanded, setExpanded] = useState(false);
   // react-native-calendars only exposes month-step arrows in its header —
   // stepping from today back to a birth year one month at a time is ~200+
@@ -86,8 +88,8 @@ export default function Calendar({ value, onChange, minDate, maxDate, placeholde
             markedDates={value ? { [value]: { selected: true, selectedColor: colors.blue } } : {}}
             enableSwipeMonths
             theme={{
-              backgroundColor: '#fff',
-              calendarBackground: '#fff',
+              backgroundColor: colors.card,
+              calendarBackground: colors.card,
               textSectionTitleColor: colors.slate,
               selectedDayBackgroundColor: colors.blue,
               selectedDayTextColor: '#fff',
@@ -110,7 +112,7 @@ export default function Calendar({ value, onChange, minDate, maxDate, placeholde
   );
 }
 
-const s = StyleSheet.create({
+const makeStyles = (colors) => StyleSheet.create({
   field: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     backgroundColor: colors.inputBg, borderRadius: 12,
@@ -121,13 +123,13 @@ const s = StyleSheet.create({
 
   panel: {
     marginTop: 8, borderRadius: 12, overflow: 'hidden',
-    borderWidth: 1, borderColor: '#EDEEF2',
+    borderWidth: 1, borderColor: colors.border,
   },
 
   yearNav: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingHorizontal: 12, paddingVertical: 8, backgroundColor: colors.canvas,
-    borderBottomWidth: 1, borderBottomColor: '#EDEEF2',
+    borderBottomWidth: 1, borderBottomColor: colors.border,
   },
   yearBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 4 },
   yearBtnText: { fontFamily: 'HankenGrotesk_600SemiBold', fontSize: 11, color: colors.ink },
