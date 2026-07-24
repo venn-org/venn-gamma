@@ -8,7 +8,13 @@ import { getCurrentUserId } from '../../lib/auth';
 import { colors } from '../../lib/theme';
 import { toUI, toDb } from '../../lib/enums';
 import { getAge } from '../../lib/age';
+import { ZONES_BY_CITY } from '../../lib/locations';
 import RangeSlider from '../../components/RangeSlider';
+import Calendar from '../../components/Calendar';
+
+const pad2 = (n) => String(n).padStart(2, '0');
+const toLocalDateStr = (date) => `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}`;
+const addYears = (date, years) => new Date(date.getFullYear() + years, date.getMonth(), date.getDate());
 
 const GENDER_OPTIONS = ['Woman', 'Man', 'Non-binary', 'Transgender', 'Other'];
 
@@ -160,6 +166,7 @@ export default function EditProfileScreen() {
   const [pronouns, setPronouns] = useState(''); // stored as string in UI, array in DB
   const [bio, setBio] = useState('');
   const [location, setLocation] = useState('');
+  const [profileCity, setProfileCity] = useState(''); // read-only, just scopes the location chip options
 
   // Work & Education
   const [jobTitle, setJobTitle] = useState('');
@@ -220,6 +227,7 @@ export default function EditProfileScreen() {
 
         setBio(data.bio || '');
         setLocation(data.location || '');
+        setProfileCity(data.city || '');
         setJobTitle(data.job_title || '');
         setJobCompany(data.job_company || '');
         setEducationSchool(data.education_school || '');
@@ -262,17 +270,6 @@ export default function EditProfileScreen() {
       return;
     }
     
-    // Simple validation for YYYY-MM-DD
-    if (birthday && !/^\d{4}-\d{2}-\d{2}$/.test(birthday)) {
-      Alert.alert('Invalid date format', 'Please use YYYY-MM-DD for your birthday.');
-      return;
-    }
-
-    if (moveInDate && !/^\d{4}-\d{2}-\d{2}$/.test(moveInDate)) {
-      Alert.alert('Invalid date format', 'Please use YYYY-MM-DD for your move-in date.');
-      return;
-    }
-
     setSaving(true);
     try {
       const uid = getCurrentUserId();
@@ -324,8 +321,8 @@ export default function EditProfileScreen() {
       
       (router.canGoBack() ? router.back() : router.replace('/(tabs)/profile'));
     } catch (e) {
-      console.log(e);
-      Alert.alert('Error', 'Failed to save profile. Please try again.');
+      console.error('Error saving profile:', e);
+      Alert.alert('Error', e?.message ? `Failed to save profile: ${e.message}` : 'Failed to save profile. Please try again.');
       setSaving(false);
     }
   };
@@ -363,14 +360,13 @@ export default function EditProfileScreen() {
                   onChangeText={setName}
                 />
                 
-                <Text style={s.label}>Birthday (YYYY-MM-DD)</Text>
-                <TextInput
-                  style={s.input}
-                  placeholder="1995-08-25"
-                  placeholderTextColor="#9AA0B2"
+                <Text style={s.label}>Birthday</Text>
+                <Calendar
                   value={birthday}
-                  onChangeText={setBirthday}
-                  keyboardType="numeric"
+                  onChange={setBirthday}
+                  minDate={toLocalDateStr(addYears(new Date(), -100))}
+                  maxDate={toLocalDateStr(addYears(new Date(), -18))}
+                  placeholder="Select your birthday"
                 />
                 
                 <Text style={s.label}>Pronouns</Text>
@@ -397,13 +393,15 @@ export default function EditProfileScreen() {
                 />
 
                 <Text style={s.label}>Location</Text>
-                <TextInput
-                  style={s.input}
-                  placeholder="e.g. Indiranagar, Bengaluru"
-                  placeholderTextColor="#9AA0B2"
-                  value={location}
-                  onChangeText={setLocation}
-                />
+                {ZONES_BY_CITY[profileCity]?.length > 0 ? (
+                  <ChipSelector
+                    options={ZONES_BY_CITY[profileCity].map(z => z.name)}
+                    selected={location}
+                    onSelect={setLocation}
+                  />
+                ) : (
+                  <Text style={s.infoText}>Set your city during onboarding to choose a location.</Text>
+                )}
               </View>
 
               {/* Work & Education Section */}
@@ -461,14 +459,12 @@ export default function EditProfileScreen() {
                   onChange={(lo, hi) => { setBudgetMin(lo); setBudgetMax(hi); }}
                 />
 
-                <Text style={s.label}>Move-in Date (YYYY-MM-DD)</Text>
-                <TextInput
-                  style={s.input}
-                  placeholder="2026-09-01"
-                  placeholderTextColor="#9AA0B2"
+                <Text style={s.label}>Move-in Date</Text>
+                <Calendar
                   value={moveInDate}
-                  onChangeText={setMoveInDate}
-                  keyboardType="numeric"
+                  onChange={setMoveInDate}
+                  minDate={toLocalDateStr(new Date())}
+                  placeholder="Select a move-in date"
                 />
               </View>
 
