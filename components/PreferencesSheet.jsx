@@ -8,7 +8,7 @@ import { ZONES_BY_CITY } from '../lib/locations';
 
 const { height: SCREEN_H } = Dimensions.get('window');
 
-export default function PreferencesSheet({ visible, prefs, city, showRole = false, onClose, onSave }) {
+export default function PreferencesSheet({ visible, prefs, city, showRole = false, only = null, onClose, onSave }) {
   const insets = useSafeAreaInsets();
 
   const zones = ZONES_BY_CITY[city] || [];
@@ -92,7 +92,7 @@ export default function PreferencesSheet({ visible, prefs, city, showRole = fals
           <ScrollView style={{ maxHeight: SCREEN_H * 0.7 }} showsVerticalScrollIndicator={false}>
             
             {/* ROLE */}
-            {showRole && (
+            {showRole && (!only || only === 'role') && (
               <View style={{ paddingHorizontal: 20, marginTop: 10 }}>
                 <Text style={pref.label}>I AM...</Text>
                 <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 18 }}>
@@ -109,36 +109,40 @@ export default function PreferencesSheet({ visible, prefs, city, showRole = fals
             )}
 
             {/* BUDGET */}
-            <View style={{ paddingHorizontal: 20 }}>
-              <Text style={pref.label}>MONTHLY BUDGET</Text>
-              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 18 }}>
-                {budgets.map(b => {
-                  const on = budget === b;
-                  return (
-                    <TouchableOpacity key={b} style={[pref.chip, on && pref.chipOn]} onPress={() => setBudget(b)} activeOpacity={0.8}>
-                      <Text style={[pref.chipText, on && pref.chipTextOn]}>{b}</Text>
-                    </TouchableOpacity>
-                  );
-                })}
+            {(!only || only === 'budget') && (
+              <View style={{ paddingHorizontal: 20 }}>
+                <Text style={pref.label}>MONTHLY BUDGET</Text>
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 18 }}>
+                  {budgets.map(b => {
+                    const on = budget === b;
+                    return (
+                      <TouchableOpacity key={b} style={[pref.chip, on && pref.chipOn]} onPress={() => setBudget(b)} activeOpacity={0.8}>
+                        <Text style={[pref.chipText, on && pref.chipTextOn]}>{b}</Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
               </View>
-            </View>
+            )}
 
             {/* AREAS */}
-            <View style={{ paddingHorizontal: 20 }}>
-              <Text style={pref.label}>PREFERRED AREAS</Text>
-              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 20 }}>
-                {zones.length === 0 ? (
-                  <Text style={pref.emptyZones}>No zones available for your city yet.</Text>
-                ) : zones.map(zone => {
-                  const on = areas.includes(zone.name);
-                  return (
-                    <TouchableOpacity key={zone.id} style={[pref.chip, on && pref.chipOn]} onPress={() => toggleArea(zone.name)} activeOpacity={0.8}>
-                      <Text style={[pref.chipText, on && pref.chipTextOn]}>{zone.name}</Text>
-                    </TouchableOpacity>
-                  );
-                })}
+            {(!only || only === 'areas') && (
+              <View style={{ paddingHorizontal: 20 }}>
+                <Text style={pref.label}>PREFERRED AREAS</Text>
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 20 }}>
+                  {zones.length === 0 ? (
+                    <Text style={pref.emptyZones}>No zones available for your city yet.</Text>
+                  ) : zones.map(zone => {
+                    const on = areas.includes(zone.name);
+                    return (
+                      <TouchableOpacity key={zone.id} style={[pref.chip, on && pref.chipOn]} onPress={() => toggleArea(zone.name)} activeOpacity={0.8}>
+                        <Text style={[pref.chipText, on && pref.chipTextOn]}>{zone.name}</Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
               </View>
-            </View>
+            )}
 
           </ScrollView>
 
