@@ -18,6 +18,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import CookieConsentBanner from "../../components/CookieConsentBanner";
 import LegalDoc from "../../components/LegalDoc";
+import GoogleLogo from "../../assets/images/signin-google-logo.svg";
 import { signInWithGoogle } from "../../lib/auth";
 import { getCookieConsent, setCookieConsent } from "../../lib/cookieConsent";
 import { COOKIE_DOC, PRIVACY_DOC, TERMS_DOC } from "../../lib/legal";
@@ -224,9 +225,16 @@ export default function LoginScreen() {
               disabled={loading}
               activeOpacity={0.85}
             >
-              <Text style={styles.googleBtnText}>
-                {loading ? "Signing in…" : "🔵  Continue with Google"}
-              </Text>
+              {loading ? (
+                <Text style={styles.googleBtnText}>Signing in…</Text>
+              ) : (
+                <View style={styles.googleBtnRow}>
+                  <View style={styles.googleLogoBg}>
+                    <GoogleLogo width={16} height={16} />
+                  </View>
+                  <Text style={styles.googleBtnText}>Continue with Google</Text>
+                </View>
+              )}
             </TouchableOpacity>
           )}
 
@@ -413,6 +421,8 @@ const styles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: "rgba(255,255,255,0.12)",
   },
+  googleBtnRow: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10 },
+  googleLogoBg: { width: 22, height: 22, borderRadius: 11, backgroundColor: "#fff", alignItems: "center", justifyContent: "center" },
   googleBtnText: { color: "#fff", fontSize: 15, fontWeight: "600" },
   btnDisabled: { opacity: 0.6 },
   legal: {
