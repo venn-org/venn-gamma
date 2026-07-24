@@ -138,14 +138,27 @@ export default function LoginScreen() {
         {/* grain effect */}
         <View style={styles.grain} />
         {/* gradients */}
-        <View style={styles.topFade} />
+        <LinearGradient
+          colors={[
+            "rgba(0,0,0,0.42)",
+            "rgba(0,0,0,0.2)",
+            "rgba(0,0,0,0.07)",
+            "transparent",
+          ]}
+          locations={[0, 0.4, 0.75, 1]}
+          style={styles.topFade}
+        />
         <LinearGradient
           colors={[
             "transparent",
-            "rgba(0,0,0,0.35)",
+            "rgba(0,0,0,0.07)",
+            "rgba(0,0,0,0.24)",
+            "rgba(0,0,0,0.48)",
             "rgba(0,0,0,0.72)",
-            "rgba(0,0,0,0.92)",
+            "rgba(0,0,0,0.88)",
+            "rgba(0,0,0,0.95)",
           ]}
+          locations={[0, 0.15, 0.32, 0.5, 0.68, 0.85, 1]}
           style={styles.bottomFade}
         />
 
@@ -341,12 +354,11 @@ const styles = StyleSheet.create({
     top: 0,
     left: 0,
     right: 0,
-    height: "22%",
-    backgroundColor: "rgba(0,0,0,0.28)",
+    height: "30%",
   },
   bottomFade: {
     position: "absolute",
-    top: "42%",
+    top: "30%",
     left: 0,
     right: 0,
     bottom: 0,
