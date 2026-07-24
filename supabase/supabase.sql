@@ -8,7 +8,7 @@ CREATE TABLE public.waitlist (
 CREATE TABLE public.profiles (
   id text NOT NULL,
   name text,
-  age integer,
+  age integer CHECK (age IS NULL OR age >= 18 AND age <= 100),
   bio text,
   location text,
   budget_min integer,
@@ -49,6 +49,12 @@ CREATE TABLE public.profiles (
   flat_type USER-DEFINED,
   paused boolean NOT NULL DEFAULT false,
   is_admin boolean NOT NULL DEFAULT false,
+  city text,
+  zone text,
+  lat double precision,
+  lng double precision,
+  coords_private boolean NOT NULL DEFAULT true,
+  updated_at timestamp with time zone DEFAULT now(),
   CONSTRAINT profiles_pkey PRIMARY KEY (id)
 );
 CREATE TABLE public.matches (
