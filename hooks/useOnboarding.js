@@ -131,7 +131,10 @@ export function useOnboarding() {
       onboarding_done: true
     };
 
-    const { error } = await supabase.from('profiles').upsert({ id: uid, ...updatePayload });
+    // ensureProfile() (lib/auth.js) already inserts a bare row for this uid
+    // right after signup, so this row always exists by the time onboarding
+    // runs — a plain update, not an upsert.
+    const { error } = await supabase.from('profiles').update(updatePayload).eq('id', uid);
     if (error) throw error;
     
     notifyOnboardingComplete();

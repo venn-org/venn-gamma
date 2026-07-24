@@ -45,6 +45,7 @@ export default function FeedScreen() {
   const [currentIndex, setCurrentIndex] = useState(0);
 
   const [prefsVisible, setPrefsVisible] = useState(false);
+  const [prefsSection, setPrefsSection] = useState(null); // which chip opened the sheet, or null for the full sheet
   const [userPrefs, setUserPrefs] = useState(null);
   const [myProfile, setMyProfile] = useState(null);
 
@@ -70,12 +71,14 @@ export default function FeedScreen() {
     fetchFeed();
     if (!uid) return;
 
-    // Listen for new matches in real-time
+    // Listen for new matches in real-time. `matches` is a client-facing view
+    // (active matches only); realtime only fires on the real table matches
+    // are created on, `matches_log`.
     const matchSub = supabase
       .channel("feed_matches")
       .on(
         "postgres_changes",
-        { event: "INSERT", schema: "public", table: "matches" },
+        { event: "INSERT", schema: "public", table: "matches_log" },
         (payload) => {
           const { user1_id, user2_id, id } = payload.new;
           if (user1_id === uid || user2_id === uid) {
@@ -325,7 +328,7 @@ export default function FeedScreen() {
           <TouchableOpacity
             style={s.filterIconBtn}
             activeOpacity={0.8}
-            onPress={() => setPrefsVisible(true)}
+            onPress={() => { setPrefsSection(null); setPrefsVisible(true); }}
           >
             <Ionicons name="options-outline" size={18} color={colors.ink} />
           </TouchableOpacity>
@@ -344,7 +347,7 @@ export default function FeedScreen() {
             key={chip.key}
             style={s.filterChip}
             activeOpacity={0.8}
-            onPress={() => setPrefsVisible(true)}
+            onPress={() => { setPrefsSection(chip.key); setPrefsVisible(true); }}
           >
             <Text style={s.filterChipText}>{chip.label}</Text>
             <Ionicons
@@ -617,6 +620,7 @@ export default function FeedScreen() {
         visible={prefsVisible}
         prefs={userPrefs}
         city={myProfile?.city}
+        only={prefsSection}
         onClose={() => setPrefsVisible(false)}
         onSave={handleSavePrefs}
       />

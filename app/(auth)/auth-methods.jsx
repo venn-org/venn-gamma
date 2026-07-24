@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useEffect, useRef, useState } from 'react';
 import { signInWithGoogle } from '../../lib/auth';
 import { colors } from '../../lib/theme';
+import GoogleLogo from '../../assets/images/signin-google-logo.svg';
 
 export default function AuthMethodsScreen() {
   const router = useRouter();
@@ -96,7 +97,12 @@ export default function AuthMethodsScreen() {
               disabled={loading}
               activeOpacity={0.85}
             >
-              <Text style={styles.googleBtnText}>{loading ? 'Signing in…' : '🔵  Continue with Google'}</Text>
+              {!loading && (
+                <View style={styles.googleLogoBg}>
+                  <GoogleLogo width={16} height={16} />
+                </View>
+              )}
+              <Text style={styles.googleBtnText}>{loading ? 'Signing in…' : 'Continue with Google'}</Text>
             </TouchableOpacity>
           )}
         </Animated.View>
@@ -127,6 +133,7 @@ const styles = StyleSheet.create({
   emailBtnIcon: { fontSize: 16, color: '#fff' },
   emailBtnText: { color: '#fff', fontSize: 16, fontWeight: '600' },
   googleBtn: { borderRadius: 50, paddingVertical: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, backgroundColor: 'rgba(255,255,255,0.12)' },
+  googleLogoBg: { width: 22, height: 22, borderRadius: 11, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center' },
   googleBtnText: { color: '#fff', fontSize: 15, fontWeight: '600' },
   btnDisabled: { opacity: 0.6 },
 });
