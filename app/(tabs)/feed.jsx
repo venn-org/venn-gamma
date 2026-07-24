@@ -26,18 +26,20 @@ import {
   recordProfileView,
 } from "../../lib/dailyLimits";
 import { mapDbPrefsToUI, mapUIPrefsToDb, toDb, toUI } from "../../lib/enums";
+import { PREF_ROWS, getPrefDisplay, isPrefSet, matchesPrefs } from "../../lib/prefs";
 import { calculateProfileCompletion, isFeedReady } from "../../lib/profileUtils";
 import { supabase } from "../../lib/supabase";
-import { colors } from "../../lib/theme";
+import { useTheme, useThemedStyles } from "../../lib/ThemeContext";
 
 const { width: SCREEN_W } = Dimensions.get("window");
 
-const FILTER_CHIPS = [
-  { key: "budget", label: "Budget" },
-  { key: "areas", label: "Areas" },
-];
+// Role is deliberately absent — it's an identity switch, not a filter, so it
+// only lives behind the options button.
+const FILTER_CHIPS = PREF_ROWS.filter((row) => !row.roleOnly);
 
 export default function FeedScreen() {
+  const s = useThemedStyles(makeStyles);
+  const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const router = useRouter();
 
@@ -190,22 +192,7 @@ export default function FeedScreen() {
         // Skip incomplete profiles — they render as empty cards
         if (!isFeedReady(p)) return false;
 
-        // Match based on overlapping area preferences
-        const myAreas = currentPrefs?.areas || [];
-        const theirAreas = p.pref_areas || [];
-
-        // If both have area preferences, they must overlap
-        if (myAreas.length > 0 && theirAreas.length > 0) {
-          const hasAreaOverlap = myAreas.some((a) => theirAreas.includes(a));
-          if (!hasAreaOverlap) return false;
-        }
-
-        // Match budget preferences if specified
-        if (currentPrefs?.budget && p.pref_budget) {
-          if (currentPrefs.budget !== p.pref_budget) return false;
-        }
-
-        return true;
+        return matchesPrefs(currentPrefs, p);
       });
       setProfiles(filtered);
     }
@@ -292,9 +279,10 @@ export default function FeedScreen() {
   };
 
   return (
-    <View style={[s.screen, { paddingTop: insets.top + 12 }]}>
-      {/* Top bar */}
-      <View style={s.topBar}>
+    <View style={s.screen}>
+      {/* Tinted header block — top bar, filter chips and banner read as one band */}
+      <View style={[s.headerBlock, { paddingTop: insets.top + 12 }]}>
+        <View style={s.topBar}>
         <View style={s.logoRow}>
           <View style={s.logoWrap}>
             <View
@@ -342,52 +330,64 @@ export default function FeedScreen() {
         style={s.filterScroll}
         contentContainerStyle={s.filterRow}
       >
-        {FILTER_CHIPS.map((chip) => (
-          <TouchableOpacity
-            key={chip.key}
-            style={s.filterChip}
-            activeOpacity={0.8}
-            onPress={() => { setPrefsSection(chip.key); setPrefsVisible(true); }}
-          >
-            <Text style={s.filterChipText}>{chip.label}</Text>
-            <Ionicons
-              name="chevron-down"
-              size={12}
-              color={colors.ink}
-              style={{ marginLeft: 2 }}
-            />
-          </TouchableOpacity>
-        ))}
+        {FILTER_CHIPS.map((chip) => {
+          const active = isPrefSet(userPrefs, chip.key, chip.multi);
+          return (
+            <TouchableOpacity
+              key={chip.key}
+              style={[s.filterChip, active && s.filterChipActive]}
+              activeOpacity={0.8}
+              onPress={() => { setPrefsSection(chip.key); setPrefsVisible(true); }}
+            >
+              <Text style={[s.filterChipText, active && s.filterChipTextActive]}>
+                {active
+                  ? getPrefDisplay(userPrefs, chip.key, chip.label, chip.multi)
+                  : chip.label}
+              </Text>
+              <Ionicons
+                name="chevron-down"
+                size={12}
+                color={active ? "#fff" : colors.ink}
+                style={{ marginLeft: 2 }}
+              />
+            </TouchableOpacity>
+          );
+        })}
       </ScrollView>
 
-      {/* Banner */}
+      {/* Banner — hidden on the empty state so the message centers on screen */}
       {showBanner &&
+        currentProfile &&
         myProfile &&
         !calculateProfileCompletion(myProfile).isComplete && (
           <View style={s.banner}>
+            <View style={s.bannerText}>
+              <Text style={s.bannerTitle}>Complete your profile</Text>
+              <Text style={s.bannerSub} numberOfLines={1}>
+                {calculateProfileCompletion(myProfile).missingText}
+              </Text>
+            </View>
+            <TouchableOpacity
+              style={s.bannerBtn}
+              onPress={() => router.push("/(settings)/edit-profile")}
+              activeOpacity={0.85}
+            >
+              <Text style={s.bannerBtnText}>Edit</Text>
+            </TouchableOpacity>
             <TouchableOpacity
               style={s.bannerClose}
               onPress={() => setShowBanner(false)}
             >
-              <Ionicons name="close" size={16} color={colors.ink} />
-            </TouchableOpacity>
-            <Text style={s.bannerTitle}>Complete your profile</Text>
-            <Text style={s.bannerSub}>
-              {calculateProfileCompletion(myProfile).missingText}
-            </Text>
-            <TouchableOpacity
-              style={s.bannerBtn}
-              onPress={() => router.push("/(settings)/edit-profile")}
-            >
-              <Text style={s.bannerBtnText}>Edit profile</Text>
+              <Ionicons name="close" size={14} color={colors.ink} />
             </TouchableOpacity>
           </View>
         )}
+      </View>
 
-      <View style={[s.separator]} />
+      {currentProfile && <View style={[s.separator]} />}
 
       {/* Feed Content */}
-      <View style={[s.feedContent, { flex: 1 }]}>
+      <View style={[s.feedContent, { flex: 1 }, !currentProfile && { paddingTop: 0 }]}>
         {!currentProfile ? (
           <View style={s.empty}>
             <Text style={s.emptyText}>
@@ -592,7 +592,7 @@ export default function FeedScreen() {
                 </View>
 
                 {/* Second Prompt (Accent) */}
-                <View style={[s.promptAccent, { backgroundColor: "#F3EEFF" }]}>
+                <View style={[s.promptAccent, { backgroundColor: colors.tintViolet }]}>
                   <Text style={s.promptAccentQ}>
                     {currentProfile.prompts?.[1]?.q || "-"}
                   </Text>
@@ -651,8 +651,9 @@ export default function FeedScreen() {
   );
 }
 
-const s = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: "#F2F3F7" },
+const makeStyles = (colors) => StyleSheet.create({
+  screen: { flex: 1, backgroundColor: colors.canvas },
+  headerBlock: { backgroundColor: colors.header },
   topBar: {
     flexDirection: "row",
     alignItems: "center",
@@ -660,21 +661,24 @@ const s = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 6,
     paddingBottom: 6,
-    backgroundColor: "#F2F3F7",
   },
   logoRow: { flexDirection: "row", alignItems: "center", gap: 8 },
-  logoWrap: { width: 30, height: 18, position: "relative" },
+  // Slightly wider than the two 18px circles so the added borders still overlap.
+  logoWrap: { width: 32, height: 20, position: "relative" },
   circle: {
     position: "absolute",
     top: 0,
-    width: 18,
-    height: 18,
-    borderRadius: 9,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    // Keeps the marks from dissolving into the blue header behind them.
+    borderWidth: 1.5,
+    borderColor: "#fff",
   },
   wordmark: {
     fontFamily: "SpaceGrotesk_700Bold",
     fontSize: 18,
-    color: colors.ink,
+    color: colors.headerText,
     letterSpacing: -0.4,
   },
   topBarRight: { flexDirection: "row", alignItems: "center", gap: 8 },
@@ -682,7 +686,7 @@ const s = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 4,
-    backgroundColor: "#F0FFF4",
+    backgroundColor: colors.tintGreen,
     borderRadius: 50,
     paddingHorizontal: 10,
     paddingVertical: 5,
@@ -697,7 +701,7 @@ const s = StyleSheet.create({
     width: 34,
     height: 34,
     borderRadius: 17,
-    backgroundColor: "#fff",
+    backgroundColor: colors.card,
     alignItems: "center",
     justifyContent: "center",
     shadowColor: "#000",
@@ -709,7 +713,6 @@ const s = StyleSheet.create({
   filterScroll: {
     flexShrink: 0,
     flexGrow: 0,
-    backgroundColor: "#F2F3F7",
     maxHeight: 44,
   },
   filterRow: {
@@ -725,18 +728,20 @@ const s = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 7,
     borderRadius: 50,
-    backgroundColor: "#fff",
+    backgroundColor: colors.card,
     shadowColor: "#000",
     shadowOpacity: 0.07,
     shadowRadius: 4,
     shadowOffset: { width: 0, height: 1 },
     elevation: 1,
   },
+  filterChipActive: { backgroundColor: colors.ink },
   filterChipText: {
     fontFamily: "HankenGrotesk_600SemiBold",
     fontSize: 13,
     color: colors.ink,
   },
+  filterChipTextActive: { color: "#fff" },
 
   separator: {
     height: 1,
@@ -745,42 +750,39 @@ const s = StyleSheet.create({
   },
 
   banner: {
-    margin: 12,
-    backgroundColor: "#FDF5F0",
-    borderRadius: 16,
-    padding: 14,
-    paddingRight: 30,
-    position: "relative",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    marginHorizontal: 12,
+    marginBottom: 8,
+    backgroundColor: colors.card,
+    borderRadius: 12,
+    paddingLeft: 12,
+    paddingRight: 8,
+    paddingVertical: 8,
   },
-  bannerClose: {
-    position: "absolute",
-    top: 10,
-    right: 10,
-    opacity: 0.4,
-    padding: 4,
-  },
+  bannerText: { flex: 1 },
+  bannerClose: { opacity: 0.4, padding: 2 },
   bannerTitle: {
     fontFamily: "HankenGrotesk_600SemiBold",
-    fontSize: 13,
+    fontSize: 12,
     color: colors.ink,
-    marginBottom: 2,
   },
   bannerSub: {
     fontFamily: "HankenGrotesk_400Regular",
-    fontSize: 12,
-    color: "#9AA0B2",
-    marginBottom: 10,
+    fontSize: 11,
+    color: colors.placeholder,
+    marginTop: 1,
   },
   bannerBtn: {
-    alignSelf: "flex-start",
     backgroundColor: colors.ink,
     borderRadius: 50,
-    paddingHorizontal: 20,
-    paddingVertical: 9,
+    paddingHorizontal: 14,
+    paddingVertical: 6,
   },
   bannerBtnText: {
     fontFamily: "HankenGrotesk_600SemiBold",
-    fontSize: 13,
+    fontSize: 12,
     color: "#fff",
   },
 
@@ -793,7 +795,7 @@ const s = StyleSheet.create({
     width: 56,
     height: 56,
     borderRadius: 28,
-    backgroundColor: "#fff",
+    backgroundColor: colors.card,
     alignItems: "center",
     justifyContent: "center",
     shadowColor: "#000",
@@ -812,7 +814,7 @@ const s = StyleSheet.create({
     paddingRight: 20,
   },
   menuBox: {
-    backgroundColor: "#fff",
+    backgroundColor: colors.card,
     borderRadius: 14,
     minWidth: 160,
     shadowColor: "#000",
@@ -834,13 +836,14 @@ const s = StyleSheet.create({
     fontSize: 14,
     color: colors.ink,
   },
-  menuDivider: { height: 1, backgroundColor: "#F0F1F5" },
+  menuDivider: { height: 1, backgroundColor: colors.border },
 
-  empty: { flex: 1, alignItems: "center", justifyContent: "center" },
+  empty: { flex: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: 32 },
   emptyText: {
     fontFamily: "HankenGrotesk_400Regular",
     fontSize: 14,
     color: colors.slate,
+    textAlign: "center",
   },
   refreshBtn: {
     backgroundColor: colors.ink,
@@ -855,7 +858,7 @@ const s = StyleSheet.create({
   },
 
   // Card Styles matching blueprint
-  cardOuter: { backgroundColor: "#F2F3F7" },
+  cardOuter: { backgroundColor: colors.canvas },
   cardHeader: {
     flexDirection: "row",
     alignItems: "flex-start",
@@ -894,9 +897,9 @@ const s = StyleSheet.create({
   pronouns: {
     fontFamily: "HankenGrotesk_400Regular",
     fontSize: 13,
-    color: "#9AA0B2",
+    color: colors.placeholder,
   },
-  dot: { fontSize: 13, color: "#9AA0B2" },
+  dot: { fontSize: 13, color: colors.placeholder },
   active: {
     fontFamily: "HankenGrotesk_600SemiBold",
     fontSize: 13,
@@ -908,7 +911,7 @@ const s = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: "#fff",
+    backgroundColor: colors.card,
     alignItems: "center",
     justifyContent: "center",
     shadowColor: "#000",
@@ -939,7 +942,7 @@ const s = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: "#fff",
+    backgroundColor: colors.card,
     alignItems: "center",
     justifyContent: "center",
     shadowColor: "#000",
@@ -950,7 +953,7 @@ const s = StyleSheet.create({
   },
 
   infoCard: {
-    backgroundColor: "#fff",
+    backgroundColor: colors.card,
     borderRadius: 20,
     padding: 18,
     marginBottom: 10,
@@ -962,16 +965,16 @@ const s = StyleSheet.create({
     fontSize: 14,
     color: colors.ink,
   },
-  infoDivider: { width: 1, height: 20, backgroundColor: "#F0F0F4" },
+  infoDivider: { width: 1, height: 20, backgroundColor: colors.divider },
   infoHorizDivider: {
     height: 1,
-    backgroundColor: "#F0F0F4",
+    backgroundColor: colors.divider,
     marginVertical: 8,
   },
 
   promptWhite: {
     position: "relative",
-    backgroundColor: "#fff",
+    backgroundColor: colors.card,
     borderRadius: 20,
     padding: 24,
     paddingBottom: 60,
@@ -997,7 +1000,7 @@ const s = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: "#F2F3F7",
+    backgroundColor: colors.canvas,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -1022,7 +1025,7 @@ const s = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: "#fff",
+    backgroundColor: colors.card,
     alignItems: "center",
     justifyContent: "center",
     shadowColor: colors.violet,

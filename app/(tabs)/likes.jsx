@@ -3,7 +3,7 @@ import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Image, Dimensions
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { supabase } from '../../lib/supabase';
-import { colors } from '../../lib/theme';
+import { useTheme, useThemedStyles } from '../../lib/ThemeContext';
 import { getCurrentUserId } from '../../lib/auth';
 import ProfileViewSheet from '../../components/ProfileViewSheet';
 import MatchCelebration from '../../components/MatchCelebration';
@@ -13,6 +13,8 @@ const { width } = Dimensions.get('window');
 const CARD_W = (width - 32 - 12) / 2;
 
 export default function LikesScreen() {
+  const s = useThemedStyles(makeStyles);
+  const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const router = useRouter();
   
@@ -104,11 +106,11 @@ export default function LikesScreen() {
   };
 
   return (
-    <View style={[s.screen, { paddingTop: insets.top + 12 }]}>
-      <View style={s.topBar}>
+    <View style={s.screen}>
+      <View style={[s.topBar, { paddingTop: insets.top + 12 }]}>
         <Text style={s.title}>Likes You</Text>
         <TouchableOpacity style={s.boostBtn} activeOpacity={0.85} onPress={() => setShowBoost(true)}>
-          <Ionicons name="flash" size={14} color="#fff" />
+          <Ionicons name="flash" size={14} color={colors.blue} />
           <Text style={s.boostText}>Boost</Text>
         </TouchableOpacity>
       </View>
@@ -188,31 +190,32 @@ export default function LikesScreen() {
   );
 }
 
-const s = StyleSheet.create({
+const makeStyles = (colors) => StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.canvas },
-  topBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingTop: 8, paddingBottom: 14 },
-  title: { fontFamily: 'SpaceGrotesk_700Bold', fontSize: 28, fontWeight: '800', color: colors.ink, letterSpacing: -0.03 * 28 },
-  boostBtn: { flexDirection: 'row', alignItems: 'center', gap: 7, backgroundColor: colors.blue, borderRadius: 50, paddingHorizontal: 18, paddingVertical: 10 },
-  boostText: { fontFamily: 'HankenGrotesk_700Bold', fontSize: 13, color: '#fff' },
+  topBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingTop: 8, paddingBottom: 14, backgroundColor: colors.header },
+  title: { fontFamily: 'SpaceGrotesk_700Bold', fontSize: 28, fontWeight: '800', color: colors.headerText, letterSpacing: -0.03 * 28 },
+  // White on the blue header — colors.blue would vanish into it.
+  boostBtn: { flexDirection: 'row', alignItems: 'center', gap: 7, backgroundColor: colors.card, borderRadius: 50, paddingHorizontal: 18, paddingVertical: 10 },
+  boostText: { fontFamily: 'HankenGrotesk_700Bold', fontSize: 13, color: colors.blue },
 
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 28, paddingBottom: 24 },
   emptyTitle: { fontFamily: 'SpaceGrotesk_700Bold', fontSize: 22, fontWeight: '800', color: colors.ink, textAlign: 'center', letterSpacing: -0.44, marginTop: 4, marginBottom: 10, lineHeight: 28 },
-  emptySub: { fontFamily: 'HankenGrotesk_400Regular', fontSize: 14, color: '#9AA0B2', textAlign: 'center', lineHeight: 22, marginBottom: 28 },
+  emptySub: { fontFamily: 'HankenGrotesk_400Regular', fontSize: 14, color: colors.placeholder, textAlign: 'center', lineHeight: 22, marginBottom: 28 },
 
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, padding: 16, paddingBottom: 100 },
-  likeCard: { width: CARD_W, borderRadius: 18, overflow: 'hidden', backgroundColor: '#fff' },
+  likeCard: { width: CARD_W, borderRadius: 18, overflow: 'hidden', backgroundColor: colors.card },
   likePhotoWrap: { width: '100%', height: CARD_W * 1.25, position: 'relative' },
   likePhoto: { width: '100%', height: '100%' },
   likePhotoPlaceholder: { backgroundColor: colors.canvas, alignItems: 'center', justifyContent: 'center' },
   likeInfo: { padding: 12 },
   likeName: { fontFamily: 'SpaceGrotesk_700Bold', fontSize: 15, color: colors.ink, marginBottom: 2 },
-  likeTime: { fontFamily: 'HankenGrotesk_400Regular', fontSize: 12, color: '#9AA0B2' },
+  likeTime: { fontFamily: 'HankenGrotesk_400Regular', fontSize: 12, color: colors.placeholder },
 
   modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'center', alignItems: 'center', padding: 20 },
-  modalBox: { backgroundColor: '#fff', borderRadius: 24, padding: 24, width: '100%', maxWidth: 340, alignItems: 'center' },
+  modalBox: { backgroundColor: colors.card, borderRadius: 24, padding: 24, width: '100%', maxWidth: 340, alignItems: 'center' },
   modalIcon: { width: 64, height: 64, borderRadius: 32, backgroundColor: colors.blue, alignItems: 'center', justifyContent: 'center', marginBottom: 16 },
   modalTitle: { fontFamily: 'SpaceGrotesk_700Bold', fontSize: 22, color: colors.ink, marginBottom: 8, textAlign: 'center' },
-  modalSub: { fontFamily: 'HankenGrotesk_400Regular', fontSize: 15, color: '#9AA0B2', textAlign: 'center', marginBottom: 24, lineHeight: 22 },
+  modalSub: { fontFamily: 'HankenGrotesk_400Regular', fontSize: 15, color: colors.placeholder, textAlign: 'center', marginBottom: 24, lineHeight: 22 },
   modalBtn: { backgroundColor: colors.ink, paddingVertical: 14, paddingHorizontal: 32, borderRadius: 50, width: '100%', alignItems: 'center' },
   modalBtnText: { fontFamily: 'HankenGrotesk_700Bold', fontSize: 15, color: '#fff' },
 });

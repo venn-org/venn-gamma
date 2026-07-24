@@ -3,7 +3,7 @@ import { View, Text, TouchableOpacity, ScrollView, StyleSheet } from 'react-nati
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { colors } from '../../lib/theme';
+import { useTheme, useThemedStyles } from '../../lib/ThemeContext';
 import LegalDoc from '../../components/LegalDoc';
 import { TERMS_DOC, PRIVACY_DOC, COOKIE_DOC, LEGAL_DRAFT_NOTICE } from '../../lib/legal';
 
@@ -14,6 +14,8 @@ const TABS = [
 ];
 
 export default function TermsScreen() {
+  const s = useThemedStyles(makeStyles);
+  const { colors } = useTheme();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const [active, setActive] = useState('terms');
@@ -21,10 +23,10 @@ export default function TermsScreen() {
   const activeDoc = TABS.find(t => t.key === active).doc;
 
   return (
-    <View style={[s.screen, { paddingTop: insets.top }]}>
-      <View style={s.header}>
+    <View style={s.screen}>
+      <View style={[s.header, { paddingTop: insets.top + 12 }]}>
         <TouchableOpacity style={s.backBtn} onPress={() => router.canGoBack() ? router.back() : router.replace('/(tabs)/profile')}>
-          <Ionicons name="chevron-back" size={24} color={colors.ink} />
+          <Ionicons name="chevron-back" size={24} color={colors.headerText} />
         </TouchableOpacity>
         <Text style={s.title}>Terms & Privacy</Text>
         <View style={{ width: 40 }} />
@@ -51,19 +53,19 @@ export default function TermsScreen() {
   );
 }
 
-const s = StyleSheet.create({
+const makeStyles = (colors) => StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.canvas },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 10, paddingVertical: 12 },
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 10, paddingVertical: 12, backgroundColor: colors.header },
   backBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
-  title: { fontFamily: 'SpaceGrotesk_700Bold', fontSize: 18, color: colors.ink },
+  title: { fontFamily: 'SpaceGrotesk_700Bold', fontSize: 18, color: colors.headerText },
 
   tabs: { flexDirection: 'row', gap: 8, paddingHorizontal: 20, paddingBottom: 12 },
-  tab: { flex: 1, paddingVertical: 9, borderRadius: 50, backgroundColor: '#fff', alignItems: 'center', borderWidth: 1, borderColor: '#E6E8EE' },
+  tab: { flex: 1, paddingVertical: 9, borderRadius: 50, backgroundColor: colors.card, alignItems: 'center', borderWidth: 1, borderColor: colors.border },
   tabOn: { backgroundColor: colors.ink, borderColor: colors.ink },
   tabText: { fontFamily: 'HankenGrotesk_600SemiBold', fontSize: 13, color: colors.slate },
   tabTextOn: { color: '#fff' },
 
   content: { paddingHorizontal: 20, paddingBottom: 60 },
-  notice: { backgroundColor: '#FDF5F0', borderRadius: 12, padding: 12, marginBottom: 20 },
+  notice: { backgroundColor: colors.tintAmber, borderRadius: 12, padding: 12, marginBottom: 20 },
   noticeText: { fontFamily: 'HankenGrotesk_400Regular', fontSize: 12, color: '#8A5A3A', lineHeight: 18 },
 });

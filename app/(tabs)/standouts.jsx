@@ -1,8 +1,10 @@
 import { View, Text, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useThemedStyles } from '../../lib/ThemeContext';
 
 export default function StandoutsScreen() {
+  const s = useThemedStyles(makeStyles);
   const insets = useSafeAreaInsets();
 
   return (
@@ -18,7 +20,7 @@ export default function StandoutsScreen() {
   );
 }
 
-const s = StyleSheet.create({
+const makeStyles = (colors) => StyleSheet.create({
   root: { flex: 1, backgroundColor: '#111' },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 10, paddingHorizontal: 32 },
   iconWrap: { width: 64, height: 64, borderRadius: 32, backgroundColor: 'rgba(138,91,255,0.15)', alignItems: 'center', justifyContent: 'center', marginBottom: 6 },

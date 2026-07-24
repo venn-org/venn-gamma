@@ -2,11 +2,13 @@ import { useRef, useEffect } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, Modal, Pressable, StyleSheet, Image, Dimensions, Animated } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { colors } from '../lib/theme';
+import { useTheme, useThemedStyles } from '../lib/ThemeContext';
 
 const { height: SCREEN_H } = Dimensions.get('window');
 
 export default function ProfileViewSheet({ visible, profile, onClose, onPass, onLike }) {
+  const s = useThemedStyles(makeStyles);
+  const { colors } = useTheme();
   const insets = useSafeAreaInsets();
 
   // Manual backdrop-fade + sheet-slide (decoupled) so the backdrop doesn't
@@ -109,7 +111,7 @@ export default function ProfileViewSheet({ visible, profile, onClose, onPass, on
 
             {/* Prompts */}
             {Array.isArray(profile.prompts) && profile.prompts.map((p, i) => (
-              <View key={i} style={i % 2 === 0 ? s.promptWhite : [s.promptAccent, { backgroundColor: '#F3EEFF' }]}>
+              <View key={i} style={i % 2 === 0 ? s.promptWhite : [s.promptAccent, { backgroundColor: colors.tintViolet }]}>
                 <Text style={i % 2 === 0 ? s.promptQ : s.promptAccentQ}>{p.q}</Text>
                 <Text style={s.promptA}>{p.a}</Text>
               </View>
@@ -133,8 +135,8 @@ export default function ProfileViewSheet({ visible, profile, onClose, onPass, on
   );
 }
 
-const s = StyleSheet.create({
-  sheet: { backgroundColor: '#F2F3F7', borderTopLeftRadius: 24, borderTopRightRadius: 24, maxHeight: SCREEN_H * 0.9 },
+const makeStyles = (colors) => StyleSheet.create({
+  sheet: { backgroundColor: colors.canvas, borderTopLeftRadius: 24, borderTopRightRadius: 24, maxHeight: SCREEN_H * 0.9 },
   handle: { width: 40, height: 4, backgroundColor: '#D1D5DB', borderRadius: 2, alignSelf: 'center', marginBottom: 20 },
   
   cardHeader: {
@@ -147,22 +149,22 @@ const s = StyleSheet.create({
   overlapPill: { borderRadius: 50, paddingHorizontal: 8, paddingVertical: 3 },
   overlapText: { fontFamily: 'SpaceGrotesk_700Bold', fontSize: 12, color: '#fff', letterSpacing: -0.2 },
   statusRow: { flexDirection: 'row', alignItems: 'center', marginTop: 3 },
-  pronouns: { fontFamily: 'HankenGrotesk_400Regular', fontSize: 13, color: '#9AA0B2' },
-  dot: { fontSize: 13, color: '#9AA0B2' },
+  pronouns: { fontFamily: 'HankenGrotesk_400Regular', fontSize: 13, color: colors.placeholder },
+  dot: { fontSize: 13, color: colors.placeholder },
   active: { fontFamily: 'HankenGrotesk_600SemiBold', fontSize: 13, color: colors.blue },
 
   photoWrap: { position: 'relative', borderRadius: 20, overflow: 'hidden', marginBottom: 10, height: 400, marginHorizontal: 16 },
   photo: { width: '100%', height: '100%' },
-  photoPlaceholder: { backgroundColor: '#E6E8EE', alignItems: 'center', justifyContent: 'center' },
+  photoPlaceholder: { backgroundColor: colors.border, alignItems: 'center', justifyContent: 'center' },
 
-  infoCard: { backgroundColor: '#fff', borderRadius: 20, padding: 18, marginBottom: 10, marginHorizontal: 16 },
+  infoCard: { backgroundColor: colors.card, borderRadius: 20, padding: 18, marginBottom: 10, marginHorizontal: 16 },
   infoRow: { flexDirection: 'row', alignItems: 'center' },
   infoItem: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8 },
   infoItemText: { fontFamily: 'HankenGrotesk_600SemiBold', fontSize: 14, color: colors.ink },
-  infoDivider: { width: 1, height: 20, backgroundColor: '#F0F0F4' },
-  infoHorizDivider: { height: 1, backgroundColor: '#F0F0F4', marginVertical: 8 },
+  infoDivider: { width: 1, height: 20, backgroundColor: colors.divider },
+  infoHorizDivider: { height: 1, backgroundColor: colors.divider, marginVertical: 8 },
 
-  promptWhite: { position: 'relative', backgroundColor: '#fff', borderRadius: 20, padding: 24, paddingBottom: 30, marginBottom: 10, marginHorizontal: 16 },
+  promptWhite: { position: 'relative', backgroundColor: colors.card, borderRadius: 20, padding: 24, paddingBottom: 30, marginBottom: 10, marginHorizontal: 16 },
   promptQ: { fontFamily: 'HankenGrotesk_600SemiBold', fontSize: 14, color: colors.slate, marginBottom: 10 },
   promptA: { fontFamily: 'SpaceGrotesk_700Bold', fontSize: 22, color: colors.ink, letterSpacing: -0.4, lineHeight: 30 },
   
@@ -174,9 +176,9 @@ const s = StyleSheet.create({
   flatLabel: { position: 'absolute', bottom: 14, left: 14, backgroundColor: 'rgba(0,0,0,0.42)', borderRadius: 50, paddingHorizontal: 12, paddingVertical: 6 },
   flatLabelText: { fontFamily: 'HankenGrotesk_600SemiBold', fontSize: 12, color: '#fff' },
 
-  actions: { flexDirection: 'row', justifyContent: 'center', gap: 20, paddingTop: 16, paddingHorizontal: 20, borderTopWidth: 1, borderTopColor: '#E6E8EE' },
+  actions: { flexDirection: 'row', justifyContent: 'center', gap: 20, paddingTop: 16, paddingHorizontal: 20, borderTopWidth: 1, borderTopColor: colors.border },
   navBtn: {
-    width: 60, height: 60, borderRadius: 30, backgroundColor: '#fff',
+    width: 60, height: 60, borderRadius: 30, backgroundColor: colors.card,
     alignItems: 'center', justifyContent: 'center',
     shadowColor: '#000', shadowOpacity: 0.10, shadowRadius: 6, shadowOffset: { width: 0, height: 1 }, elevation: 2,
   },

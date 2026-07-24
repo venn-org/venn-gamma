@@ -23,11 +23,15 @@ import { signInWithGoogle } from "../../lib/auth";
 import { getCookieConsent, setCookieConsent } from "../../lib/cookieConsent";
 import { COOKIE_DOC, PRIVACY_DOC, TERMS_DOC } from "../../lib/legal";
 import { colors } from "../../lib/theme";
+import { useTheme } from "../../lib/ThemeContext";
 
 const { height: SCREEN_H } = Dimensions.get("window");
 
 export default function LoginScreen() {
   const router = useRouter();
+  // Login itself stays light, but LegalDoc inside the sheet is themed —
+  // the card has to follow it or dark text lands on a white panel.
+  const { colors: themed } = useTheme();
   const insets = useSafeAreaInsets();
   const [loading, setLoading] = useState(false);
   const [showCookieBanner, setShowCookieBanner] = useState(false);
@@ -308,6 +312,7 @@ export default function LoginScreen() {
           <Animated.View
             style={[
               styles.legalCard,
+              { backgroundColor: themed.card },
               { transform: [{ translateY: legalSheetY }] },
             ]}
           >

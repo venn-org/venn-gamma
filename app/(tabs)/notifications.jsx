@@ -3,11 +3,13 @@ import { View, Text, TouchableOpacity, ScrollView, StyleSheet, RefreshControl, I
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { colors } from '../../lib/theme';
+import { useTheme, useThemedStyles } from '../../lib/ThemeContext';
 import { getCurrentUserId } from '../../lib/auth';
 import { getNotifications, markRead, markAllRead } from '../../lib/notifications';
 
 export default function NotificationsScreen() {
+  const s = useThemedStyles(makeStyles);
+  const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const router = useRouter();
   
@@ -51,14 +53,14 @@ export default function NotificationsScreen() {
   };
 
   return (
-    <View style={[s.screen, { paddingTop: insets.top + 12 }]}>
-      <View style={s.topBar}>
+    <View style={s.screen}>
+      <View style={[s.topBar, { paddingTop: insets.top + 12 }]}>
         <TouchableOpacity style={s.backBtn} onPress={() => router.canGoBack() ? router.back() : router.replace('/(tabs)/feed')} activeOpacity={0.8}>
-          <Ionicons name="arrow-back" size={20} color={colors.ink} />
+          <Ionicons name="arrow-back" size={20} color={colors.headerText} />
         </TouchableOpacity>
         <Text style={s.title}>Notifications</Text>
         <TouchableOpacity onPress={handleMarkAllRead} activeOpacity={0.8}>
-          <Ionicons name="checkmark-done-outline" size={22} color={colors.blue} />
+          <Ionicons name="checkmark-done-outline" size={22} color={colors.headerText} />
         </TouchableOpacity>
       </View>
 
@@ -115,26 +117,26 @@ export default function NotificationsScreen() {
   );
 }
 
-const s = StyleSheet.create({
+const makeStyles = (colors) => StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.canvas },
-  topBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingTop: 8, paddingBottom: 12 },
-  backBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 4, shadowOffset: { width: 0, height: 1 }, elevation: 1 },
-  title: { fontFamily: 'SpaceGrotesk_700Bold', fontSize: 20, color: colors.ink },
+  topBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingTop: 8, paddingBottom: 12, backgroundColor: colors.header },
+  backBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: colors.card, alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 4, shadowOffset: { width: 0, height: 1 }, elevation: 1 },
+  title: { fontFamily: 'SpaceGrotesk_700Bold', fontSize: 20, color: colors.headerText },
   
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32 },
   emptyTitle: { fontFamily: 'SpaceGrotesk_700Bold', fontSize: 20, color: colors.ink, marginBottom: 8 },
-  emptySub: { fontFamily: 'HankenGrotesk_400Regular', fontSize: 14, color: '#9AA0B2', textAlign: 'center', lineHeight: 22 },
+  emptySub: { fontFamily: 'HankenGrotesk_400Regular', fontSize: 14, color: colors.placeholder, textAlign: 'center', lineHeight: 22 },
 
-  notifCard: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 14, paddingHorizontal: 20, backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#F0F1F5' },
-  notifUnread: { backgroundColor: '#F8F9FF' },
+  notifCard: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 14, paddingHorizontal: 20, backgroundColor: colors.card, borderBottomWidth: 1, borderBottomColor: colors.border },
+  notifUnread: { backgroundColor: colors.unread },
   avatarWrap: { position: 'relative', width: 48, height: 48, borderRadius: 24, backgroundColor: colors.canvas, alignItems: 'center', justifyContent: 'center' },
   avatar: { width: '100%', height: '100%', borderRadius: 24 },
   initials: { fontFamily: 'SpaceGrotesk_700Bold', fontSize: 18, color: colors.slate },
-  badgeIcon: { position: 'absolute', bottom: -2, right: -2, width: 20, height: 20, borderRadius: 10, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#fff' },
+  badgeIcon: { position: 'absolute', bottom: -2, right: -2, width: 20, height: 20, borderRadius: 10, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: colors.card },
   notifContent: { flex: 1 },
-  notifText: { fontFamily: 'HankenGrotesk_400Regular', fontSize: 14, color: '#5A6072', lineHeight: 20 },
+  notifText: { fontFamily: 'HankenGrotesk_400Regular', fontSize: 14, color: colors.slate, lineHeight: 20 },
   notifTextUnread: { color: colors.ink, fontFamily: 'HankenGrotesk_600SemiBold' },
   notifName: { fontFamily: 'SpaceGrotesk_700Bold', color: colors.ink },
-  notifTime: { fontFamily: 'HankenGrotesk_400Regular', fontSize: 12, color: '#9AA0B2', marginTop: 4 },
+  notifTime: { fontFamily: 'HankenGrotesk_400Regular', fontSize: 12, color: colors.placeholder, marginTop: 4 },
   unreadDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.blue },
 });

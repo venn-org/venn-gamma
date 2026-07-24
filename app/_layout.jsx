@@ -6,7 +6,9 @@ import { SpaceMono_400Regular } from '@expo-google-fonts/space-mono';
 import { HankenGrotesk_400Regular, HankenGrotesk_600SemiBold, HankenGrotesk_700Bold } from '@expo-google-fonts/hanken-grotesk';
 import { Ionicons } from '@expo/vector-icons';
 import * as SplashScreen from 'expo-splash-screen';
+import { StatusBar } from 'expo-status-bar';
 import { auth, supabase, getCurrentUserId, ensureProfile, isOnboardingComplete, subscribeOnboardingComplete } from '../lib';
+import { ThemeProvider, useTheme } from '../lib/ThemeContext';
 import MatchCelebration from '../components/MatchCelebration';
 
 LogBox.ignoreLogs([
@@ -23,6 +25,15 @@ if (Platform.OS === 'web' && typeof window !== 'undefined') {
 }
 
 export default function RootLayout() {
+  return (
+    <ThemeProvider>
+      <RootLayoutInner />
+    </ThemeProvider>
+  );
+}
+
+function RootLayoutInner() {
+  const { colors, isDark } = useTheme();
   const [fontsLoaded] = useFonts({
     SpaceGrotesk_700Bold,
     SpaceGrotesk_600SemiBold,
@@ -160,19 +171,26 @@ export default function RootLayout() {
   if (!fontsLoaded || !authReady) {
     // Show splash screen manually while checking auth state if fonts are loaded but auth is slow
     return (
-      <View style={s.splash}>
+      <View style={[s.splash, { backgroundColor: colors.paper }]}>
         <View style={s.logoWrap}>
           <View style={[s.circle, { backgroundColor: '#335CFF', left: 0 }]} />
           <View style={[s.circle, { backgroundColor: '#8A5BFF', right: 0, opacity: 0.9 }]} />
         </View>
-        <Text style={s.text}>Venn</Text>
+        <Text style={[s.text, { color: colors.ink }]}>Venn</Text>
       </View>
     );
   }
 
   return (
     <>
-      <Stack screenOptions={{ headerShown: false, animation: 'slide_from_right' }}>
+      <StatusBar style={isDark ? 'light' : 'dark'} />
+      <Stack
+        screenOptions={{
+          headerShown: false,
+          animation: 'slide_from_right',
+          contentStyle: { backgroundColor: colors.canvas },
+        }}
+      >
         <Stack.Screen name="(tabs)" options={{ animation: 'none' }} />
       </Stack>
       
@@ -193,8 +211,8 @@ export default function RootLayout() {
 }
 
 const s = StyleSheet.create({
-  splash: { ...StyleSheet.absoluteFillObject, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center', gap: 14 },
+  splash: { ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center', gap: 14 },
   logoWrap: { width: 68, height: 44, position: 'relative' },
   circle: { position: 'absolute', top: 0, width: 44, height: 44, borderRadius: 22 },
-  text: { fontSize: 26, fontWeight: '700', color: '#14161B', letterSpacing: -0.5 },
+  text: { fontSize: 26, fontWeight: '700', letterSpacing: -0.5 },
 });

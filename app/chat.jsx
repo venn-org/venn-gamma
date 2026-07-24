@@ -5,7 +5,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../lib/supabase';
 import { getCurrentUserId } from '../lib/auth';
-import { colors } from '../lib/theme';
+import { useTheme, useThemedStyles } from '../lib/ThemeContext';
 import { activeStatusText, isOnline } from '../lib/presence';
 
 const GROUP_WINDOW_MS = 5 * 60 * 1000;
@@ -19,6 +19,8 @@ const POLL_INTERVAL_MS = 3000;
 const TYPING_TIMEOUT_MS = 3000;
 
 export default function ChatScreen() {
+  const s = useThemedStyles(makeStyles);
+  const { colors } = useTheme();
   const { matchId, name: rawName, photo: rawPhoto } = useLocalSearchParams();
   const name = !rawName || rawName === 'null' ? 'User' : rawName;
   const photo = !rawPhoto || rawPhoto === 'null' ? null : rawPhoto;
@@ -255,18 +257,18 @@ export default function ChatScreen() {
 
   return (
     <KeyboardAvoidingView 
-      style={[s.screen, { paddingTop: insets.top }]} 
+      style={s.screen}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
-      <View style={s.topBar}>
+      <View style={[s.topBar, { paddingTop: insets.top + 12 }]}>
         <TouchableOpacity style={s.backBtn} onPress={() => router.canGoBack() ? router.back() : router.replace('/(tabs)/messages')} activeOpacity={0.8}>
-          <Ionicons name="chevron-back" size={24} color={colors.ink} />
+          <Ionicons name="chevron-back" size={24} color={colors.headerText} />
         </TouchableOpacity>
         <View style={s.headerInfo}>
           {photo ? (
             <Image source={{ uri: photo }} style={s.headerAvatar} />
           ) : (
-            <View style={[s.headerAvatar, { backgroundColor: '#E2E8F0', alignItems: 'center', justifyContent: 'center' }]}>
+            <View style={[s.headerAvatar, { backgroundColor: colors.avatarFallback, alignItems: 'center', justifyContent: 'center' }]}>
               <Text style={{ fontFamily: 'SpaceGrotesk_700Bold', color: '#64748B' }}>{name?.charAt(0)}</Text>
             </View>
           )}
@@ -324,14 +326,14 @@ export default function ChatScreen() {
   );
 }
 
-const s = StyleSheet.create({
+const makeStyles = (colors) => StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.canvas },
-  topBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-start', paddingHorizontal: 12, paddingVertical: 12, backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#F0F1F5', zIndex: 10 },
+  topBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-start', paddingHorizontal: 12, paddingVertical: 12, backgroundColor: colors.header, borderBottomWidth: 1, borderBottomColor: colors.border, zIndex: 10 },
   backBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
   headerInfo: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   headerAvatar: { width: 36, height: 36, borderRadius: 18 },
-  headerName: { fontFamily: 'SpaceGrotesk_700Bold', fontSize: 17, color: colors.ink },
-  headerStatus: { fontFamily: 'HankenGrotesk_400Regular', fontSize: 12, color: colors.slate, marginTop: 1 },
+  headerName: { fontFamily: 'SpaceGrotesk_700Bold', fontSize: 17, color: colors.headerText },
+  headerStatus: { fontFamily: 'HankenGrotesk_400Regular', fontSize: 12, color: 'rgba(255,255,255,0.7)', marginTop: 1 },
   headerStatusOnline: { color: colors.success },
   
   loading: { flex: 1, alignItems: 'center', justifyContent: 'center' },
@@ -350,19 +352,19 @@ const s = StyleSheet.create({
   msgColLeft: { alignItems: 'flex-start', marginLeft: 8, maxWidth: '75%' },
   msgColRight: { alignItems: 'flex-end', marginRight: 8, maxWidth: '75%' },
   avatar: { width: 28, height: 28, borderRadius: 14 },
-  avatarFallback: { backgroundColor: '#E2E8F0', alignItems: 'center', justifyContent: 'center' },
+  avatarFallback: { backgroundColor: colors.avatarFallback, alignItems: 'center', justifyContent: 'center' },
   avatarFallbackText: { fontFamily: 'SpaceGrotesk_700Bold', fontSize: 12, color: '#64748B' },
   msgBubble: { maxWidth: '100%', paddingHorizontal: 16, paddingVertical: 12, borderRadius: 20 },
   bubbleRight: { backgroundColor: colors.blue, borderBottomRightRadius: 4 },
-  bubbleLeft: { backgroundColor: '#fff', borderBottomLeftRadius: 4, borderWidth: 1, borderColor: '#EDEEF2' },
+  bubbleLeft: { backgroundColor: colors.card, borderBottomLeftRadius: 4, borderWidth: 1, borderColor: colors.border },
   msgText: { fontFamily: 'HankenGrotesk_400Regular', fontSize: 15, lineHeight: 22 },
   textRight: { color: '#fff' },
   textLeft: { color: colors.ink },
   metaRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 3 },
   timestamp: { fontFamily: 'HankenGrotesk_400Regular', fontSize: 11, color: colors.slate },
 
-  inputWrap: { flexDirection: 'row', alignItems: 'flex-end', gap: 12, paddingHorizontal: 16, paddingTop: 12, paddingBottom: 12, backgroundColor: '#fff', borderTopWidth: 1, borderTopColor: '#F0F1F5' },
-  input: { flex: 1, height: 44, backgroundColor: '#F2F3F7', borderRadius: 22, paddingHorizontal: 16, fontFamily: 'HankenGrotesk_400Regular', fontSize: 15, color: colors.ink },
+  inputWrap: { flexDirection: 'row', alignItems: 'flex-end', gap: 12, paddingHorizontal: 16, paddingTop: 12, paddingBottom: 12, backgroundColor: colors.card, borderTopWidth: 1, borderTopColor: colors.border },
+  input: { flex: 1, height: 44, backgroundColor: colors.canvas, borderRadius: 22, paddingHorizontal: 16, fontFamily: 'HankenGrotesk_400Regular', fontSize: 15, color: colors.ink },
   sendBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: colors.blue, alignItems: 'center', justifyContent: 'center', marginBottom: 0 },
-  sendBtnDisabled: { backgroundColor: '#D0D4DF' },
+  sendBtnDisabled: { backgroundColor: colors.border },
 });
