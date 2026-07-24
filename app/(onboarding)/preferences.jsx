@@ -2,12 +2,14 @@ import { useState } from 'react';
 import { Text, View, TouchableOpacity, ScrollView, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
 import { colors } from '../../lib/theme';
-import { useOnboarding } from '../../hooks/useOnboarding';
+import { useOnboarding, totalSteps } from '../../hooks/useOnboarding';
+import { ENUMS } from '../../lib/enums';
+import { ZONES_BY_CITY } from '../../lib/locations';
 import OnboardingShell from '../../components/OnboardingShell';
 
-const BUDGETS = ['Under ₹10k', '₹10k–20k', '₹20k–35k', '₹35k–50k', '₹50k+'];
-const FLAT_TYPES = ['1 RK', '1 BHK', '2 BHK', '3 BHK', '4+ BHK'];
-const GENDERS = ['Women only', 'Men only', 'Any gender'];
+const BUDGETS = Object.values(ENUMS.pref_budget.dbToUI);
+const FLAT_TYPES = Object.values(ENUMS.flat_type.dbToUI);
+const GENDERS = Object.values(ENUMS.pref_gender.dbToUI);
 
 export default function PreferencesScreen() {
   const router = useRouter();
@@ -23,13 +25,17 @@ export default function PreferencesScreen() {
   const handleContinue = async () => {
     if (!valid) return;
     setLoading(true);
+    // An owner's preferred area is wherever their flat is — location.jsx
+    // already detected the zone, so seed it rather than asking again.
+    const zone = (ZONES_BY_CITY[data.city] || []).find(z => z.id === data.zone);
     updateData({
       prefs: {
-        areas: [],
+        ...data.prefs,
+        areas: zone ? [zone.name] : [],
         budget,
         flatType,
-        gender: prefGender
-      }
+        gender: prefGender,
+      },
     });
     setLoading(false);
     router.push('/(onboarding)/photos');
@@ -37,7 +43,7 @@ export default function PreferencesScreen() {
 
   return (
     <OnboardingShell
-      step={6} total={9}
+      step={9} total={totalSteps(data.type)}
       footer={
         <TouchableOpacity
           style={[styles.btn, (!valid || loading) && styles.btnDisabled]}

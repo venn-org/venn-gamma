@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
 import { colors } from '../../lib/theme';
-import { useOnboarding } from '../../hooks/useOnboarding';
+import { useOnboarding, totalSteps } from '../../hooks/useOnboarding';
 import OnboardingShell from '../../components/OnboardingShell';
 
 export default function BirthdayScreen() {
@@ -62,7 +62,7 @@ export default function BirthdayScreen() {
 
   return (
     <OnboardingShell
-      step={3} total={9}
+      step={4} total={totalSteps(data.type)}
       footer={
         <TouchableOpacity
           style={[styles.btn, (!valid || loading) && styles.btnDisabled]}

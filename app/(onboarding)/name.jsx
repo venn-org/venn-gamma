@@ -4,13 +4,14 @@ import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors } from '../../lib/theme';
-import { useOnboarding } from '../../hooks/useOnboarding';
+import { useOnboarding, totalSteps } from '../../hooks/useOnboarding';
 
 export default function NameScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { data, updateData, submitData } = useOnboarding();
+  const { data, updateData } = useOnboarding();
   const [loading, setLoading] = useState(false);
+  const total = totalSteps(data.type);
 
   const [first, setFirst] = useState(data.firstName || '');
   const [last, setLast] = useState(data.lastName || '');
@@ -27,9 +28,9 @@ export default function NameScreen() {
     <View style={[styles.container, { paddingTop: insets.top }]}>
       <View style={styles.topBar}>
         <View style={styles.progressTrack}>
-          <LinearGradient colors={[colors.blue, colors.violet]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={[styles.progressFill, { width: '11%' }]} />
+          <LinearGradient colors={[colors.blue, colors.violet]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={[styles.progressFill, { width: `${Math.round((1 / total) * 100)}%` }]} />
         </View>
-        <Text style={styles.stepLabel}>STEP 1 OF 9</Text>
+        <Text style={styles.stepLabel}>STEP 1 OF {total}</Text>
       </View>
 
       <View style={styles.body}>

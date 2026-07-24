@@ -5,7 +5,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors } from '../../lib/theme';
-import { useOnboarding } from '../../hooks/useOnboarding';
+import { useOnboarding, totalSteps } from '../../hooks/useOnboarding';
 import { CITIES } from '../../lib/locations';
 import OnboardingShell from '../../components/OnboardingShell';
 
@@ -22,15 +22,12 @@ export default function CityScreen() {
     setLoading(true);
     updateData({ city });
     setLoading(false);
-
-    // Branch by type: owners → location, seekers → preferences
-    const nextRoute = data.type === 'owner' ? '/(onboarding)/location' : '/(onboarding)/preferences';
-    router.push(nextRoute);
+    router.push('/(onboarding)/birthday');
   };
 
   return (
     <OnboardingShell
-      step={3} total={9}
+      step={3} total={totalSteps(data.type)}
       footer={
         <TouchableOpacity
           style={[styles.btn, (!city || loading) && styles.btnDisabled]}

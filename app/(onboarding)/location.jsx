@@ -5,7 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors } from '../../lib/theme';
-import { useOnboarding } from '../../hooks/useOnboarding';
+import { useOnboarding, totalSteps } from '../../hooks/useOnboarding';
 import { findZoneByGPS } from '../../lib/locations';
 import OnboardingShell from '../../components/OnboardingShell';
 
@@ -73,7 +73,7 @@ export default function LocationScreen() {
 
   return (
     <OnboardingShell
-      step={4} total={9}
+      step={8} total={totalSteps(data.type)}
       footer={
         zone && (
           <TouchableOpacity

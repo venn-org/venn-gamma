@@ -5,7 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors } from '../../lib/theme';
-import { useOnboarding } from '../../hooks/useOnboarding';
+import { useOnboarding, totalSteps } from '../../hooks/useOnboarding';
 import OnboardingShell from '../../components/OnboardingShell';
 
 export default function PhotosScreen() {
@@ -56,7 +56,7 @@ export default function PhotosScreen() {
     : profilePhoto;
 
   return (
-    <OnboardingShell step={8} total={9}>
+    <OnboardingShell step={totalSteps(data.type)} total={totalSteps(data.type)}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 20 }}>
         {isOwner ? (
           <>

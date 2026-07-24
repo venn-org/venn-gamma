@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
 import { colors } from '../../lib/theme';
-import { useOnboarding } from '../../hooks/useOnboarding';
+import { useOnboarding, totalSteps } from '../../hooks/useOnboarding';
 import OnboardingShell from '../../components/OnboardingShell';
 
 const OPTIONS = ['She/her', 'He/him', 'They/them', 'Ze/zir', 'Ze/zan', 'Other'];
@@ -31,7 +31,7 @@ export default function PronounsScreen() {
 
   return (
     <OnboardingShell
-      step={4} total={9}
+      step={5} total={totalSteps(data.type)}
       footer={
         <View style={styles.footerInner}>
           <Text style={styles.visible}>Visible on profile</Text>

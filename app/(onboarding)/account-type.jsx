@@ -5,15 +5,16 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors } from '../../lib/theme';
-import { useOnboarding } from '../../hooks/useOnboarding';
+import { useOnboarding, totalSteps } from '../../hooks/useOnboarding';
 
 export default function AccountTypeScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { data, updateData, submitData } = useOnboarding();
+  const { data, updateData } = useOnboarding();
   const [loading, setLoading] = useState(false);
 
   const [type, setType] = useState(data.type || null);
+  const total = totalSteps(type);
 
   const handleContinue = async () => {
     if (!type) return;
@@ -30,10 +31,10 @@ export default function AccountTypeScreen() {
           <LinearGradient
             colors={[colors.blue, colors.violet]}
             start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-            style={[styles.progressFill, { width: '22%' }]}
+            style={[styles.progressFill, { width: `${Math.round((2 / total) * 100)}%` }]}
           />
         </View>
-        <Text style={styles.stepLabel}>STEP 2 OF 9</Text>
+        <Text style={styles.stepLabel}>STEP 2 OF {total}</Text>
       </View>
 
       <TouchableOpacity style={styles.back} onPress={() => router.canGoBack() ? router.back() : router.replace('/(onboarding)/name')}>
