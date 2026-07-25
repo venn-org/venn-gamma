@@ -8,6 +8,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { supabase, getCurrentUserId, ensureProfile, isOnboardingComplete, subscribeOnboardingComplete, loadSession, onAuthChange } from '../lib';
+import { loadLocations } from '../lib/locations';
 import { ThemeProvider, useTheme } from '../lib/ThemeContext';
 import MatchCelebration from '../components/MatchCelebration';
 
@@ -45,12 +46,24 @@ function RootLayoutInner() {
   });
 
   const [authReady, setAuthReady] = useState(false);
+  const [locationsReady, setLocationsReady] = useState(false);
   const [session, setSession] = useState(null);
   const [onboardingDone, setOnboardingDone] = useState(null); // null = unknown, true/false
   const [incomingMatch, setIncomingMatch] = useState(null); // { matchId, name, photo }
 
   const router = useRouter();
   const segments = useSegments();
+
+  // Cities/zones now live in the DB (see supabase/migrations — `cities` /
+  // `zones`) instead of lib/locations.json, so fetch them once up front,
+  // the same way fonts/auth gate the splash screen — city.jsx, location.jsx,
+  // preferences.jsx, and edit-profile.jsx all read CITIES/ZONES_BY_CITY
+  // synchronously and would otherwise render against an empty list.
+  useEffect(() => {
+    loadLocations()
+      .catch((e) => console.error('loadLocations failed:', e))
+      .finally(() => setLocationsReady(true));
+  }, []);
 
   // Auth listener
   useEffect(() => {
@@ -107,14 +120,14 @@ function RootLayoutInner() {
 
   // Hide splash when ready
   useEffect(() => {
-    if (fontsLoaded && authReady) {
+    if (fontsLoaded && authReady && locationsReady) {
       SplashScreen.hideAsync();
     }
-  }, [fontsLoaded, authReady]);
+  }, [fontsLoaded, authReady, locationsReady]);
 
   // Route guarding
   useEffect(() => {
-    if (!fontsLoaded || !authReady) return;
+    if (!fontsLoaded || !authReady || !locationsReady) return;
 
     const inAuthGroup = segments[0] === '(auth)';
     const inOnboardingGroup = segments[0] === '(onboarding)';
@@ -135,7 +148,7 @@ function RootLayoutInner() {
         router.replace('/feed');
       }
     }
-  }, [session, onboardingDone, segments, authReady, fontsLoaded]);
+  }, [session, onboardingDone, segments, authReady, fontsLoaded, locationsReady]);
 
   // Presence heartbeat (last_active_at)
   useEffect(() => {
@@ -193,7 +206,7 @@ function RootLayoutInner() {
     };
   }, [session, onboardingDone]);
 
-  if (!fontsLoaded || !authReady) {
+  if (!fontsLoaded || !authReady || !locationsReady) {
     // Show splash screen manually while checking auth state if fonts are loaded but auth is slow
     return (
       <View style={[s.splash, { backgroundColor: colors.paper }]}>

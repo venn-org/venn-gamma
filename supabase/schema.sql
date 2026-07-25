@@ -104,10 +104,31 @@ CREATE TABLE public.option_values (
 CREATE INDEX idx_option_values_group ON public.option_values USING btree (group_key, sort_order) WHERE active;
 
 CREATE TABLE public.cities (
-    id   bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-    name text NOT NULL UNIQUE,
-    slug text NOT NULL UNIQUE
+    id          bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    name        text NOT NULL UNIQUE,
+    slug        text NOT NULL UNIQUE,
+    country     text NOT NULL DEFAULT 'India',
+    sort_order  smallint NOT NULL DEFAULT 0,
+    active      boolean NOT NULL DEFAULT true
 );
+
+-- Zones (neighbourhoods) within a city, replacing lib/locations.json's
+-- zonesByCity. Admin-editable the same way option_values is — no client
+-- release needed to add a city or zone.
+CREATE TABLE public.zones (
+    id          bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    city_id     bigint NOT NULL REFERENCES public.cities(id) ON DELETE CASCADE,
+    name        text NOT NULL,
+    slug        text NOT NULL,                 -- matches lib/locations.js zone.id (e.g. 'koramangala')
+    lat         double precision NOT NULL,
+    lng         double precision NOT NULL,
+    radius_km   double precision NOT NULL DEFAULT 6,
+    sort_order  smallint NOT NULL DEFAULT 0,
+    active      boolean NOT NULL DEFAULT true,
+    UNIQUE (city_id, slug)
+);
+
+CREATE INDEX idx_zones_city ON public.zones USING btree (city_id, sort_order) WHERE active;
 
 
 -- ============================================================================
@@ -685,6 +706,9 @@ CREATE POLICY option_values_select ON public.option_values FOR SELECT USING (tru
 ALTER TABLE public.cities ENABLE ROW LEVEL SECURITY;
 CREATE POLICY cities_select ON public.cities FOR SELECT USING (true);
 
+ALTER TABLE public.zones ENABLE ROW LEVEL SECURITY;
+CREATE POLICY zones_select ON public.zones FOR SELECT USING (true);
+
 ALTER TABLE public.profile_core ENABLE ROW LEVEL SECURITY;
 CREATE POLICY profile_core_select ON public.profile_core FOR SELECT USING ((auth.jwt() ->> 'sub') IS NOT NULL);
 CREATE POLICY profile_core_insert_own ON public.profile_core FOR INSERT WITH CHECK ((auth.jwt() ->> 'sub') = id);
@@ -906,4 +930,24 @@ INSERT INTO public.option_values (group_key, code, label, sort_order) VALUES
   ('notification_type', 'match', 'Match', 2),
   ('notification_type', 'message', 'Message', 3);
 
-INSERT INTO public.cities (name, slug) VALUES ('Bangalore', 'bangalore');
+INSERT INTO public.cities (name, slug, country, sort_order) VALUES
+  ('Bangalore', 'bangalore', 'India', 1),
+  ('Mumbai',    'mumbai',    'India', 2);
+
+INSERT INTO public.zones (city_id, name, slug, lat, lng, radius_km, sort_order)
+SELECT c.id, z.name, z.slug, z.lat, z.lng, z.radius_km, z.sort_order
+FROM (VALUES
+  ('bangalore', 'Koramangala', 'koramangala', 12.9352, 77.6245, 6, 1),
+  ('bangalore', 'Indiranagar', 'indiranagar', 13.0347, 77.6410, 6, 2),
+  ('bangalore', 'Whitefield',  'whitefield',  12.9698, 77.7499, 8, 3),
+  ('bangalore', 'JP Nagar',    'jp-nagar',    12.9352, 77.5945, 6, 4),
+  ('bangalore', 'HSR Layout',  'hsr-layout',  12.9250, 77.6245, 6, 5),
+  ('bangalore', 'Bellandur',   'bellandur',   12.9698, 77.6854, 6, 6),
+  ('mumbai',    'Andheri',     'andheri',     19.1197, 72.8468, 8, 1),
+  ('mumbai',    'Bandra',      'bandra',      19.0596, 72.8295, 6, 2),
+  ('mumbai',    'Powai',       'powai',       19.1176, 72.9060, 6, 3),
+  ('mumbai',    'Dadar',       'dadar',       19.0178, 72.8478, 6, 4),
+  ('mumbai',    'Thane',       'thane',       19.2183, 72.9781, 12, 5),
+  ('mumbai',    'Navi Mumbai', 'navi-mumbai', 19.0330, 73.0297, 14, 6)
+) AS z(city_slug, name, slug, lat, lng, radius_km, sort_order)
+JOIN public.cities c ON c.slug = z.city_slug;
