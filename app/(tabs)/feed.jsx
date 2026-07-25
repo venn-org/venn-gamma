@@ -33,6 +33,11 @@ import { useTheme, useThemedStyles } from "../../lib/ThemeContext";
 
 const { width: SCREEN_W } = Dimensions.get("window");
 
+// TEMP: daily view limit disabled for today — profiles cycle (wrap around)
+// instead of dead-ending at "come back tomorrow" once you've seen them all.
+// Revert by flipping this back to false.
+const TEMP_DISABLE_VIEW_LIMIT = true;
+
 // Role is deliberately absent — it's an identity switch, not a filter, so it
 // only lives behind the options button.
 const FILTER_CHIPS = PREF_ROWS.filter((row) => !row.roleOnly);
@@ -161,7 +166,7 @@ export default function FeedScreen() {
     setCurrentIndex(0);
     const [blocked, viewedToday] = await Promise.all([
       getBlockedIds(uid),
-      getTodayViewedProfileIds(uid),
+      TEMP_DISABLE_VIEW_LIMIT ? Promise.resolve(new Set()) : getTodayViewedProfileIds(uid),
     ]);
 
     let query = supabase
@@ -200,6 +205,18 @@ export default function FeedScreen() {
 
   const currentProfile = profiles[currentIndex];
 
+  // TEMP: with the view limit off, wrap back to the start instead of
+  // dead-ending once the list runs out, so profiles cycle like before.
+  const advanceIndex = () => {
+    setCurrentIndex((i) => {
+      const next = i + 1;
+      if (TEMP_DISABLE_VIEW_LIMIT && profiles.length > 0) {
+        return next % profiles.length;
+      }
+      return next;
+    });
+  };
+
   const handlePass = async () => {
     const uid = getCurrentUserId();
     if (uid && currentProfile) {
@@ -212,7 +229,7 @@ export default function FeedScreen() {
       duration: 150,
       useNativeDriver: true,
     }).start(() => {
-      setCurrentIndex((i) => i + 1);
+      advanceIndex();
     });
   };
 
@@ -236,7 +253,7 @@ export default function FeedScreen() {
       duration: 150,
       useNativeDriver: true,
     }).start(() => {
-      setCurrentIndex((i) => i + 1);
+      advanceIndex();
     });
 
     const { error } = await supabase.from("likes").insert({
