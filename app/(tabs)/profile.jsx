@@ -2,10 +2,11 @@ import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import { LinearGradient } from "expo-linear-gradient";
 import { useFocusEffect, useRouter } from "expo-router";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
     ActivityIndicator,
     Alert,
+    Animated,
     Dimensions,
     Image,
     Modal,
@@ -40,17 +41,51 @@ import { calculateProfileCompletion } from "../../lib/profileUtils";
 import { supabase } from "../../lib/supabase";
 import { useTheme, useThemedStyles } from "../../lib/ThemeContext";
 
-// 3 across, matching the blueprint's photo grid
-const THEME_MODES = [
-  { key: "light", label: "Light", subtitle: "Light", icon: "sunny-outline" },
-  { key: "dark", label: "Dark", subtitle: "Dark", icon: "moon-outline" },
-  {
-    key: "system",
-    label: "Use System Default",
-    subtitle: "Following your device",
-    icon: "phone-portrait-outline",
-  },
-];
+// Fixed pixel width per option so the sliding indicator doesn't need a layout
+// measurement pass before it can animate.
+const THEME_TOGGLE_BTN_W = 44;
+
+// Segmented Light/Dark control (not a bare on/off switch) — the sun/moon
+// icons plus a sliding highlight make it clear which mode is selected rather
+// than implying a single boolean toggle.
+const ThemeToggle = ({ isDark, onToggle }) => {
+  const s = useThemedStyles(makeStyles);
+  const { colors } = useTheme();
+  const anim = useRef(new Animated.Value(isDark ? 1 : 0)).current;
+
+  useEffect(() => {
+    Animated.spring(anim, {
+      toValue: isDark ? 1 : 0,
+      useNativeDriver: true,
+      friction: 8,
+      tension: 90,
+    }).start();
+  }, [isDark]);
+
+  const translateX = anim.interpolate({ inputRange: [0, 1], outputRange: [0, THEME_TOGGLE_BTN_W] });
+
+  return (
+    <View style={s.themeToggle}>
+      <Animated.View style={[s.themeToggleThumb, { transform: [{ translateX }] }]} />
+      <TouchableOpacity
+        style={s.themeToggleBtn}
+        onPress={() => onToggle(false)}
+        activeOpacity={0.8}
+        accessibilityLabel="Light mode"
+      >
+        <Ionicons name="sunny" size={15} color={!isDark ? "#fff" : colors.placeholder} />
+      </TouchableOpacity>
+      <TouchableOpacity
+        style={s.themeToggleBtn}
+        onPress={() => onToggle(true)}
+        activeOpacity={0.8}
+        accessibilityLabel="Dark mode"
+      >
+        <Ionicons name="moon" size={15} color={isDark ? "#fff" : colors.placeholder} />
+      </TouchableOpacity>
+    </View>
+  );
+};
 
 const PHOTO_SLOT = (Dimensions.get("window").width - 40 - 16) / 3;
 
@@ -104,7 +139,7 @@ const SettingsRow = ({
 
 export default function ProfileScreen() {
   const s = useThemedStyles(makeStyles);
-  const { colors, mode, setMode, isDark } = useTheme();
+  const { colors, setMode, isDark } = useTheme();
   const insets = useSafeAreaInsets();
   const router = useRouter();
 
@@ -124,11 +159,6 @@ export default function ProfileScreen() {
   const [flatUploadingIndex, setFlatUploadingIndex] = useState(null);
   const [pendingFlatPhoto, setPendingFlatPhoto] = useState(null); // { index, uri, isReplace }
   const [flatPhotoMenuIndex, setFlatPhotoMenuIndex] = useState(null);
-
-  const [themeMenuOpen, setThemeMenuOpen] = useState(false);
-
-  const activeThemeMode =
-    THEME_MODES.find((m) => m.key === mode) ?? THEME_MODES[2];
 
   // Refetch on focus so completion % reflects edits made in edit-profile
   useFocusEffect(
@@ -349,6 +379,11 @@ export default function ProfileScreen() {
     }
   };
 
+  // The crossfade-on-switch animation lives in ThemeProvider now (it needs
+  // to cover the floating tab bar too, which sits outside this screen) —
+  // this just forwards the pick.
+  const handleToggleTheme = (nextDark) => setMode(nextDark ? "dark" : "light");
+
   const toggleIncognito = async (val) => {
     setIncognito(val);
     const uid = getCurrentUserId();
@@ -356,12 +391,25 @@ export default function ProfileScreen() {
     await supabase.from("profiles").update({ paused: val }).eq("id", uid);
   };
 
-  const handleSavePrefs = async (newPrefs) => {
+  const handleSavePrefs = async (newPrefs, housing) => {
     const uid = getCurrentUserId();
     if (!uid) return;
     setUserPrefs(newPrefs);
     const updates = mapUIPrefsToDb(newPrefs);
+    if (housing) {
+      updates.budget_min = housing.budgetMin;
+      updates.budget_max = housing.budgetMax;
+      updates.move_in_date = housing.moveInDate || null;
+    }
     await supabase.from("profiles").update(updates).eq("id", uid);
+    if (housing) {
+      setProfile((p) => ({
+        ...p,
+        budget_min: housing.budgetMin,
+        budget_max: housing.budgetMax,
+        move_in_date: housing.moveInDate || null,
+      }));
+    }
   };
 
   const handleSaveFlatDetails = async ({ flatType, description }) => {
@@ -612,11 +660,16 @@ export default function ProfileScreen() {
           </View>
           <View style={{ flex: 1, marginLeft: 6 }}>
             <Text style={s.profileName} numberOfLines={1}>{name}</Text>
-            <Text style={s.profileRole} numberOfLines={1}>
-              {profile?.user_type === "owner"
-                ? "Has a flat"
-                : "Looking for flat"}
-            </Text>
+            <View
+              style={[
+                s.rolePill,
+                { backgroundColor: profile?.user_type === "owner" ? colors.blue : colors.violet },
+              ]}
+            >
+              <Text style={s.rolePillText} numberOfLines={1}>
+                {profile?.user_type === "owner" ? "Has a flat" : "Looking for flat"}
+              </Text>
+            </View>
             <Text style={s.completionText}>{percentage}% Complete</Text>
           </View>
         </View>
@@ -748,9 +801,9 @@ export default function ProfileScreen() {
               icon={isDark ? "moon" : "sunny"}
               iconBg={colors.inputBg}
               iconColor={colors.slate}
-              title="Appearence"
-              subtitle={activeThemeMode.subtitle}
-              onPress={() => setThemeMenuOpen(true)}
+              title="Appearance"
+              subtitle={isDark ? "Dark mode" : "Light mode"}
+              right={<ThemeToggle isDark={isDark} onToggle={handleToggleTheme} />}
               last
             />
           </View>
@@ -1043,76 +1096,15 @@ export default function ProfileScreen() {
         </Pressable>
       </Modal>
 
-      {/* Theme picker */}
-      <Modal
-        visible={themeMenuOpen}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setThemeMenuOpen(false)}
-      >
-        <Pressable
-          style={s.confirmBackdrop}
-          onPress={() => setThemeMenuOpen(false)}
-        >
-          <Pressable style={s.menuSheet} onPress={() => {}}>
-            <Text style={s.menuHeading}>Theme</Text>
-            <View style={s.menuDivider} />
-            {THEME_MODES.map((m, i) => {
-              const on = mode === m.key;
-              return (
-                <View key={m.key}>
-                  {i > 0 && <View style={s.menuDivider} />}
-                  <TouchableOpacity
-                    style={s.menuOption}
-                    onPress={() => {
-                      setMode(m.key);
-                      setThemeMenuOpen(false);
-                    }}
-                  >
-                    <Ionicons
-                      name={m.icon}
-                      size={18}
-                      color={on ? colors.blue : colors.ink}
-                    />
-                    <Text
-                      style={[
-                        s.menuOptionText,
-                        { flex: 1 },
-                        on && { color: colors.blue },
-                      ]}
-                    >
-                      {m.label}
-                    </Text>
-                    {on && (
-                      <Ionicons
-                        name="checkmark"
-                        size={18}
-                        color={colors.blue}
-                      />
-                    )}
-                  </TouchableOpacity>
-                </View>
-              );
-            })}
-            <View style={s.menuDivider} />
-            <TouchableOpacity
-              style={s.menuOption}
-              onPress={() => setThemeMenuOpen(false)}
-            >
-              <Text
-                style={[s.menuOptionText, { flex: 1, textAlign: "center" }]}
-              >
-                Cancel
-              </Text>
-            </TouchableOpacity>
-          </Pressable>
-        </Pressable>
-      </Modal>
-
       <PreferencesSheet
         visible={prefsVisible}
         prefs={userPrefs}
         city={profile?.city}
+        housing={{
+          budgetMin: profile?.budget_min ?? 0,
+          budgetMax: profile?.budget_max ?? 20000,
+          moveInDate: typeof profile?.move_in_date === "string" ? profile.move_in_date.split("T")[0] : "",
+        }}
         showRole
         onClose={() => setPrefsVisible(false)}
         onSave={handleSavePrefs}
@@ -1165,13 +1157,18 @@ const makeStyles = (colors) =>
       marginBottom: 4,
       letterSpacing: -0.5,
     },
-    profileRole: {
-      fontFamily: "HankenGrotesk_600SemiBold",
-      fontSize: 13,
-      color: colors.placeholder,
-      textTransform: "uppercase",
-      letterSpacing: 0.8,
-      marginTop: 4,
+    rolePill: {
+      alignSelf: "flex-start",
+      borderRadius: 50,
+      paddingHorizontal: 8,
+      paddingVertical: 3,
+      marginTop: 5,
+    },
+    rolePillText: {
+      fontFamily: "SpaceGrotesk_700Bold",
+      fontSize: 11,
+      color: "#fff",
+      letterSpacing: -0.2,
     },
     completionText: {
       fontFamily: "HankenGrotesk_600SemiBold",
@@ -1485,5 +1482,28 @@ const makeStyles = (colors) =>
       fontSize: 13,
       color: colors.placeholder,
       marginTop: 2,
+    },
+
+    themeToggle: {
+      flexDirection: "row",
+      backgroundColor: colors.inputBg,
+      borderRadius: 20,
+      padding: 3,
+      width: THEME_TOGGLE_BTN_W * 2 + 6,
+    },
+    themeToggleThumb: {
+      position: "absolute",
+      top: 3,
+      left: 3,
+      width: THEME_TOGGLE_BTN_W,
+      height: 26,
+      borderRadius: 16,
+      backgroundColor: colors.blue,
+    },
+    themeToggleBtn: {
+      width: THEME_TOGGLE_BTN_W,
+      height: 26,
+      alignItems: "center",
+      justifyContent: "center",
     },
   });
