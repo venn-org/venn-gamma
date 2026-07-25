@@ -1,0 +1,22 @@
+<!--
+  Email OTP template for signInWithOtp().
+
+  Supabase picks the "magic link" template for signInWithOtp({ email }); the code
+  and the link are two renderings of the same one-time token. Rendering
+  {{ .Token }} is what turns it into the 6-digit code the app's OTP screen
+  expects — swapping this back to {{ .ConfirmationURL }} would break that screen.
+-->
+<div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 480px; margin: 0 auto; padding: 32px 24px; color: #14161B;">
+  <p style="font-size: 20px; font-weight: 700; letter-spacing: -0.5px; margin: 0 0 24px;">Venn</p>
+
+  <h2 style="font-size: 22px; font-weight: 700; letter-spacing: -0.6px; margin: 0 0 8px;">Your sign-in code</h2>
+  <p style="font-size: 15px; color: #5A6072; line-height: 22px; margin: 0 0 24px;">
+    Enter this code in the app to continue.
+  </p>
+
+  <p style="font-size: 34px; font-weight: 700; letter-spacing: 8px; margin: 0 0 24px; color: #335CFF;">{{ .Token }}</p>
+
+  <p style="font-size: 13px; color: #9AA0B2; line-height: 20px; margin: 0;">
+    This code expires in 1 hour. If you didn't request it, you can ignore this email — nobody can sign in without it.
+  </p>
+</div>
