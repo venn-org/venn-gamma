@@ -485,27 +485,12 @@ export default function FeedScreen() {
                           <Ionicons name="checkmark" size={12} color="#fff" />
                         </View>
                       )}
-                      <View
-                        style={[
-                          s.rolePill,
-                          {
-                            backgroundColor:
-                              currentProfile.user_type === "owner"
-                                ? colors.blue
-                                : colors.violet,
-                            marginLeft: 6,
-                          },
-                        ]}
-                      >
-                        <Text style={s.rolePillText}>
-                          {currentProfile.user_type === "owner"
-                            ? "Has a flat"
-                            : "Looking for flat"}
-                        </Text>
-                      </View>
                       {overlapScore != null && (
                         <View style={s.overlapPill}>
-                          <Ionicons name="git-compare-outline" size={11} color={colors.violet} />
+                          <View style={s.overlapMark}>
+                            <View style={[s.overlapCircle, { backgroundColor: colors.blue, left: 0 }]} />
+                            <View style={[s.overlapCircle, { backgroundColor: colors.violet, right: 0, opacity: 0.9 }]} />
+                          </View>
                           <Text style={s.overlapText}>{overlapScore}% overlap</Text>
                         </View>
                       )}
@@ -516,6 +501,24 @@ export default function FeedScreen() {
                       </Text>
                       <Text style={s.dot}> • </Text>
                       <Text style={s.active}>Active now</Text>
+                      <View
+                        style={[
+                          s.rolePill,
+                          {
+                            backgroundColor:
+                              currentProfile.user_type === "owner"
+                                ? colors.blue
+                                : colors.violet,
+                            marginLeft: 8,
+                          },
+                        ]}
+                      >
+                        <Text style={s.rolePillText}>
+                          {currentProfile.user_type === "owner"
+                            ? "Has a flat"
+                            : "Looking for flat"}
+                        </Text>
+                      </View>
                     </View>
                   </View>
                   <View style={s.navBtns}>
@@ -960,12 +963,23 @@ const makeStyles = (colors) => StyleSheet.create({
   overlapPill: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 4,
+    gap: 5,
     borderRadius: 50,
     paddingHorizontal: 8,
     paddingVertical: 3,
-    marginLeft: 6,
     backgroundColor: colors.tintViolet,
+  },
+  // Mini version of the app's own two-circle Venn mark (see logoWrap/circle
+  // in the header) — reused here so "overlap" reads as the same idea.
+  overlapMark: { width: 16, height: 11, position: "relative" },
+  overlapCircle: {
+    position: "absolute",
+    top: 0,
+    width: 11,
+    height: 11,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: colors.tintViolet,
   },
   overlapText: {
     fontFamily: "SpaceGrotesk_700Bold",
