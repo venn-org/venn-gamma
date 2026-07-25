@@ -150,12 +150,25 @@ export default function FeedScreen() {
     }
   };
 
-  const handleSavePrefs = async (newPrefs) => {
+  const handleSavePrefs = async (newPrefs, housing) => {
     const uid = getCurrentUserId();
     if (!uid) return;
     setUserPrefs(newPrefs);
     const updates = mapUIPrefsToDb(newPrefs);
+    if (housing) {
+      updates.budget_min = housing.budgetMin;
+      updates.budget_max = housing.budgetMax;
+      updates.move_in_date = housing.moveInDate || null;
+    }
     await supabase.from("profiles").update(updates).eq("id", uid);
+    if (housing) {
+      setMyProfile((p) => (p ? {
+        ...p,
+        budget_min: housing.budgetMin,
+        budget_max: housing.budgetMax,
+        move_in_date: housing.moveInDate || null,
+      } : p));
+    }
     fetchFeed(newPrefs);
   };
 
@@ -295,52 +308,11 @@ export default function FeedScreen() {
     }
   };
 
-  return (
-    <View style={s.screen}>
-      {/* Tinted header block — top bar, filter chips and banner read as one band */}
-      <View style={[s.headerBlock, { paddingTop: insets.top + 12 }]}>
-        <View style={s.topBar}>
-        <View style={s.logoRow}>
-          <View style={s.logoWrap}>
-            <View
-              style={[s.circle, { backgroundColor: colors.blue, left: 0 }]}
-            />
-            <View
-              style={[
-                s.circle,
-                { backgroundColor: colors.violet, right: 0, opacity: 0.9 },
-              ]}
-            />
-          </View>
-          <Text style={s.wordmark}>Venn</Text>
-        </View>
-        <View style={s.topBarRight}>
-          <View style={s.likesPill}>
-            <Ionicons
-              name="heart"
-              size={12}
-              color={remainingLikes > 0 ? "#22C55E" : "#FF4D6A"}
-            />
-            <Text
-              style={[
-                s.likesPillText,
-                { color: remainingLikes > 0 ? "#22C55E" : "#FF4D6A" },
-              ]}
-            >
-              {remainingLikes} {remainingLikes === 1 ? "like" : "likes"} left
-            </Text>
-          </View>
-          <TouchableOpacity
-            style={s.filterIconBtn}
-            activeOpacity={0.8}
-            onPress={() => { setPrefsSection(null); setPrefsVisible(true); }}
-          >
-            <Ionicons name="options-outline" size={18} color={colors.ink} />
-          </TouchableOpacity>
-        </View>
-      </View>
-
-      {/* Filter chips */}
+  // Filter chips + completion banner — rendered inside the scrollable content
+  // on both branches below so they scroll away with the card, leaving only
+  // the top bar (logo/likes/filter icon) pinned.
+  const renderScrollTopSection = () => (
+    <View style={{ marginHorizontal: -16 }}>
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
@@ -399,24 +371,74 @@ export default function FeedScreen() {
             </TouchableOpacity>
           </View>
         )}
-      </View>
 
-      {currentProfile && <View style={[s.separator]} />}
+      {currentProfile && <View style={s.separator} />}
+    </View>
+  );
+
+  return (
+    <View style={s.screen}>
+      {/* Topmost section — stays fixed while everything else scrolls */}
+      <View style={[s.headerBlock, { paddingTop: insets.top + 12 }]}>
+        <View style={s.topBar}>
+        <View style={s.logoRow}>
+          <View style={s.logoWrap}>
+            <View
+              style={[s.circle, { backgroundColor: colors.blue, left: 0 }]}
+            />
+            <View
+              style={[
+                s.circle,
+                { backgroundColor: colors.violet, right: 0, opacity: 0.9 },
+              ]}
+            />
+          </View>
+          <Text style={s.wordmark}>Venn</Text>
+        </View>
+        <View style={s.topBarRight}>
+          <View style={s.likesPill}>
+            <Ionicons
+              name="heart"
+              size={12}
+              color={remainingLikes > 0 ? "#22C55E" : "#FF4D6A"}
+            />
+            <Text
+              style={[
+                s.likesPillText,
+                { color: remainingLikes > 0 ? "#22C55E" : "#FF4D6A" },
+              ]}
+            >
+              {remainingLikes} {remainingLikes === 1 ? "like" : "likes"} left
+            </Text>
+          </View>
+          <TouchableOpacity
+            style={s.filterIconBtn}
+            activeOpacity={0.8}
+            onPress={() => { setPrefsSection(null); setPrefsVisible(true); }}
+          >
+            <Ionicons name="options-outline" size={18} color={colors.ink} />
+          </TouchableOpacity>
+        </View>
+      </View>
+      </View>
 
       {/* Feed Content */}
       <View style={[s.feedContent, { flex: 1 }, !currentProfile && { paddingTop: 0 }]}>
         {!currentProfile ? (
-          <View style={s.empty}>
-            <Text style={s.emptyText}>
-              No more profiles found. Come back tomorrow.
-            </Text>
-            <TouchableOpacity
-              style={[s.refreshBtn, { marginTop: 16 }]}
-              onPress={() => fetchFeed()}
-            >
-              <Text style={s.refreshBtnText}>Refresh Feed</Text>
-            </TouchableOpacity>
-          </View>
+          <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
+            {renderScrollTopSection()}
+            <View style={s.empty}>
+              <Text style={s.emptyText}>
+                No more profiles found. Come back tomorrow.
+              </Text>
+              <TouchableOpacity
+                style={[s.refreshBtn, { marginTop: 16 }]}
+                onPress={() => fetchFeed()}
+              >
+                <Text style={s.refreshBtnText}>Refresh Feed</Text>
+              </TouchableOpacity>
+            </View>
+          </ScrollView>
         ) : (
           <>
             <Animated.View style={[s.cardOuter, { flex: 1, opacity: fadeIn }]}>
@@ -450,6 +472,8 @@ export default function FeedScreen() {
                 showsVerticalScrollIndicator={false}
                 contentContainerStyle={{ paddingBottom: 110 }}
               >
+                {renderScrollTopSection()}
+
                 {/* Card Header */}
                 <View style={s.cardHeader}>
                   <View>
@@ -637,6 +661,11 @@ export default function FeedScreen() {
         visible={prefsVisible}
         prefs={userPrefs}
         city={myProfile?.city}
+        housing={{
+          budgetMin: myProfile?.budget_min ?? 0,
+          budgetMax: myProfile?.budget_max ?? 20000,
+          moveInDate: typeof myProfile?.move_in_date === "string" ? myProfile.move_in_date.split("T")[0] : "",
+        }}
         only={prefsSection}
         onClose={() => setPrefsVisible(false)}
         onSave={handleSavePrefs}
