@@ -675,45 +675,56 @@ export default function ProfileScreen() {
               <Text style={s.photoHeaderLabel}>FLAT DETAILS</Text>
             </View>
             <View style={s.flatCard}>
-              <View style={s.flatInfoRow}>
-                <Ionicons name="home-outline" size={16} color={colors.slate} />
-                <Text style={s.flatInfoText}>
-                  {toUI("flat_type", profile?.flat_type) || "Flat type not set"}
-                </Text>
+              <View style={s.flatCardHeader}>
+                <View style={s.flatCardHeaderLeft}>
+                  <View style={[s.flatIconBadge, { backgroundColor: colors.tintBlue }]}>
+                    <Ionicons name="home" size={18} color={colors.blue} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={s.flatTypeText} numberOfLines={1}>
+                      {toUI("flat_type", profile?.flat_type) || "Flat type not set"}
+                    </Text>
+                    {profile?.location ? (
+                      <Text style={s.flatLocationText} numberOfLines={1}>{profile.location}</Text>
+                    ) : null}
+                  </View>
+                </View>
+                <TouchableOpacity
+                  style={s.flatEditBtn}
+                  onPress={() => setFlatDetailsModalVisible(true)}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons name="pencil" size={14} color={colors.blue} />
+                </TouchableOpacity>
               </View>
-              {profile?.location ? (
-                <View style={s.flatInfoRow}>
-                  <Ionicons name="location-outline" size={16} color={colors.slate} />
-                  <Text style={s.flatInfoText}>{profile.location}</Text>
+
+              {((profile?.budget_min || profile?.budget_max) || profile?.move_in_date) && (
+                <View style={s.flatStatsRow}>
+                  {(profile?.budget_min || profile?.budget_max) ? (
+                    <View style={s.flatStat}>
+                      <Ionicons name="cash-outline" size={14} color={colors.placeholder} />
+                      <Text style={s.flatStatText}>
+                        ₹{profile.budget_min ?? 0}–₹{profile.budget_max ?? 0}/mo
+                      </Text>
+                    </View>
+                  ) : null}
+                  {(profile?.budget_min || profile?.budget_max) && profile?.move_in_date ? (
+                    <View style={s.flatStatDivider} />
+                  ) : null}
+                  {profile?.move_in_date ? (
+                    <View style={s.flatStat}>
+                      <Ionicons name="calendar-outline" size={14} color={colors.placeholder} />
+                      <Text style={s.flatStatText}>
+                        Move-in {String(profile.move_in_date).split("T")[0]}
+                      </Text>
+                    </View>
+                  ) : null}
                 </View>
-              ) : null}
-              {(profile?.budget_min || profile?.budget_max) ? (
-                <View style={s.flatInfoRow}>
-                  <Ionicons name="cash-outline" size={16} color={colors.slate} />
-                  <Text style={s.flatInfoText}>
-                    ₹{profile.budget_min ?? 0} – ₹{profile.budget_max ?? 0} / month
-                  </Text>
-                </View>
-              ) : null}
-              {profile?.move_in_date ? (
-                <View style={s.flatInfoRow}>
-                  <Ionicons name="calendar-outline" size={16} color={colors.slate} />
-                  <Text style={s.flatInfoText}>
-                    Move-in: {String(profile.move_in_date).split("T")[0]}
-                  </Text>
-                </View>
-              ) : null}
+              )}
+
               {flatDetails?.description ? (
                 <Text style={s.flatDescriptionText}>{flatDetails.description}</Text>
               ) : null}
-              <TouchableOpacity
-                style={s.flatEditLink}
-                onPress={() => setFlatDetailsModalVisible(true)}
-                activeOpacity={0.7}
-              >
-                <Ionicons name="pencil" size={13} color={colors.blue} />
-                <Text style={s.flatEditLinkText}>Edit flat details</Text>
-              </TouchableOpacity>
             </View>
 
             <View style={s.photoHeader}>
@@ -1287,36 +1298,66 @@ const makeStyles = (colors) =>
 
     flatCard: {
       backgroundColor: colors.card,
-      borderRadius: 16,
+      borderRadius: 20,
       borderWidth: 1,
       borderColor: colors.border,
       padding: 16,
-      gap: 10,
+      gap: 14,
       marginBottom: 16,
+      shadowColor: "#000",
+      shadowOpacity: 0.05,
+      shadowRadius: 8,
+      shadowOffset: { width: 0, height: 2 },
+      elevation: 1,
     },
-    flatInfoRow: { flexDirection: "row", alignItems: "center", gap: 10 },
-    flatInfoText: {
-      fontFamily: "HankenGrotesk_600SemiBold",
-      fontSize: 14,
+    flatCardHeader: { flexDirection: "row", alignItems: "center", gap: 10 },
+    flatCardHeaderLeft: { flex: 1, flexDirection: "row", alignItems: "center", gap: 12 },
+    flatIconBadge: {
+      width: 40,
+      height: 40,
+      borderRadius: 14,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    flatTypeText: {
+      fontFamily: "SpaceGrotesk_700Bold",
+      fontSize: 16,
       color: colors.ink,
     },
+    flatLocationText: {
+      fontFamily: "HankenGrotesk_400Regular",
+      fontSize: 13,
+      color: colors.placeholder,
+      marginTop: 2,
+    },
+    flatEditBtn: {
+      width: 32,
+      height: 32,
+      borderRadius: 16,
+      backgroundColor: colors.canvas,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    flatStatsRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      backgroundColor: colors.canvas,
+      borderRadius: 12,
+      paddingVertical: 10,
+      paddingHorizontal: 12,
+    },
+    flatStat: { flex: 1, flexDirection: "row", alignItems: "center", gap: 6 },
+    flatStatText: {
+      fontFamily: "HankenGrotesk_600SemiBold",
+      fontSize: 12,
+      color: colors.slate,
+    },
+    flatStatDivider: { width: 1, height: 16, backgroundColor: colors.border, marginHorizontal: 8 },
     flatDescriptionText: {
       fontFamily: "HankenGrotesk_400Regular",
       fontSize: 13,
       color: colors.slate,
       lineHeight: 19,
-    },
-    flatEditLink: {
-      flexDirection: "row",
-      alignItems: "center",
-      gap: 6,
-      alignSelf: "flex-start",
-      marginTop: 2,
-    },
-    flatEditLinkText: {
-      fontFamily: "HankenGrotesk_600SemiBold",
-      fontSize: 13,
-      color: colors.blue,
     },
 
     menuSheet: {
