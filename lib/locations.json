@@ -1,18 +1,9 @@
 {
   "cities": [
-    { "id": "delhi", "name": "Delhi NCR", "country": "India" },
     { "id": "bangalore", "name": "Bengaluru", "country": "India" },
     { "id": "mumbai", "name": "Mumbai", "country": "India" }
   ],
   "zonesByCity": {
-    "delhi": [
-      { "id": "south-delhi", "name": "South Delhi", "lat": 28.5244, "lng": 77.1855, "radiusKm": 8 },
-      { "id": "gurgaon", "name": "Gurgaon", "lat": 28.4595, "lng": 77.0266, "radiusKm": 12 },
-      { "id": "noida", "name": "Noida", "lat": 28.5921, "lng": 77.3707, "radiusKm": 10 },
-      { "id": "east-delhi", "name": "East Delhi", "lat": 28.6328, "lng": 77.3045, "radiusKm": 10 },
-      { "id": "west-delhi", "name": "West Delhi", "lat": 28.6692, "lng": 77.0411, "radiusKm": 10 },
-      { "id": "north-delhi", "name": "North Delhi", "lat": 28.7547, "lng": 77.2301, "radiusKm": 10 }
-    ],
     "bangalore": [
       { "id": "koramangala", "name": "Koramangala", "lat": 12.9352, "lng": 77.6245, "radiusKm": 6 },
       { "id": "indiranagar", "name": "Indiranagar", "lat": 13.0347, "lng": 77.6410, "radiusKm": 6 },
