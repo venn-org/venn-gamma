@@ -26,7 +26,7 @@ import {
   recordProfileView,
 } from "../../lib/dailyLimits";
 import { mapDbPrefsToUI, mapUIPrefsToDb, toDb, toUI } from "../../lib/enums";
-import { PREF_ROWS, getPrefDisplay, isPrefSet, matchesPrefs } from "../../lib/prefs";
+import { PREF_ROWS, calculateOverlapScore, getPrefDisplay, isPrefSet, matchesPrefs } from "../../lib/prefs";
 import { calculateProfileCompletion, isFeedReady } from "../../lib/profileUtils";
 import { supabase } from "../../lib/supabase";
 import { useTheme, useThemedStyles } from "../../lib/ThemeContext";
@@ -217,6 +217,7 @@ export default function FeedScreen() {
   };
 
   const currentProfile = profiles[currentIndex];
+  const overlapScore = currentProfile ? calculateOverlapScore(userPrefs, currentProfile) : null;
 
   // TEMP: with the view limit off, wrap back to the start instead of
   // dead-ending once the list runs out, so profiles cycle like before.
@@ -486,7 +487,7 @@ export default function FeedScreen() {
                       )}
                       <View
                         style={[
-                          s.overlapPill,
+                          s.rolePill,
                           {
                             backgroundColor:
                               currentProfile.user_type === "owner"
@@ -496,12 +497,18 @@ export default function FeedScreen() {
                           },
                         ]}
                       >
-                        <Text style={s.overlapText}>
+                        <Text style={s.rolePillText}>
                           {currentProfile.user_type === "owner"
                             ? "Has a flat"
                             : "Looking for flat"}
                         </Text>
                       </View>
+                      {overlapScore != null && (
+                        <View style={s.overlapPill}>
+                          <Ionicons name="git-compare-outline" size={11} color={colors.violet} />
+                          <Text style={s.overlapText}>{overlapScore}% overlap</Text>
+                        </View>
+                      )}
                     </View>
                     <View style={s.statusRow}>
                       <Text style={s.pronouns}>
@@ -538,11 +545,15 @@ export default function FeedScreen() {
                     </View>
                   )}
                   <TouchableOpacity
-                    style={s.heartBtn}
+                    style={[s.heartBtn, remainingLikes <= 0 && s.heartBtnDisabled]}
                     activeOpacity={0.9}
                     onPress={handleLike}
                   >
-                    <Ionicons name="heart" size={24} color={colors.violet} />
+                    <Ionicons
+                      name="heart"
+                      size={24}
+                      color={remainingLikes > 0 ? colors.violet : colors.placeholder}
+                    />
                   </TouchableOpacity>
                 </View>
 
@@ -645,7 +656,11 @@ export default function FeedScreen() {
                     activeOpacity={0.9}
                     onPress={handleLike}
                   >
-                    <Ionicons name="heart" size={20} color={colors.violet} />
+                    <Ionicons
+                      name="heart"
+                      size={20}
+                      color={remainingLikes > 0 ? colors.violet : colors.placeholder}
+                    />
                   </TouchableOpacity>
                 </View>
               </ScrollView>
@@ -910,6 +925,7 @@ const makeStyles = (colors) => StyleSheet.create({
     alignItems: "flex-start",
     justifyContent: "space-between",
     paddingHorizontal: 4,
+    paddingTop: 14,
     paddingBottom: 12,
   },
   nameRow: {
@@ -932,11 +948,29 @@ const makeStyles = (colors) => StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  overlapPill: { borderRadius: 50, paddingHorizontal: 8, paddingVertical: 3 },
-  overlapText: {
+  rolePill: { borderRadius: 50, paddingHorizontal: 8, paddingVertical: 3 },
+  rolePillText: {
     fontFamily: "SpaceGrotesk_700Bold",
     fontSize: 12,
     color: "#fff",
+    letterSpacing: -0.2,
+  },
+  // The actual Venn-overlap indicator — how much this candidate matches my
+  // stated preferences (see lib/prefs.js#calculateOverlapScore).
+  overlapPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    borderRadius: 50,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    marginLeft: 6,
+    backgroundColor: colors.tintViolet,
+  },
+  overlapText: {
+    fontFamily: "SpaceGrotesk_700Bold",
+    fontSize: 12,
+    color: colors.violet,
     letterSpacing: -0.2,
   },
   statusRow: { flexDirection: "row", alignItems: "center", marginTop: 3 },
@@ -997,6 +1031,7 @@ const makeStyles = (colors) => StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     elevation: 4,
   },
+  heartBtnDisabled: { backgroundColor: colors.mist, shadowOpacity: 0 },
 
   infoCard: {
     backgroundColor: colors.card,
