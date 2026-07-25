@@ -99,14 +99,18 @@ export default function ProfileViewSheet({ visible, profile, onClose, onPass, on
               </View>
             </View>
 
-            {/* Flat Photo */}
-            {profile.photos?.[1] && (
-              <View style={s.flatPhotoWrap}>
-                <Image source={{ uri: profile.photos[1] }} style={s.flatPhoto} resizeMode="cover" />
-                <View style={s.flatLabel}>
-                  <Text style={s.flatLabelText}>Living Room</Text>
-                </View>
-              </View>
+            {/* Flat Photos (owners only, labeled by room) */}
+            {profile.user_type === 'owner' && Array.isArray(profile.flat_photos) && profile.flat_photos.length > 0 && (
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.flatPhotoScroll} contentContainerStyle={{ paddingHorizontal: 16, gap: 10 }}>
+                {profile.flat_photos.filter(Boolean).map((fp, i) => (
+                  <View key={i} style={s.flatPhotoWrap}>
+                    <Image source={{ uri: fp.url }} style={s.flatPhoto} resizeMode="cover" />
+                    <View style={s.flatLabel}>
+                      <Text style={s.flatLabelText}>{fp.label}</Text>
+                    </View>
+                  </View>
+                ))}
+              </ScrollView>
             )}
 
             {/* Prompts */}
@@ -171,7 +175,8 @@ const makeStyles = (colors) => StyleSheet.create({
   promptAccent: { position: 'relative', borderRadius: 20, padding: 24, paddingBottom: 30, marginBottom: 10, marginHorizontal: 16 },
   promptAccentQ: { fontFamily: 'HankenGrotesk_600SemiBold', fontSize: 14, color: colors.violet, marginBottom: 10 },
 
-  flatPhotoWrap: { position: 'relative', borderRadius: 20, overflow: 'hidden', marginBottom: 10, height: 280, marginHorizontal: 16 },
+  flatPhotoScroll: { marginBottom: 10 },
+  flatPhotoWrap: { position: 'relative', borderRadius: 20, overflow: 'hidden', width: 240, height: 200 },
   flatPhoto: { width: '100%', height: '100%' },
   flatLabel: { position: 'absolute', bottom: 14, left: 14, backgroundColor: 'rgba(0,0,0,0.42)', borderRadius: 50, paddingHorizontal: 12, paddingVertical: 6 },
   flatLabelText: { fontFamily: 'HankenGrotesk_600SemiBold', fontSize: 12, color: '#fff' },

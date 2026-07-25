@@ -20,13 +20,19 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Svg, { Circle } from "react-native-svg";
+import FlatDetailsModal from "../../components/FlatDetailsModal";
 import PreferencesSheet from "../../components/PreferencesSheet";
 import { getCurrentUserId, signOutUser } from "../../lib/auth";
-import { mapDbPrefsToUI, mapUIPrefsToDb } from "../../lib/enums";
+import { mapDbPrefsToUI, mapUIPrefsToDb, toDb, toUI } from "../../lib/enums";
+import { fetchFlatDetails, upsertFlatDetails } from "../../lib/flatDetails";
 import {
+    FLAT_ROOM_LABELS,
     makeProfilePhoto,
+    MAX_FLAT_PHOTOS,
     MAX_PHOTOS,
+    removeFlatPhotoAt,
     removePhotoAt,
+    setFlatPhotoAt,
     setPhotoAt,
     uploadPhoto,
 } from "../../lib/photos";
@@ -103,14 +109,22 @@ export default function ProfileScreen() {
   const router = useRouter();
 
   const [profile, setProfile] = useState(null);
+  const [flatDetails, setFlatDetails] = useState(null);
   const [incognito, setIncognito] = useState(false);
   const [prefsVisible, setPrefsVisible] = useState(false);
   const [userPrefs, setUserPrefs] = useState(null);
+  const [flatDetailsModalVisible, setFlatDetailsModalVisible] = useState(false);
 
-  // Photo editing
+  // Profile photo editing
   const [uploadingIndex, setUploadingIndex] = useState(null);
   const [pendingPhoto, setPendingPhoto] = useState(null); // { index, uri, isReplace }
   const [photoMenuIndex, setPhotoMenuIndex] = useState(null); // index whose Change/Remove menu is open
+
+  // Flat photo editing (owners only, backed by flat_details table)
+  const [flatUploadingIndex, setFlatUploadingIndex] = useState(null);
+  const [pendingFlatPhoto, setPendingFlatPhoto] = useState(null); // { index, uri, isReplace }
+  const [flatPhotoMenuIndex, setFlatPhotoMenuIndex] = useState(null);
+
   const [themeMenuOpen, setThemeMenuOpen] = useState(false);
 
   const activeThemeMode =
@@ -136,10 +150,21 @@ export default function ProfileScreen() {
       setProfile(data);
       setIncognito(!!data.paused);
       setUserPrefs(mapDbPrefsToUI(data));
+
+      if (data.user_type === "owner") {
+        try {
+          setFlatDetails(await fetchFlatDetails(uid));
+        } catch (e) {
+          console.error("fetchFlatDetails error:", e);
+        }
+      } else {
+        setFlatDetails(null);
+      }
     }
   };
 
   const photos = profile?.photos || [];
+  const flatPhotos = flatDetails?.photos || [];
 
   const pickPhoto = async (index) => {
     const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -177,11 +202,7 @@ export default function ProfileScreen() {
     setUploadingIndex(index);
 
     try {
-      const url = await uploadPhoto(
-        uid,
-        uri,
-        index === 0 ? "profile" : `flat-${index}`,
-      );
+      const url = await uploadPhoto(uid, uri, "profile");
       const nextPhotos = setPhotoAt(photos, index, url);
       const { error } = await supabase
         .from("profiles")
@@ -248,6 +269,86 @@ export default function ProfileScreen() {
     }
   };
 
+  const pickFlatPhoto = async (index) => {
+    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!perm.granted) {
+      Alert.alert(
+        "Permission needed",
+        "Allow photo access to update your flat's pictures.",
+      );
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [4, 3],
+      quality: 0.8,
+    });
+    if (result.canceled || !result.assets?.length) return;
+
+    setPendingFlatPhoto({
+      index,
+      uri: result.assets[0].uri,
+      isReplace: !!flatPhotos[index]?.url,
+    });
+  };
+
+  const confirmFlatPhoto = async () => {
+    if (!pendingFlatPhoto) return;
+    const { index, uri } = pendingFlatPhoto;
+    setPendingFlatPhoto(null);
+
+    const uid = getCurrentUserId();
+    if (!uid) return;
+    setFlatUploadingIndex(index);
+
+    try {
+      const url = await uploadPhoto(uid, uri, `flat-${FLAT_ROOM_LABELS[index]}`);
+      const nextPhotos = setFlatPhotoAt(flatPhotos, index, url);
+      const saved = await upsertFlatDetails(uid, { photos: nextPhotos });
+      setFlatDetails(saved);
+    } catch (e) {
+      console.error("Flat photo upload failed:", e);
+      Alert.alert("Error", "Failed to update photo. Please try again.");
+    } finally {
+      setFlatUploadingIndex(null);
+    }
+  };
+
+  const handleRemoveFlatPhoto = async (index) => {
+    const doRemove = async () => {
+      const uid = getCurrentUserId();
+      if (!uid) return;
+      const nextPhotos = removeFlatPhotoAt(flatPhotos, index);
+      try {
+        const saved = await upsertFlatDetails(uid, { photos: nextPhotos });
+        setFlatDetails(saved);
+      } catch (e) {
+        Alert.alert("Error", "Failed to remove photo.");
+      }
+    };
+
+    if (Platform.OS === "web") {
+      if (window.confirm("Remove this photo from your flat?")) {
+        await doRemove();
+      }
+    } else {
+      Alert.alert("Remove photo", "Remove this photo from your flat?", [
+        { text: "Cancel", style: "cancel" },
+        { text: "Remove", style: "destructive", onPress: doRemove },
+      ]);
+    }
+  };
+
+  const handleFlatPhotoSlotPress = (index) => {
+    if (flatPhotos[index]?.url) {
+      setFlatPhotoMenuIndex(index);
+    } else {
+      pickFlatPhoto(index);
+    }
+  };
+
   const toggleIncognito = async (val) => {
     setIncognito(val);
     const uid = getCurrentUserId();
@@ -261,6 +362,21 @@ export default function ProfileScreen() {
     setUserPrefs(newPrefs);
     const updates = mapUIPrefsToDb(newPrefs);
     await supabase.from("profiles").update(updates).eq("id", uid);
+  };
+
+  const handleSaveFlatDetails = async ({ flatType, description }) => {
+    const uid = getCurrentUserId();
+    if (!uid) return;
+
+    const { error } = await supabase
+      .from("profiles")
+      .update({ flat_type: toDb("flat_type", flatType) || null })
+      .eq("id", uid);
+    if (error) throw error;
+    setProfile((p) => ({ ...p, flat_type: toDb("flat_type", flatType) || null }));
+
+    const saved = await upsertFlatDetails(uid, { description: description || null });
+    setFlatDetails(saved);
   };
 
   const handleSignOut = async () => {
@@ -307,6 +423,76 @@ export default function ProfileScreen() {
   const name = profile?.name || "User";
   const photo = profile?.photos?.[0] || null;
   const initials = name.charAt(0).toUpperCase();
+  const isOwner = profile?.user_type === "owner";
+
+  const renderPhotoSlot = (i) => (
+    <Pressable
+      key={i}
+      style={({ pressed }) => [s.photoSlot, pressed && { opacity: 0.8 }]}
+      onPress={() => handlePhotoSlotPress(i)}
+    >
+      {photos[i] ? (
+        <>
+          <Image
+            source={{ uri: photos[i] }}
+            style={s.photoSlotImg}
+            resizeMode="cover"
+          />
+          {i === 0 && (
+            <View style={s.photoBadge}>
+              <Ionicons name="person-circle" size={11} color="#fff" />
+              <Text style={s.photoBadgeText}>Profile</Text>
+            </View>
+          )}
+          <View style={s.photoEditBadge}>
+            <Ionicons name="pencil" size={12} color="#fff" />
+          </View>
+        </>
+      ) : uploadingIndex === i ? (
+        <ActivityIndicator size="small" color={colors.blue} />
+      ) : (
+        <Ionicons name="add" size={24} color="#C0C5D0" />
+      )}
+      {uploadingIndex === i && photos[i] && (
+        <View style={s.photoSlotUploading}>
+          <ActivityIndicator size="small" color="#fff" />
+        </View>
+      )}
+    </Pressable>
+  );
+
+  const renderFlatPhotoSlot = (i) => {
+    const label = FLAT_ROOM_LABELS[i];
+    const url = flatPhotos[i]?.url;
+    return (
+      <Pressable
+        key={i}
+        style={({ pressed }) => [s.photoSlot, pressed && { opacity: 0.8 }]}
+        onPress={() => handleFlatPhotoSlotPress(i)}
+      >
+        {url ? (
+          <>
+            <Image source={{ uri: url }} style={s.photoSlotImg} resizeMode="cover" />
+            <View style={s.photoEditBadge}>
+              <Ionicons name="pencil" size={12} color="#fff" />
+            </View>
+          </>
+        ) : flatUploadingIndex === i ? (
+          <ActivityIndicator size="small" color={colors.blue} />
+        ) : (
+          <Ionicons name="add" size={24} color="#C0C5D0" />
+        )}
+        {flatUploadingIndex === i && url && (
+          <View style={s.photoSlotUploading}>
+            <ActivityIndicator size="small" color="#fff" />
+          </View>
+        )}
+        <View style={s.photoLabelBadge}>
+          <Text style={s.photoLabelBadgeText} numberOfLines={1}>{label}</Text>
+        </View>
+      </Pressable>
+    );
+  };
 
   const { percentage } = calculateProfileCompletion(profile);
   const size = 84;
@@ -425,18 +611,13 @@ export default function ProfileScreen() {
             </TouchableOpacity>
           </View>
           <View style={{ flex: 1, marginLeft: 6 }}>
-            <Text style={s.profileName}>{name}</Text>
-            <View
-              style={{ flexDirection: "row", alignItems: "center", gap: 8 }}
-            >
-              <Text style={s.profileRole}>
-                {profile?.user_type === "owner"
-                  ? "Has a flat"
-                  : "Looking for flat"}
-              </Text>
-              <View style={s.dot} />
-              <Text style={s.completionText}>{percentage}% Complete</Text>
-            </View>
+            <Text style={s.profileName} numberOfLines={1}>{name}</Text>
+            <Text style={s.profileRole} numberOfLines={1}>
+              {profile?.user_type === "owner"
+                ? "Has a flat"
+                : "Looking for flat"}
+            </Text>
+            <Text style={s.completionText}>{percentage}% Complete</Text>
           </View>
         </View>
 
@@ -483,46 +664,81 @@ export default function ProfileScreen() {
             </Text>
           </View>
           <View style={s.photoGrid}>
-            {Array.from({ length: MAX_PHOTOS }).map((_, i) => (
-              <Pressable
-                key={i}
-                style={({ pressed }) => [
-                  s.photoSlot,
-                  pressed && { opacity: 0.8 },
-                ]}
-                onPress={() => handlePhotoSlotPress(i)}
-              >
-                {photos[i] ? (
-                  <>
-                    <Image
-                      source={{ uri: photos[i] }}
-                      style={s.photoSlotImg}
-                      resizeMode="cover"
-                    />
-                    {i === 0 && (
-                      <View style={s.photoBadge}>
-                        <Ionicons name="person-circle" size={11} color="#fff" />
-                        <Text style={s.photoBadgeText}>Profile</Text>
-                      </View>
-                    )}
-                    <View style={s.photoEditBadge}>
-                      <Ionicons name="pencil" size={12} color="#fff" />
-                    </View>
-                  </>
-                ) : uploadingIndex === i ? (
-                  <ActivityIndicator size="small" color={colors.blue} />
-                ) : (
-                  <Ionicons name="add" size={24} color="#C0C5D0" />
-                )}
-                {uploadingIndex === i && photos[i] && (
-                  <View style={s.photoSlotUploading}>
-                    <ActivityIndicator size="small" color="#fff" />
-                  </View>
-                )}
-              </Pressable>
-            ))}
+            {Array.from({ length: MAX_PHOTOS }).map((_, i) => renderPhotoSlot(i))}
           </View>
         </View>
+
+        {/* Flat Details (owners only) */}
+        {isOwner && (
+          <View style={s.section}>
+            <View style={s.photoHeader}>
+              <Text style={s.photoHeaderLabel}>FLAT DETAILS</Text>
+            </View>
+            <View style={s.flatCard}>
+              <View style={s.flatCardHeader}>
+                <View style={s.flatCardHeaderLeft}>
+                  <View style={[s.flatIconBadge, { backgroundColor: colors.tintBlue }]}>
+                    <Ionicons name="home" size={18} color={colors.blue} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={s.flatTypeText} numberOfLines={1}>
+                      {toUI("flat_type", profile?.flat_type) || "Flat type not set"}
+                    </Text>
+                    {profile?.location ? (
+                      <Text style={s.flatLocationText} numberOfLines={1}>{profile.location}</Text>
+                    ) : null}
+                  </View>
+                </View>
+                <TouchableOpacity
+                  style={s.flatEditBtn}
+                  onPress={() => setFlatDetailsModalVisible(true)}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons name="pencil" size={14} color={colors.blue} />
+                </TouchableOpacity>
+              </View>
+
+              {((profile?.budget_min || profile?.budget_max) || profile?.move_in_date) && (
+                <View style={s.flatStatsRow}>
+                  {(profile?.budget_min || profile?.budget_max) ? (
+                    <View style={s.flatStat}>
+                      <Ionicons name="cash-outline" size={14} color={colors.placeholder} />
+                      <Text style={s.flatStatText}>
+                        ₹{profile.budget_min ?? 0}–₹{profile.budget_max ?? 0}/mo
+                      </Text>
+                    </View>
+                  ) : null}
+                  {(profile?.budget_min || profile?.budget_max) && profile?.move_in_date ? (
+                    <View style={s.flatStatDivider} />
+                  ) : null}
+                  {profile?.move_in_date ? (
+                    <View style={s.flatStat}>
+                      <Ionicons name="calendar-outline" size={14} color={colors.placeholder} />
+                      <Text style={s.flatStatText}>
+                        Move-in {String(profile.move_in_date).split("T")[0]}
+                      </Text>
+                    </View>
+                  ) : null}
+                </View>
+              )}
+
+              {flatDetails?.description ? (
+                <Text style={s.flatDescriptionText}>{flatDetails.description}</Text>
+              ) : null}
+            </View>
+
+            <View style={s.photoHeader}>
+              <Text style={s.photoHint}>
+                Add photos of your flat — kitchen, living room, and more.
+              </Text>
+            </View>
+            <View style={s.photoGrid}>
+              {Array.from({ length: MAX_FLAT_PHOTOS }).map((_, i) =>
+                renderFlatPhotoSlot(i),
+              )}
+            </View>
+          </View>
+        )}
 
         {/* Settings Sections */}
         <View style={s.section}>
@@ -730,6 +946,103 @@ export default function ProfileScreen() {
         </Pressable>
       </Modal>
 
+      {/* Confirm before a flat photo actually changes */}
+      <Modal
+        visible={!!pendingFlatPhoto}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setPendingFlatPhoto(null)}
+      >
+        <Pressable
+          style={s.confirmBackdrop}
+          onPress={() => setPendingFlatPhoto(null)}
+        >
+          <Pressable style={s.confirmBox} onPress={() => {}}>
+            <Text style={s.confirmTitle}>
+              {pendingFlatPhoto?.isReplace ? "Replace this photo?" : "Add this photo?"}
+            </Text>
+            <Text style={s.confirmSub}>
+              {pendingFlatPhoto
+                ? `This will be shown as your flat's ${FLAT_ROOM_LABELS[pendingFlatPhoto.index]} photo.`
+                : ""}
+            </Text>
+            {pendingFlatPhoto && (
+              <Image
+                source={{ uri: pendingFlatPhoto.uri }}
+                style={s.confirmPreview}
+                resizeMode="cover"
+              />
+            )}
+            <View style={s.confirmActions}>
+              <TouchableOpacity
+                style={[s.confirmBtn, s.confirmCancel]}
+                onPress={() => setPendingFlatPhoto(null)}
+              >
+                <Text style={s.confirmCancelText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[s.confirmBtn, s.confirmOk]}
+                onPress={confirmFlatPhoto}
+              >
+                <Text style={s.confirmOkText}>Confirm</Text>
+              </TouchableOpacity>
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      {/* Change / remove menu for an existing flat photo */}
+      <Modal
+        visible={flatPhotoMenuIndex !== null}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setFlatPhotoMenuIndex(null)}
+      >
+        <Pressable
+          style={s.confirmBackdrop}
+          onPress={() => setFlatPhotoMenuIndex(null)}
+        >
+          <Pressable style={s.menuSheet} onPress={() => {}}>
+            <TouchableOpacity
+              style={s.menuOption}
+              onPress={() => {
+                const i = flatPhotoMenuIndex;
+                setFlatPhotoMenuIndex(null);
+                pickFlatPhoto(i);
+              }}
+            >
+              <Ionicons name="image-outline" size={18} color={colors.ink} />
+              <Text style={s.menuOptionText}>Change photo</Text>
+            </TouchableOpacity>
+            <View style={s.menuDivider} />
+            <TouchableOpacity
+              style={s.menuOption}
+              onPress={() => {
+                const i = flatPhotoMenuIndex;
+                setFlatPhotoMenuIndex(null);
+                handleRemoveFlatPhoto(i);
+              }}
+            >
+              <Ionicons name="trash-outline" size={18} color="#FF4D6A" />
+              <Text style={[s.menuOptionText, { color: "#FF4D6A" }]}>
+                Remove photo
+              </Text>
+            </TouchableOpacity>
+            <View style={s.menuDivider} />
+            <TouchableOpacity
+              style={s.menuOption}
+              onPress={() => setFlatPhotoMenuIndex(null)}
+            >
+              <Text
+                style={[s.menuOptionText, { flex: 1, textAlign: "center" }]}
+              >
+                Cancel
+              </Text>
+            </TouchableOpacity>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
       {/* Theme picker */}
       <Modal
         visible={themeMenuOpen}
@@ -804,6 +1117,14 @@ export default function ProfileScreen() {
         onClose={() => setPrefsVisible(false)}
         onSave={handleSavePrefs}
       />
+
+      <FlatDetailsModal
+        visible={flatDetailsModalVisible}
+        flatType={toUI("flat_type", profile?.flat_type)}
+        description={flatDetails?.description}
+        onClose={() => setFlatDetailsModalVisible(false)}
+        onSave={handleSaveFlatDetails}
+      />
     </View>
   );
 }
@@ -834,6 +1155,7 @@ const makeStyles = (colors) =>
       alignItems: "center",
       gap: 16,
       paddingHorizontal: 20,
+      marginTop: 20,
       marginBottom: 20,
     },
     profileName: {
@@ -849,17 +1171,13 @@ const makeStyles = (colors) =>
       color: colors.placeholder,
       textTransform: "uppercase",
       letterSpacing: 0.8,
+      marginTop: 4,
     },
     completionText: {
       fontFamily: "HankenGrotesk_600SemiBold",
       fontSize: 13,
       color: colors.blue,
-    },
-    dot: {
-      width: 4,
-      height: 4,
-      borderRadius: 2,
-      backgroundColor: colors.border,
+      marginTop: 4,
     },
 
     actionBtn: {
@@ -960,6 +1278,86 @@ const makeStyles = (colors) =>
       backgroundColor: "rgba(0,0,0,0.5)",
       alignItems: "center",
       justifyContent: "center",
+    },
+    photoLabelBadge: {
+      position: "absolute",
+      bottom: 6,
+      right: 6,
+      left: 6,
+      backgroundColor: "rgba(0,0,0,0.55)",
+      borderRadius: 8,
+      paddingHorizontal: 6,
+      paddingVertical: 2,
+    },
+    photoLabelBadgeText: {
+      fontFamily: "HankenGrotesk_600SemiBold",
+      fontSize: 10,
+      color: "#fff",
+      textAlign: "center",
+    },
+
+    flatCard: {
+      backgroundColor: colors.card,
+      borderRadius: 20,
+      borderWidth: 1,
+      borderColor: colors.border,
+      padding: 16,
+      gap: 14,
+      marginBottom: 16,
+      shadowColor: "#000",
+      shadowOpacity: 0.05,
+      shadowRadius: 8,
+      shadowOffset: { width: 0, height: 2 },
+      elevation: 1,
+    },
+    flatCardHeader: { flexDirection: "row", alignItems: "center", gap: 10 },
+    flatCardHeaderLeft: { flex: 1, flexDirection: "row", alignItems: "center", gap: 12 },
+    flatIconBadge: {
+      width: 40,
+      height: 40,
+      borderRadius: 14,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    flatTypeText: {
+      fontFamily: "SpaceGrotesk_700Bold",
+      fontSize: 16,
+      color: colors.ink,
+    },
+    flatLocationText: {
+      fontFamily: "HankenGrotesk_400Regular",
+      fontSize: 13,
+      color: colors.placeholder,
+      marginTop: 2,
+    },
+    flatEditBtn: {
+      width: 32,
+      height: 32,
+      borderRadius: 16,
+      backgroundColor: colors.canvas,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    flatStatsRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      backgroundColor: colors.canvas,
+      borderRadius: 12,
+      paddingVertical: 10,
+      paddingHorizontal: 12,
+    },
+    flatStat: { flex: 1, flexDirection: "row", alignItems: "center", gap: 6 },
+    flatStatText: {
+      fontFamily: "HankenGrotesk_600SemiBold",
+      fontSize: 12,
+      color: colors.slate,
+    },
+    flatStatDivider: { width: 1, height: 16, backgroundColor: colors.border, marginHorizontal: 8 },
+    flatDescriptionText: {
+      fontFamily: "HankenGrotesk_400Regular",
+      fontSize: 13,
+      color: colors.slate,
+      lineHeight: 19,
     },
 
     menuSheet: {

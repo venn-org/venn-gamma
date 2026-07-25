@@ -356,7 +356,7 @@ export default function EditProfileScreen() {
         // Alert.alert('Debug Data', `gender: ${data.gender}, drink: ${data.drink}, tobacco: ${data.tobacco}, weed: ${data.weed}`);
         
         setName(data.name || '');
-        
+
         let initialBirthday = '';
         if (typeof data.birthday === 'string') {
           initialBirthday = data.birthday.split('T')[0];
@@ -474,7 +474,7 @@ export default function EditProfileScreen() {
       
       const { error } = await supabase.from('profiles').update(updatePayload).eq('id', uid);
       if (error) throw error;
-      
+
       (router.canGoBack() ? router.back() : router.replace('/(tabs)/profile'));
     } catch (e) {
       console.error('Error saving profile:', e);
@@ -713,7 +713,7 @@ const makeStyles = (colors) => StyleSheet.create({
   promptSheetActions: { flexDirection: 'row', gap: 10, marginTop: 16 },
   promptClearBtn: { borderRadius: 50, paddingVertical: 15, paddingHorizontal: 22, backgroundColor: colors.canvas },
   promptClearText: { fontFamily: 'HankenGrotesk_600SemiBold', fontSize: 15, color: '#FF4D6A' },
-  promptDoneBtn: { flex: 1, borderRadius: 50, paddingVertical: 15, alignItems: 'center', backgroundColor: colors.ink },
+  promptDoneBtn: { flex: 1, borderRadius: 50, paddingVertical: 15, alignItems: 'center', backgroundColor: colors.blue },
   promptDoneText: { fontFamily: 'HankenGrotesk_700Bold', fontSize: 15, color: '#fff' },
   
   label: { fontFamily: 'HankenGrotesk_600SemiBold', fontSize: 13, color: colors.slate, marginBottom: 8, marginTop: 12 },
@@ -739,7 +739,7 @@ const makeStyles = (colors) => StyleSheet.create({
 
   categoryRow: { flexDirection: 'row', gap: 8, marginTop: 4, marginBottom: 10 },
   categoryChip: { paddingHorizontal: 12, paddingVertical: 7, borderRadius: 50, backgroundColor: colors.canvas },
-  categoryChipActive: { backgroundColor: colors.ink },
+  categoryChipActive: { backgroundColor: colors.blue },
   categoryChipText: { fontFamily: 'HankenGrotesk_600SemiBold', fontSize: 12, color: colors.slate },
   categoryChipTextActive: { color: '#fff' },
 

@@ -207,6 +207,6 @@ const makeStyles = (colors) => StyleSheet.create({
   confirmOkText: { fontFamily: 'HankenGrotesk_600SemiBold', fontSize: 14, color: '#fff' },
 
   saveFooter: { paddingHorizontal: 20, paddingTop: 16, borderTopWidth: 1, borderTopColor: colors.border },
-  saveBtn: { backgroundColor: colors.ink, borderRadius: 50, paddingVertical: 16, alignItems: 'center' },
+  saveBtn: { backgroundColor: colors.blue, borderRadius: 50, paddingVertical: 16, alignItems: 'center' },
   saveBtnText: { fontFamily: 'HankenGrotesk_700Bold', fontSize: 16, color: '#fff' },
 });

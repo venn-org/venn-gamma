@@ -333,7 +333,7 @@ const makeStyles = (colors) => StyleSheet.create({
   headerInfo: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   headerAvatar: { width: 36, height: 36, borderRadius: 18 },
   headerName: { fontFamily: 'SpaceGrotesk_700Bold', fontSize: 17, color: colors.headerText },
-  headerStatus: { fontFamily: 'HankenGrotesk_400Regular', fontSize: 12, color: 'rgba(255,255,255,0.7)', marginTop: 1 },
+  headerStatus: { fontFamily: 'HankenGrotesk_400Regular', fontSize: 12, color: colors.slate, marginTop: 1 },
   headerStatusOnline: { color: colors.success },
   
   loading: { flex: 1, alignItems: 'center', justifyContent: 'center' },
