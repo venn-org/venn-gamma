@@ -1,5 +1,5 @@
 import { LinearGradient } from "expo-linear-gradient";
-import { useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useRef, useState } from "react";
 import {
     Animated,
@@ -11,16 +11,16 @@ import {
     View
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { sendEmailLink } from "../../lib/auth";
+import { isValidEmail, sendEmailOtp } from "../../lib/auth";
 import { colors } from "../../lib/theme";
 
 export default function EmailScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { mode } = useLocalSearchParams(); // 'signup' or 'signin'
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [sent, setSent] = useState(false);
 
   const slideY = useRef(new Animated.Value(50)).current;
   const opacity = useRef(new Animated.Value(0)).current;
@@ -39,82 +39,34 @@ export default function EmailScreen() {
         useNativeDriver: true,
       }),
     ]).start();
-  }, [sent]);
+  }, []);
 
-  const valid = email.includes("@") && email.includes(".");
+  const valid = isValidEmail(email);
 
   const handleSend = async () => {
     if (!valid) return;
     setLoading(true);
     setError("");
+    const address = email.trim().toLowerCase();
     try {
-      await sendEmailLink(email);
-      setSent(true);
-      slideY.setValue(50);
-      opacity.setValue(0);
+      await sendEmailOtp(address, mode);
+      router.push(`/(auth)/email-otp?email=${encodeURIComponent(address)}&mode=${mode ?? 'signup'}`);
     } catch (e) {
-      console.error('sendEmailLink failed:', e);
-      setError('Failed to send the sign-in link. Please try again.');
+      console.error('sendEmailOtp failed:', e);
+      // "Sign in" uses shouldCreateUser:false, so an unknown address is a real
+      // outcome to explain rather than a generic failure.
+      if (e.code === 'otp_disabled' || e.code === 'signup_disabled') {
+        setError("We couldn't find an account for that email. Try creating one instead.");
+      } else if (e.status === 429 || e.code === 'over_email_send_rate_limit') {
+        setError('Too many requests. Please wait a minute and try again.');
+      } else {
+        setError(e.message || 'Failed to send the code. Please try again.');
+      }
     } finally {
       setLoading(false);
     }
   };
 
-  if (sent) {
-    return (
-      <View style={[styles.container, { paddingTop: insets.top }]}>
-        <TouchableOpacity
-          style={styles.back}
-          onPress={() =>
-            router.canGoBack() ? router.back() : router.replace("/login")
-          }
-        >
-          <Text style={styles.backArrow}>‹</Text>
-        </TouchableOpacity>
-
-        <View style={styles.sentBody}>
-          <View style={styles.logoRow}>
-            <View style={styles.logoWrap}>
-              <View
-                style={[
-                  styles.circle,
-                  { backgroundColor: colors.blue, left: 0 },
-                ]}
-              />
-              <View
-                style={[
-                  styles.circle,
-                  { backgroundColor: colors.violet, right: 0, opacity: 0.9 },
-                ]}
-              />
-            </View>
-          </View>
-          <Text style={styles.title}>Check your email</Text>
-          <Text style={styles.sentSubtitle}>
-            We sent a sign-in link to{"\n"}
-            <Text style={{ fontWeight: "700", color: colors.ink }}>
-              {email}
-            </Text>
-          </Text>
-          <Text style={styles.sentHint}>
-            Click the link in the email to sign in. You can close this screen —
-            the link will bring you back. Please check spam if you cant find it.
-          </Text>
-
-          <TouchableOpacity
-            style={[styles.resendBtn, loading && styles.btnDisabled]}
-            onPress={handleSend}
-            disabled={loading}
-            activeOpacity={0.85}
-          >
-            <Text style={styles.resendBtnText}>
-              {loading ? "Sending…" : "Resend link"}
-            </Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-    );
-  }
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
@@ -145,7 +97,7 @@ export default function EmailScreen() {
         </View>
         <Text style={styles.title}>What's your email?</Text>
         <Text style={styles.subtitle}>
-          We'll send you a magic link to sign in — no password needed.
+          We'll send you a 6-digit code to sign in — no password needed.
         </Text>
 
         <TextInput
@@ -175,7 +127,7 @@ export default function EmailScreen() {
             style={styles.gradientBtn}
           >
             <Text style={styles.btnText}>
-              {loading ? "Sending…" : "Send sign-in link"}
+              {loading ? "Sending…" : "Send code"}
             </Text>
           </LinearGradient>
         </TouchableOpacity>
@@ -238,36 +190,4 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     textAlign: "center",
   },
-
-  // "Check your email" state
-  sentBody: {
-    flex: 1,
-    paddingHorizontal: 28,
-    paddingTop: 20,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  sentSubtitle: {
-    fontSize: 16,
-    color: colors.slate,
-    textAlign: "center",
-    lineHeight: 24,
-    marginBottom: 12,
-  },
-  sentHint: {
-    fontSize: 13,
-    color: colors.placeholder,
-    textAlign: "center",
-    lineHeight: 20,
-    marginBottom: 32,
-    paddingHorizontal: 12,
-  },
-  resendBtn: {
-    borderRadius: 50,
-    paddingVertical: 14,
-    paddingHorizontal: 36,
-    borderWidth: 1.5,
-    borderColor: colors.mist,
-  },
-  resendBtnText: { fontSize: 14, fontWeight: "600", color: colors.ink },
 });
