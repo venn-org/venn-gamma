@@ -356,7 +356,7 @@ export default function EditProfileScreen() {
         // Alert.alert('Debug Data', `gender: ${data.gender}, drink: ${data.drink}, tobacco: ${data.tobacco}, weed: ${data.weed}`);
         
         setName(data.name || '');
-        
+
         let initialBirthday = '';
         if (typeof data.birthday === 'string') {
           initialBirthday = data.birthday.split('T')[0];
@@ -474,7 +474,7 @@ export default function EditProfileScreen() {
       
       const { error } = await supabase.from('profiles').update(updatePayload).eq('id', uid);
       if (error) throw error;
-      
+
       (router.canGoBack() ? router.back() : router.replace('/(tabs)/profile'));
     } catch (e) {
       console.error('Error saving profile:', e);

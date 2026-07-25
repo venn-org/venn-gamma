@@ -48,11 +48,29 @@ export default function LikesScreen() {
     );
 
     if (data) {
-      setLikes(data.map(l => ({
-        likeId: l.id,
-        userId: l.from_user_id,
-        profile: l.profiles // The full profile row
-      })).filter(l => l.profile && !matchedUserIds.has(l.userId)));
+      const mapped = data
+        .map(l => ({
+          likeId: l.id,
+          userId: l.from_user_id,
+          profile: l.profiles // The full profile row
+        }))
+        .filter(l => l.profile && !matchedUserIds.has(l.userId));
+
+      // flat_details is a separate table (not embeddable through the
+      // `profiles` view), so fetch owners' flat photos in one extra query.
+      const ownerIds = mapped.filter(l => l.profile.user_type === 'owner').map(l => l.userId);
+      if (ownerIds.length > 0) {
+        const { data: flatRows } = await supabase
+          .from('flat_details')
+          .select('profile_id, photos')
+          .in('profile_id', ownerIds);
+        const photosByProfile = new Map((flatRows || []).map(r => [r.profile_id, r.photos]));
+        mapped.forEach(l => {
+          l.profile.flat_photos = photosByProfile.get(l.userId) || [];
+        });
+      }
+
+      setLikes(mapped);
     }
     setRefreshing(false);
   };

@@ -2,6 +2,8 @@ import { useState, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
 import { getCurrentUserId, notifyOnboardingComplete } from '../lib/auth';
 import { mapUIPrefsToDb, toDb, toUI } from '../lib/enums';
+import { upsertFlatDetails } from '../lib/flatDetails';
+import { FLAT_ROOM_LABELS } from '../lib/photos';
 import { getAge } from '../lib/age';
 
 // Shared state object instance outside the hook so it persists across screen unmounts/mounts
@@ -51,8 +53,7 @@ export function useOnboarding() {
 
     // Upload photos if any
     let profilePhotoUrl = null;
-    let flatPhotoUrls = [];
-    
+
     // Upload profile photo
     if (onboardingState.photos?.profile) {
       const uri = onboardingState.photos.profile;
@@ -75,27 +76,33 @@ export function useOnboarding() {
       }
     }
 
-    // Upload flat photos
+    // Upload flat photos — kept positionally aligned with FLAT_ROOM_LABELS so
+    // they line up with the labeled slots in the profile screen's Flat Details section.
+    const flatPhotos = [];
     if (onboardingState.photos?.flat) {
       for (let i = 0; i < onboardingState.photos.flat.length; i++) {
         const uri = onboardingState.photos.flat[i];
         if (!uri) continue;
+        let url = null;
         if (uri.startsWith('http')) {
-          flatPhotoUrls.push(uri);
+          url = uri;
         } else {
           try {
             const res = await fetch(uri);
             const blob = await res.blob();
             const ext = uri.split('.').pop() || 'jpg';
-            const filename = `${uid}/flat-${Date.now()}-${i}.${ext}`;
+            const filename = `${uid}/flat-${FLAT_ROOM_LABELS[i]}-${Date.now()}.${ext}`;
             const { error } = await supabase.storage.from('photos').upload(filename, blob, { upsert: true });
             if (!error) {
               const { data } = supabase.storage.from('photos').getPublicUrl(filename);
-              flatPhotoUrls.push(data.publicUrl);
+              url = data.publicUrl;
             }
           } catch (e) {
             console.error("Flat photo upload failed", e);
           }
+        }
+        if (url) {
+          flatPhotos[i] = { label: FLAT_ROOM_LABELS[i], url };
         }
       }
     }
@@ -131,7 +138,7 @@ export function useOnboarding() {
 
       ...dbPrefs,
 
-      photos: profilePhotoUrl ? [profilePhotoUrl, ...flatPhotoUrls] : (flatPhotoUrls.length > 0 ? flatPhotoUrls : null),
+      photos: profilePhotoUrl ? [profilePhotoUrl] : null,
       onboarding_done: true
     };
 
@@ -140,7 +147,11 @@ export function useOnboarding() {
     // runs — a plain update, not an upsert.
     const { error } = await supabase.from('profiles').update(updatePayload).eq('id', uid);
     if (error) throw error;
-    
+
+    if (onboardingState.type === 'owner' && flatPhotos.length > 0) {
+      await upsertFlatDetails(uid, { photos: flatPhotos });
+    }
+
     notifyOnboardingComplete();
     if (typeof window !== 'undefined') {
       window.localStorage.removeItem('venn_onboarding_state');
