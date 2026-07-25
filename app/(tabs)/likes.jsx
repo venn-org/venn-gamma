@@ -110,7 +110,7 @@ export default function LikesScreen() {
       <View style={[s.topBar, { paddingTop: insets.top + 12 }]}>
         <Text style={s.title}>Likes You</Text>
         <TouchableOpacity style={s.boostBtn} activeOpacity={0.85} onPress={() => setShowBoost(true)}>
-          <Ionicons name="flash" size={14} color={colors.blue} />
+          <Ionicons name="flash" size={14} color="#fff" />
           <Text style={s.boostText}>Boost</Text>
         </TouchableOpacity>
       </View>
@@ -194,9 +194,8 @@ const makeStyles = (colors) => StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.canvas },
   topBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingTop: 8, paddingBottom: 14, backgroundColor: colors.header },
   title: { fontFamily: 'SpaceGrotesk_700Bold', fontSize: 28, fontWeight: '800', color: colors.headerText, letterSpacing: -0.03 * 28 },
-  // White on the blue header — colors.blue would vanish into it.
-  boostBtn: { flexDirection: 'row', alignItems: 'center', gap: 7, backgroundColor: colors.card, borderRadius: 50, paddingHorizontal: 18, paddingVertical: 10 },
-  boostText: { fontFamily: 'HankenGrotesk_700Bold', fontSize: 13, color: colors.blue },
+  boostBtn: { flexDirection: 'row', alignItems: 'center', gap: 7, backgroundColor: colors.blue, borderRadius: 50, paddingHorizontal: 18, paddingVertical: 10 },
+  boostText: { fontFamily: 'HankenGrotesk_700Bold', fontSize: 13, color: '#fff' },
 
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 28, paddingBottom: 24 },
   emptyTitle: { fontFamily: 'SpaceGrotesk_700Bold', fontSize: 22, fontWeight: '800', color: colors.ink, textAlign: 'center', letterSpacing: -0.44, marginTop: 4, marginBottom: 10, lineHeight: 28 },
@@ -216,6 +215,6 @@ const makeStyles = (colors) => StyleSheet.create({
   modalIcon: { width: 64, height: 64, borderRadius: 32, backgroundColor: colors.blue, alignItems: 'center', justifyContent: 'center', marginBottom: 16 },
   modalTitle: { fontFamily: 'SpaceGrotesk_700Bold', fontSize: 22, color: colors.ink, marginBottom: 8, textAlign: 'center' },
   modalSub: { fontFamily: 'HankenGrotesk_400Regular', fontSize: 15, color: colors.placeholder, textAlign: 'center', marginBottom: 24, lineHeight: 22 },
-  modalBtn: { backgroundColor: colors.ink, paddingVertical: 14, paddingHorizontal: 32, borderRadius: 50, width: '100%', alignItems: 'center' },
+  modalBtn: { backgroundColor: colors.blue, paddingVertical: 14, paddingHorizontal: 32, borderRadius: 50, width: '100%', alignItems: 'center' },
   modalBtnText: { fontFamily: 'HankenGrotesk_700Bold', fontSize: 15, color: '#fff' },
 });

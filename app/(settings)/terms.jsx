@@ -61,7 +61,7 @@ const makeStyles = (colors) => StyleSheet.create({
 
   tabs: { flexDirection: 'row', gap: 8, paddingHorizontal: 20, paddingBottom: 12 },
   tab: { flex: 1, paddingVertical: 9, borderRadius: 50, backgroundColor: colors.card, alignItems: 'center', borderWidth: 1, borderColor: colors.border },
-  tabOn: { backgroundColor: colors.ink, borderColor: colors.ink },
+  tabOn: { backgroundColor: colors.blue, borderColor: colors.blue },
   tabText: { fontFamily: 'HankenGrotesk_600SemiBold', fontSize: 13, color: colors.slate },
   tabTextOn: { color: '#fff' },
 

@@ -671,9 +671,9 @@ const makeStyles = (colors) => StyleSheet.create({
     width: 20,
     height: 20,
     borderRadius: 10,
-    // Keeps the marks from dissolving into the blue header behind them.
+    // Separates the two overlapping circles from each other and the panel.
     borderWidth: 1.5,
-    borderColor: "#fff",
+    borderColor: colors.header,
   },
   wordmark: {
     fontFamily: "SpaceGrotesk_700Bold",
@@ -735,7 +735,7 @@ const makeStyles = (colors) => StyleSheet.create({
     shadowOffset: { width: 0, height: 1 },
     elevation: 1,
   },
-  filterChipActive: { backgroundColor: colors.ink },
+  filterChipActive: { backgroundColor: colors.blue },
   filterChipText: {
     fontFamily: "HankenGrotesk_600SemiBold",
     fontSize: 13,
@@ -775,7 +775,7 @@ const makeStyles = (colors) => StyleSheet.create({
     marginTop: 1,
   },
   bannerBtn: {
-    backgroundColor: colors.ink,
+    backgroundColor: colors.blue,
     borderRadius: 50,
     paddingHorizontal: 14,
     paddingVertical: 6,
@@ -846,7 +846,7 @@ const makeStyles = (colors) => StyleSheet.create({
     textAlign: "center",
   },
   refreshBtn: {
-    backgroundColor: colors.ink,
+    backgroundColor: colors.blue,
     borderRadius: 50,
     paddingHorizontal: 26,
     paddingVertical: 12,

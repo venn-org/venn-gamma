@@ -425,18 +425,13 @@ export default function ProfileScreen() {
             </TouchableOpacity>
           </View>
           <View style={{ flex: 1, marginLeft: 6 }}>
-            <Text style={s.profileName}>{name}</Text>
-            <View
-              style={{ flexDirection: "row", alignItems: "center", gap: 8 }}
-            >
-              <Text style={s.profileRole}>
-                {profile?.user_type === "owner"
-                  ? "Has a flat"
-                  : "Looking for flat"}
-              </Text>
-              <View style={s.dot} />
-              <Text style={s.completionText}>{percentage}% Complete</Text>
-            </View>
+            <Text style={s.profileName} numberOfLines={1}>{name}</Text>
+            <Text style={s.profileRole} numberOfLines={1}>
+              {profile?.user_type === "owner"
+                ? "Has a flat"
+                : "Looking for flat"}
+            </Text>
+            <Text style={s.completionText}>{percentage}% Complete</Text>
           </View>
         </View>
 
@@ -834,6 +829,7 @@ const makeStyles = (colors) =>
       alignItems: "center",
       gap: 16,
       paddingHorizontal: 20,
+      marginTop: 20,
       marginBottom: 20,
     },
     profileName: {
@@ -849,17 +845,13 @@ const makeStyles = (colors) =>
       color: colors.placeholder,
       textTransform: "uppercase",
       letterSpacing: 0.8,
+      marginTop: 4,
     },
     completionText: {
       fontFamily: "HankenGrotesk_600SemiBold",
       fontSize: 13,
       color: colors.blue,
-    },
-    dot: {
-      width: 4,
-      height: 4,
-      borderRadius: 2,
-      backgroundColor: colors.border,
+      marginTop: 4,
     },
 
     actionBtn: {
