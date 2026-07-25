@@ -1,5 +1,5 @@
-import { createContext, useContext, useEffect, useMemo, useState } from 'react';
-import { useColorScheme } from 'react-native';
+import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { Animated, StyleSheet, useColorScheme, View } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { darkColors, lightColors } from './theme';
 
@@ -28,12 +28,34 @@ export function ThemeProvider({ children }) {
       .catch(() => {});
   }, []);
 
-  const setMode = (next) => {
-    setModeState(next);
-    AsyncStorage.setItem(STORAGE_KEY, next).catch(() => {});
-  };
-
   const scheme = mode === 'system' ? (systemScheme ?? 'light') : mode;
+
+  // Flash-mask a theme switch so the recolor reads as a crossfade instead of
+  // an instant snap. Lives here (the app root, above the Stack/Tabs) rather
+  // than on the screen that owns the toggle — the floating tab bar renders
+  // as a sibling of screen content, so a screen-local overlay never covered
+  // it and it visibly recolored a beat later than the rest of the page.
+  const flashAnim = useRef(new Animated.Value(0)).current;
+  const [flashColor, setFlashColor] = useState(null);
+
+  const setMode = (next) => {
+    const nextScheme = next === 'system' ? (systemScheme ?? 'light') : next;
+
+    if (nextScheme === scheme) {
+      // No visible recolor (e.g. picking 'system' while it already matches
+      // the current scheme) — skip the flash.
+      setModeState(next);
+      AsyncStorage.setItem(STORAGE_KEY, next).catch(() => {});
+      return;
+    }
+
+    setFlashColor(nextScheme === 'dark' ? darkColors.canvas : lightColors.canvas);
+    Animated.timing(flashAnim, { toValue: 1, duration: 150, useNativeDriver: true }).start(() => {
+      setModeState(next);
+      AsyncStorage.setItem(STORAGE_KEY, next).catch(() => {});
+      Animated.timing(flashAnim, { toValue: 0, duration: 300, useNativeDriver: true }).start();
+    });
+  };
 
   const value = useMemo(() => ({
     mode,
@@ -43,7 +65,20 @@ export function ThemeProvider({ children }) {
     setMode,
   }), [mode, scheme]);
 
-  return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
+  return (
+    <ThemeContext.Provider value={value}>
+      <View style={{ flex: 1 }}>
+        {children}
+        <Animated.View
+          pointerEvents="none"
+          style={[
+            StyleSheet.absoluteFill,
+            { backgroundColor: flashColor || value.colors.canvas, opacity: flashAnim, zIndex: 999, elevation: 999 },
+          ]}
+        />
+      </View>
+    </ThemeContext.Provider>
+  );
 }
 
 export const useTheme = () => useContext(ThemeContext);

@@ -39,7 +39,6 @@ import {
 } from "../../lib/photos";
 import { calculateProfileCompletion } from "../../lib/profileUtils";
 import { supabase } from "../../lib/supabase";
-import { darkColors, lightColors } from "../../lib/theme";
 import { useTheme, useThemedStyles } from "../../lib/ThemeContext";
 
 // Fixed pixel width per option so the sliding indicator doesn't need a layout
@@ -150,13 +149,6 @@ export default function ProfileScreen() {
   const [prefsVisible, setPrefsVisible] = useState(false);
   const [userPrefs, setUserPrefs] = useState(null);
   const [flatDetailsModalVisible, setFlatDetailsModalVisible] = useState(false);
-
-  // Dark-mode switch flash: briefly cover the screen with the incoming
-  // theme's background, swap the theme underneath while hidden, then fade
-  // the cover away — turns the otherwise-instant recolor into a soft
-  // crossfade instead of a jarring snap.
-  const themeFlashAnim = useRef(new Animated.Value(0)).current;
-  const [themeFlashColor, setThemeFlashColor] = useState(null);
 
   // Profile photo editing
   const [uploadingIndex, setUploadingIndex] = useState(null);
@@ -387,14 +379,10 @@ export default function ProfileScreen() {
     }
   };
 
-  const handleToggleTheme = (nextDark) => {
-    if (nextDark === isDark) return;
-    setThemeFlashColor(nextDark ? darkColors.canvas : lightColors.canvas);
-    Animated.timing(themeFlashAnim, { toValue: 1, duration: 150, useNativeDriver: true }).start(() => {
-      setMode(nextDark ? "dark" : "light");
-      Animated.timing(themeFlashAnim, { toValue: 0, duration: 300, useNativeDriver: true }).start();
-    });
-  };
+  // The crossfade-on-switch animation lives in ThemeProvider now (it needs
+  // to cover the floating tab bar too, which sits outside this screen) —
+  // this just forwards the pick.
+  const handleToggleTheme = (nextDark) => setMode(nextDark ? "dark" : "light");
 
   const toggleIncognito = async (val) => {
     setIncognito(val);
@@ -1128,14 +1116,6 @@ export default function ProfileScreen() {
         description={flatDetails?.description}
         onClose={() => setFlatDetailsModalVisible(false)}
         onSave={handleSaveFlatDetails}
-      />
-
-      <Animated.View
-        pointerEvents="none"
-        style={[
-          StyleSheet.absoluteFill,
-          { backgroundColor: themeFlashColor || colors.canvas, opacity: themeFlashAnim, zIndex: 999 },
-        ]}
       />
     </View>
   );
