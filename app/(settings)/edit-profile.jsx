@@ -9,7 +9,6 @@ import { useTheme, useThemedStyles } from '../../lib/ThemeContext';
 import { toUI, toDb } from '../../lib/enums';
 import { getAge } from '../../lib/age';
 import { ZONES_BY_CITY } from '../../lib/locations';
-import RangeSlider from '../../components/RangeSlider';
 import Calendar from '../../components/Calendar';
 
 const { height: SCREEN_H } = Dimensions.get('window');
@@ -75,9 +74,6 @@ const PROMPT_CATEGORIES = [
   },
 ];
 const LIFESTYLE_OPTIONS = ['Yes', 'Sometimes', 'No', 'Prefer not to say'];
-const BUDGET_MIN = 0;
-const BUDGET_MAX = 100000;
-const BUDGET_STEP = 1000;
 
 const ChipSelector = ({ options, selected, onSelect }) => {
   const s = useThemedStyles(makeStyles);
@@ -314,11 +310,6 @@ export default function EditProfileScreen() {
   const [educationSchool, setEducationSchool] = useState('');
   const [educationLevel, setEducationLevel] = useState('');
 
-  // Housing
-  const [budgetMin, setBudgetMin] = useState(BUDGET_MIN);
-  const [budgetMax, setBudgetMax] = useState(20000);
-  const [moveInDate, setMoveInDate] = useState(''); // YYYY-MM-DD
-
   // Lifestyle
   const [drink, setDrink] = useState('');
   const [tobacco, setTobacco] = useState('');
@@ -380,9 +371,6 @@ export default function EditProfileScreen() {
         setJobCompany(data.job_company || '');
         setEducationSchool(data.education_school || '');
         setEducationLevel(data.education_level || '');
-        setBudgetMin(data.budget_min ?? BUDGET_MIN);
-        setBudgetMax(data.budget_max ?? 20000);
-        setMoveInDate(typeof data.move_in_date === 'string' ? data.move_in_date.split('T')[0] : '');
 
         setDrink(toUI('lifestyle', data.drink) || data.drink || '');
         setTobacco(toUI('lifestyle', data.tobacco) || data.tobacco || '');
@@ -458,9 +446,6 @@ export default function EditProfileScreen() {
         job_company: jobCompany.trim() || null,
         education_school: educationSchool.trim() || null,
         education_level: educationLevel.trim() || null,
-        budget_min: budgetMin,
-        budget_max: budgetMax,
-        move_in_date: moveInDate || null,
         drink: toDb('lifestyle', drink) || null,
         tobacco: toDb('lifestyle', tobacco) || null,
         weed: toDb('lifestyle', weed) || null,
@@ -596,29 +581,6 @@ export default function EditProfileScreen() {
                   placeholderTextColor="#9AA0B2"
                   value={educationLevel}
                   onChangeText={setEducationLevel}
-                />
-              </View>
-
-              {/* Housing Section */}
-              <View style={s.section}>
-                <Text style={s.sectionTitle}>Housing</Text>
-
-                <Text style={s.label}>Budget Range (₹ / month)</Text>
-                <RangeSlider
-                  min={BUDGET_MIN}
-                  max={BUDGET_MAX}
-                  step={BUDGET_STEP}
-                  valueMin={budgetMin}
-                  valueMax={budgetMax}
-                  onChange={(lo, hi) => { setBudgetMin(lo); setBudgetMax(hi); }}
-                />
-
-                <Text style={s.label}>Move-in Date</Text>
-                <Calendar
-                  value={moveInDate}
-                  onChange={setMoveInDate}
-                  minDate={toLocalDateStr(new Date())}
-                  placeholder="Select a move-in date"
                 />
               </View>
 

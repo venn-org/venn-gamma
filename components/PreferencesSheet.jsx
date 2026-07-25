@@ -4,15 +4,30 @@ import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme, useThemedStyles } from '../lib/ThemeContext';
 import { PREF_SECTIONS, getPrefDisplay, isPrefSet, prefOptions } from '../lib/prefs';
+import RangeSlider from './RangeSlider';
+import Calendar from './Calendar';
 
 const { height: SCREEN_H } = Dimensions.get('window');
 
-export default function PreferencesSheet({ visible, prefs, city, showRole = false, only = null, onClose, onSave }) {
+const BUDGET_MIN = 0;
+const BUDGET_MAX = 100000;
+const BUDGET_STEP = 1000;
+
+const pad2 = (n) => String(n).padStart(2, '0');
+const todayStr = () => {
+  const d = new Date();
+  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+};
+
+const defaultHousing = () => ({ budgetMin: BUDGET_MIN, budgetMax: 20000, moveInDate: '' });
+
+export default function PreferencesSheet({ visible, prefs, city, housing, showRole = false, only = null, onClose, onSave }) {
   const insets = useSafeAreaInsets();
   const pref = useThemedStyles(makeStyles);
   const { colors } = useTheme();
 
   const [draft, setDraft] = useState(prefs || {});
+  const [housingDraft, setHousingDraft] = useState(housing || defaultHousing());
   const [openKey, setOpenKey] = useState(only);
   const [pendingRole, setPendingRole] = useState(null);
 
@@ -20,9 +35,10 @@ export default function PreferencesSheet({ visible, prefs, city, showRole = fals
   useEffect(() => {
     if (visible) {
       setDraft(prefs || {});
+      setHousingDraft(housing || defaultHousing());
       setOpenKey(only);
     }
-  }, [visible, prefs, only]);
+  }, [visible, prefs, housing, only]);
 
   // Manual backdrop-fade + sheet-slide (decoupled) so the backdrop doesn't
   // ride along with the sheet's slide transform, which reads as a solid
@@ -60,7 +76,7 @@ export default function PreferencesSheet({ visible, prefs, city, showRole = fals
   })).filter((section) => section.rows.length > 0);
 
   const handleSave = () => {
-    onSave(draft);
+    onSave(draft, housingDraft);
     onClose();
   };
 
@@ -83,6 +99,35 @@ export default function PreferencesSheet({ visible, prefs, city, showRole = fals
           <Text style={pref.subtitle}>Set what you need — we'll show you the right matches.</Text>
 
           <ScrollView style={{ maxHeight: SCREEN_H * 0.6 }} showsVerticalScrollIndicator={false}>
+            {!only && (
+              <View style={{ paddingHorizontal: 20 }}>
+                <View style={pref.sectionHeader}>
+                  <Text style={pref.sectionTitle}>Housing</Text>
+                  <View style={pref.sectionLine} />
+                </View>
+
+                <Text style={pref.housingLabel}>Budget range (₹ / month)</Text>
+                <RangeSlider
+                  min={BUDGET_MIN}
+                  max={BUDGET_MAX}
+                  step={BUDGET_STEP}
+                  valueMin={housingDraft.budgetMin}
+                  valueMax={housingDraft.budgetMax}
+                  onChange={(lo, hi) => setHousingDraft((h) => ({ ...h, budgetMin: lo, budgetMax: hi }))}
+                />
+
+                <Text style={pref.housingLabel}>Move-in date</Text>
+                <View style={{ marginBottom: 16 }}>
+                  <Calendar
+                    value={housingDraft.moveInDate}
+                    onChange={(d) => setHousingDraft((h) => ({ ...h, moveInDate: d }))}
+                    minDate={todayStr()}
+                    placeholder="Select a move-in date"
+                  />
+                </View>
+              </View>
+            )}
+
             {sections.map((section) => (
               <View key={section.title} style={{ paddingHorizontal: 20 }}>
                 <View style={pref.sectionHeader}>
@@ -97,7 +142,7 @@ export default function PreferencesSheet({ visible, prefs, city, showRole = fals
                   return (
                     <View key={row.key}>
                       <TouchableOpacity
-                        style={pref.prefRow}
+                        style={[pref.prefRow, isOpen && pref.prefRowOpen]}
                         onPress={() => setOpenKey(isOpen ? null : row.key)}
                         activeOpacity={0.7}
                       >
@@ -183,7 +228,13 @@ const makeStyles = (colors) => StyleSheet.create({
   sectionTitle: { fontFamily: 'SpaceMono_400Regular', fontSize: 10, letterSpacing: 1.5, color: colors.placeholder, textTransform: 'uppercase' },
   sectionLine: { flex: 1, height: 1, backgroundColor: colors.border },
 
-  prefRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 14 },
+  housingLabel: { fontFamily: 'HankenGrotesk_600SemiBold', fontSize: 13, color: colors.slate, marginTop: 12, marginBottom: 8 },
+
+  prefRow: {
+    flexDirection: 'row', alignItems: 'center', paddingVertical: 12, paddingHorizontal: 14,
+    marginTop: 10, borderRadius: 12, borderWidth: 1.5, borderColor: colors.border, backgroundColor: colors.canvas,
+  },
+  prefRowOpen: { borderColor: colors.blue },
   prefTitle: { fontFamily: 'HankenGrotesk_600SemiBold', fontSize: 15, color: colors.ink },
   prefVal: { fontFamily: 'HankenGrotesk_400Regular', fontSize: 13, color: colors.placeholder, marginTop: 2 },
   prefValSet: { color: colors.blue },
