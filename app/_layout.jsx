@@ -7,7 +7,7 @@ import { HankenGrotesk_400Regular, HankenGrotesk_600SemiBold, HankenGrotesk_700B
 import { Ionicons } from '@expo/vector-icons';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
-import { auth, supabase, getCurrentUserId, ensureProfile, isOnboardingComplete, subscribeOnboardingComplete } from '../lib';
+import { supabase, getCurrentUserId, ensureProfile, isOnboardingComplete, subscribeOnboardingComplete, loadSession, onAuthChange } from '../lib';
 import { ThemeProvider, useTheme } from '../lib/ThemeContext';
 import MatchCelebration from '../components/MatchCelebration';
 
@@ -54,15 +54,26 @@ function RootLayoutInner() {
 
   // Auth listener
   useEffect(() => {
-    const unsubscribe = auth.onAuthStateChanged(async (user) => {
-      setSession(user);
-      if (user) {
-        // Need to force refresh token to ensure we have the 'authenticated' custom claim
-        await user.getIdToken(true);
+    let unsubscribe = () => {};
+    // onAuthStateChange replays INITIAL_SESSION on subscribe, and fires again
+    // on every token refresh — none of which change who is signed in. Track the
+    // last id so the profile/onboarding round-trip only runs on a real change.
+    let lastUserId;
+
+    const applySession = async (session) => {
+      const uid = session?.user?.id ?? null;
+      if (uid === lastUserId) {
+        setAuthReady(true);
+        return;
+      }
+      lastUserId = uid;
+      setSession(session);
+
+      if (session) {
         // Every sign-in method funnels through here, so this is the one place
-        // that's guaranteed to run regardless of which one was used (phone,
-        // email link, Google, ...) — ensureProfile() tolerates being called
-        // again for an existing row (23505), so this is safe on every login.
+        // that's guaranteed to run regardless of which one was used (email OTP,
+        // Google, ...) — ensureProfile() tolerates being called again for an
+        // existing row (23505), so this is safe on every login.
         await ensureProfile();
         const done = await isOnboardingComplete();
         setOnboardingDone(done);
@@ -70,7 +81,21 @@ function RootLayoutInner() {
         setOnboardingDone(false);
       }
       setAuthReady(true);
-    });
+    };
+
+    // Resolve the stored session — and, on web, any OAuth code sitting in the
+    // URL — before subscribing, so the route guard never sees a spurious
+    // signed-out state and bounces a returning user to /login.
+    loadSession()
+      .then(applySession)
+      .catch((e) => {
+        console.error('loadSession failed:', e);
+        setAuthReady(true);
+      })
+      .finally(() => {
+        unsubscribe = onAuthChange(applySession);
+      });
+
     return () => unsubscribe();
   }, []);
 

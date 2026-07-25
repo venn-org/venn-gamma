@@ -1,21 +1,29 @@
-import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { Alert, ImageBackground, Platform, StyleSheet, Text, TouchableOpacity, View, Animated } from 'react-native';
+import { Alert, Animated, Dimensions, ImageBackground, Modal, Platform, Pressable, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useEffect, useRef, useState } from 'react';
 import { signInWithGoogle } from '../../lib/auth';
 import { colors } from '../../lib/theme';
 import GoogleLogo from '../../assets/images/signin-google-logo.svg';
 
+const { height: SCREEN_H } = Dimensions.get('window');
+
 export default function AuthMethodsScreen() {
   const router = useRouter();
   const { mode } = useLocalSearchParams(); // 'signup' or 'signin'
   const insets = useSafeAreaInsets();
   const [loading, setLoading] = useState(false);
+  // On sign-up we interrupt email with a nudge towards Google first.
+  const [nudge, setNudge] = useState(false);
 
   const slideY = useRef(new Animated.Value(50)).current;
   const opacity = useRef(new Animated.Value(0)).current;
+
+  // Manual backdrop-fade + sheet-slide, same as login.jsx's legal sheet —
+  // Modal's own animationType="slide" drags the backdrop along with the sheet.
+  const nudgeBackdropOpacity = useRef(new Animated.Value(0)).current;
+  const nudgeSheetY = useRef(new Animated.Value(SCREEN_H)).current;
 
   useEffect(() => {
     Animated.parallel([
@@ -24,20 +32,40 @@ export default function AuthMethodsScreen() {
     ]).start();
   }, []);
 
-  const title = mode === 'signup' ? 'Get started' : 'Welcome back';
-  const subtitle = mode === 'signup' ? "Choose how you'd like to create your account." : "Choose how you'd like to continue.";
+  useEffect(() => {
+    if (nudge) {
+      Animated.parallel([
+        Animated.timing(nudgeBackdropOpacity, { toValue: 1, duration: 200, useNativeDriver: true }),
+        Animated.timing(nudgeSheetY, { toValue: 0, duration: 250, useNativeDriver: true }),
+      ]).start();
+    } else {
+      nudgeBackdropOpacity.setValue(0);
+      nudgeSheetY.setValue(SCREEN_H);
+    }
+  }, [nudge]);
 
-  const handleGoogleSignUp = async () => {
-    if (Platform.OS !== 'web') {
-      Alert.alert('Not available', 'Google sign-in on native requires a dev-build. Use phone or email instead.');
+  const isSignup = mode === 'signup';
+  const title = isSignup ? 'Get started' : 'Welcome back';
+  const subtitle = isSignup ? "Choose how you'd like to create your account." : "Choose how you'd like to continue.";
+
+  const goToEmail = () => router.push(`/(auth)/email?mode=${mode}`);
+
+  const handleEmailPress = () => {
+    if (isSignup) {
+      setNudge(true);
       return;
     }
+    goToEmail();
+  };
+
+  const handleGoogleSignIn = async () => {
+    setNudge(false);
     setLoading(true);
     try {
       await signInWithGoogle();
-      // Auth listener routes automatically
+      // Web redirects away; native resolves here and the auth listener routes.
     } catch (e) {
-      if (e.code !== 'auth/popup-closed-by-user') {
+      if (e.code !== 'oauth-cancelled') {
         console.error('signInWithGoogle failed:', e);
         Alert.alert('Sign in failed', 'Please try again.');
       }
@@ -67,46 +95,59 @@ export default function AuthMethodsScreen() {
           <Text style={styles.title}>{title}</Text>
           <Text style={styles.subtitle}>{subtitle}</Text>
 
-          {Platform.OS !== 'web' && (
-            <TouchableOpacity style={styles.phoneBtn} onPress={() => router.push(`/(auth)/phone?mode=${mode}`)} activeOpacity={0.9}>
-              <Text style={styles.phoneBtnIcon}>📞</Text>
-              <Text style={styles.phoneBtnText}>Continue with phone</Text>
-            </TouchableOpacity>
-          )}
-
-          {Platform.OS === 'web' && (
-            <TouchableOpacity style={styles.phoneBtn} onPress={() => router.push(`/(auth)/phone?mode=${mode}`)} activeOpacity={0.9}>
-              <Text style={styles.phoneBtnIcon}>📞</Text>
-              <Text style={styles.phoneBtnText}>Continue with phone</Text>
-            </TouchableOpacity>
-          )}
-
-          <TouchableOpacity
-            style={styles.emailBtn}
-            onPress={() => router.push(`/(auth)/email?mode=${mode}`)}
-            activeOpacity={0.85}
-          >
+          <TouchableOpacity style={styles.emailBtn} onPress={handleEmailPress} activeOpacity={0.9}>
             <Text style={styles.emailBtnIcon}>✉</Text>
             <Text style={styles.emailBtnText}>Continue with email</Text>
           </TouchableOpacity>
 
-          {Platform.OS === 'web' && (
-            <TouchableOpacity
-              style={[styles.googleBtn, loading && styles.btnDisabled]}
-              onPress={handleGoogleSignUp}
-              disabled={loading}
-              activeOpacity={0.85}
-            >
-              {!loading && (
-                <View style={styles.googleLogoBg}>
-                  <GoogleLogo width={16} height={16} />
-                </View>
-              )}
-              <Text style={styles.googleBtnText}>{loading ? 'Signing in…' : 'Continue with Google'}</Text>
-            </TouchableOpacity>
-          )}
+          <TouchableOpacity
+            style={[styles.googleBtn, loading && styles.btnDisabled]}
+            onPress={handleGoogleSignIn}
+            disabled={loading}
+            activeOpacity={0.85}
+          >
+            {!loading && (
+              <View style={styles.googleLogoBg}>
+                <GoogleLogo width={16} height={16} />
+              </View>
+            )}
+            <Text style={styles.googleBtnText}>{loading ? 'Signing in…' : 'Continue with Google'}</Text>
+          </TouchableOpacity>
         </Animated.View>
       </ImageBackground>
+
+      <Modal visible={nudge} transparent animationType="none" onRequestClose={() => setNudge(false)}>
+        <View style={{ flex: 1, justifyContent: 'flex-end' }}>
+          <Animated.View
+            style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(10,10,20,0.55)', opacity: nudgeBackdropOpacity }]}
+          />
+          <Pressable style={StyleSheet.absoluteFill} onPress={() => setNudge(false)} />
+
+          <Animated.View style={[styles.nudgeCard, { paddingBottom: insets.bottom + 28 }, { transform: [{ translateY: nudgeSheetY }] }]}>
+            <View style={styles.nudgeHandle} />
+            <Text style={styles.nudgeIcon}>🔒</Text>
+            <Text style={styles.nudgeTitle}>Google sign-in is more secure</Text>
+            <Text style={styles.nudgeBody}>
+              Your Google account already protects you with 2-step verification — there's no code to intercept and nothing to lose access to. Signing up with your email still works, it's just less protected.
+            </Text>
+
+            <TouchableOpacity style={styles.nudgePrimary} onPress={handleGoogleSignIn} activeOpacity={0.85}>
+              <View style={styles.googleLogoBg}>
+                <GoogleLogo width={16} height={16} />
+              </View>
+              <Text style={styles.nudgePrimaryText}>Continue with Google</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.nudgeSecondary}
+              onPress={() => { setNudge(false); goToEmail(); }}
+              activeOpacity={0.85}
+            >
+              <Text style={styles.nudgeSecondaryText}>Use my email anyway</Text>
+            </TouchableOpacity>
+          </Animated.View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -126,14 +167,32 @@ const styles = StyleSheet.create({
   appName: { fontFamily: 'SpaceGrotesk_700Bold', fontSize: 17, color: '#fff' },
   title: { fontFamily: 'SpaceGrotesk_700Bold', fontSize: 26, color: '#fff', letterSpacing: -0.8 },
   subtitle: { fontSize: 14, color: 'rgba(255,255,255,0.55)', marginBottom: 4 },
-  phoneBtn: { backgroundColor: '#fff', borderRadius: 50, paddingVertical: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10 },
-  phoneBtnIcon: { fontSize: 18 },
-  phoneBtnText: { color: colors.ink, fontSize: 16, fontWeight: '700' },
-  emailBtn: { borderRadius: 50, paddingVertical: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.3)' },
-  emailBtnIcon: { fontSize: 16, color: '#fff' },
-  emailBtnText: { color: '#fff', fontSize: 16, fontWeight: '600' },
+  // Email takes the solid-white slot phone used to hold, so the screen keeps
+  // its one-primary-one-secondary shape now that there are only two methods.
+  emailBtn: { backgroundColor: '#fff', borderRadius: 50, paddingVertical: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10 },
+  emailBtnIcon: { fontSize: 16, color: colors.ink },
+  emailBtnText: { color: colors.ink, fontSize: 16, fontWeight: '700' },
   googleBtn: { borderRadius: 50, paddingVertical: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, backgroundColor: 'rgba(255,255,255,0.12)' },
   googleLogoBg: { width: 22, height: 22, borderRadius: 11, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center' },
   googleBtnText: { color: '#fff', fontSize: 15, fontWeight: '600' },
   btnDisabled: { opacity: 0.6 },
+
+  // Google-recommendation sheet (sign-up only). Dark to sit with the hero
+  // behind it rather than flashing a white panel over the photo.
+  nudgeCard: {
+    backgroundColor: '#16181F',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingHorizontal: 28,
+    paddingTop: 12,
+    gap: 12,
+  },
+  nudgeHandle: { alignSelf: 'center', width: 40, height: 4, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.18)', marginBottom: 12 },
+  nudgeIcon: { fontSize: 26 },
+  nudgeTitle: { fontFamily: 'SpaceGrotesk_700Bold', fontSize: 22, color: '#fff', letterSpacing: -0.6 },
+  nudgeBody: { fontSize: 14, color: 'rgba(255,255,255,0.6)', lineHeight: 21, marginBottom: 6 },
+  nudgePrimary: { backgroundColor: '#fff', borderRadius: 50, paddingVertical: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10 },
+  nudgePrimaryText: { color: colors.ink, fontSize: 16, fontWeight: '700' },
+  nudgeSecondary: { borderRadius: 50, paddingVertical: 15, alignItems: 'center' },
+  nudgeSecondaryText: { color: 'rgba(255,255,255,0.55)', fontSize: 14, fontWeight: '600' },
 });

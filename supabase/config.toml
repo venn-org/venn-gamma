@@ -156,11 +156,15 @@ max_indexes = 5
 enabled = true
 # The base URL of your website. Used as an allow-list for redirects and for constructing URLs used
 # in emails.
-site_url = "http://127.0.0.1:3000"
+# Expo's web dev server. The hosted project's Site URL should be the production
+# domain instead.
+site_url = "http://localhost:8081"
 # The public URL that Auth serves on. Defaults to the API external URL with `/auth/v1` appended.
 # external_url = ""
 # A list of *exact* URLs that auth providers are permitted to redirect to post authentication.
-additional_redirect_urls = ["https://127.0.0.1:3000"]
+# `venn://` is the native deep link signInWithGoogle() hands to
+# WebBrowser.openAuthSessionAsync; the wildcard covers Expo Router paths under it.
+additional_redirect_urls = ["http://127.0.0.1:8081", "venn://", "venn://*"]
 # How long tokens are valid for, in seconds. Defaults to 3600 (1 hour), maximum 604,800 (1 week).
 jwt_expiry = 3600
 # JWT issuer URL. If not set, defaults to auth.external_url.
@@ -248,6 +252,14 @@ otp_expiry = 3600
 # subject = "You have been invited"
 # content_path = "./supabase/templates/invite.html"
 
+# signInWithOtp() renders the "magic link" template. The stock version contains
+# {{ .ConfirmationURL }}, which mails a link; the app asks for a 6-digit code, so
+# this override renders {{ .Token }} instead. The hosted project needs the same
+# change under Authentication → Emails → Magic Link.
+[auth.email.template.magic_link]
+subject = "Your Venn sign-in code"
+content_path = "./supabase/templates/magic_link.html"
+
 # Uncomment to customize notification email template
 # [auth.email.notification.password_changed]
 # enabled = true
@@ -332,6 +344,20 @@ url = ""
 # If enabled, the nonce check will be skipped. Required for local sign in with Google auth.
 skip_nonce_check = false
 # If enabled, it will allow the user to successfully authenticate when the provider does not return an email address.
+email_optional = false
+
+# Google OAuth — the app's other sign-in method. Credentials come from a Google
+# Cloud OAuth 2.0 Web client whose authorized redirect URI must be
+# <supabase-url>/auth/v1/callback (locally: http://127.0.0.1:54321/auth/v1/callback).
+[auth.external.google]
+enabled = true
+client_id = "env(SUPABASE_AUTH_EXTERNAL_GOOGLE_CLIENT_ID)"
+# DO NOT commit your OAuth provider secret to git. Use environment variable substitution instead:
+secret = "env(SUPABASE_AUTH_EXTERNAL_GOOGLE_SECRET)"
+redirect_uri = ""
+url = ""
+# Required for local sign in with Google auth.
+skip_nonce_check = true
 email_optional = false
 
 # Allow Solana wallet holders to sign in to your project via the Sign in with Solana (SIWS, EIP-4361) standard.

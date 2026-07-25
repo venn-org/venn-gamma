@@ -2,7 +2,6 @@ import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import { useEffect, useRef, useState } from "react";
 import {
-    Alert,
     Animated,
     Dimensions,
     ImageBackground,
@@ -18,8 +17,6 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import CookieConsentBanner from "../../components/CookieConsentBanner";
 import LegalDoc from "../../components/LegalDoc";
-import GoogleLogo from "../../assets/images/signin-google-logo.svg";
-import { signInWithGoogle } from "../../lib/auth";
 import { getCookieConsent, setCookieConsent } from "../../lib/cookieConsent";
 import { COOKIE_DOC, PRIVACY_DOC, TERMS_DOC } from "../../lib/legal";
 import { colors } from "../../lib/theme";
@@ -33,7 +30,6 @@ export default function LoginScreen() {
   // the card has to follow it or dark text lands on a white panel.
   const { colors: themed } = useTheme();
   const insets = useSafeAreaInsets();
-  const [loading, setLoading] = useState(false);
   const [showCookieBanner, setShowCookieBanner] = useState(false);
   const [legalDoc, setLegalDoc] = useState(null);
 
@@ -109,27 +105,6 @@ export default function LoginScreen() {
       ]),
     ]).start();
   }, []);
-
-  const handleGoogleSignIn = async () => {
-    if (Platform.OS !== "web") {
-      Alert.alert(
-        "Not available",
-        "Google sign-in on native requires a dev-build. Use phone or email instead.",
-      );
-      return;
-    }
-    setLoading(true);
-    try {
-      await signInWithGoogle();
-      // Auth listener in _layout will route automatically
-    } catch (e) {
-      if (e.code !== "auth/popup-closed-by-user") {
-        console.error("signInWithGoogle failed:", e);
-        Alert.alert("Sign in failed", "Please try again.");
-      }
-      setLoading(false);
-    }
-  };
 
   return (
     <View style={styles.frame}>
@@ -234,26 +209,6 @@ export default function LoginScreen() {
           >
             <Text style={styles.ghostBtnText}>Sign in</Text>
           </TouchableOpacity>
-
-          {Platform.OS === "web" && (
-            <TouchableOpacity
-              style={[styles.googleBtn, loading && styles.btnDisabled]}
-              onPress={handleGoogleSignIn}
-              disabled={loading}
-              activeOpacity={0.85}
-            >
-              {loading ? (
-                <Text style={styles.googleBtnText}>Signing in…</Text>
-              ) : (
-                <View style={styles.googleBtnRow}>
-                  <View style={styles.googleLogoBg}>
-                    <GoogleLogo width={16} height={16} />
-                  </View>
-                  <Text style={styles.googleBtnText}>Continue with Google</Text>
-                </View>
-              )}
-            </TouchableOpacity>
-          )}
 
           <Text style={styles.legal}>
             By tapping Create account or Sign in, you agree to our{" "}
@@ -432,16 +387,6 @@ const styles = StyleSheet.create({
     borderColor: "rgba(255,255,255,0.3)",
   },
   ghostBtnText: { color: "#fff", fontSize: 16, fontWeight: "600" },
-  googleBtn: {
-    borderRadius: 50,
-    paddingVertical: 16,
-    alignItems: "center",
-    backgroundColor: "rgba(255,255,255,0.12)",
-  },
-  googleBtnRow: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10 },
-  googleLogoBg: { width: 22, height: 22, borderRadius: 11, backgroundColor: "#fff", alignItems: "center", justifyContent: "center" },
-  googleBtnText: { color: "#fff", fontSize: 15, fontWeight: "600" },
-  btnDisabled: { opacity: 0.6 },
   legal: {
     fontSize: 11,
     color: "rgba(255,255,255,0.35)",
