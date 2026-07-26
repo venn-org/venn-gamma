@@ -1,10 +1,11 @@
 import { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Platform } from 'react-native';
+import { Alert, View, Text, TextInput, TouchableOpacity, StyleSheet, Platform } from 'react-native';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors } from '../../lib/theme';
 import { useOnboarding, totalSteps } from '../../hooks/useOnboarding';
+import { deleteAccountAndSignOut } from '../../lib/auth';
 
 export default function NameScreen() {
   const router = useRouter();
@@ -24,6 +25,31 @@ export default function NameScreen() {
     router.push('/(onboarding)/account-type');
   };
 
+  // This is the first onboarding screen, reached right after ensureProfile()
+  // created a bare profile row for the new account — so "back" here means
+  // abandoning the signup, not stepping to a prior onboarding screen.
+  const handleBack = () => {
+    Alert.alert(
+      'Discard sign-up?',
+      'Going back will delete the account you just started creating.',
+      [
+        { text: 'Stay', style: 'cancel' },
+        {
+          text: 'Discard',
+          style: 'destructive',
+          onPress: async () => {
+            setLoading(true);
+            try {
+              await deleteAccountAndSignOut();
+            } finally {
+              router.replace('/login');
+            }
+          },
+        },
+      ],
+    );
+  };
+
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
       <View style={styles.topBar}>
@@ -32,6 +58,10 @@ export default function NameScreen() {
         </View>
         <Text style={styles.stepLabel}>STEP 1 OF {total}</Text>
       </View>
+
+      <TouchableOpacity style={styles.back} onPress={handleBack} disabled={loading}>
+        <Text style={styles.backArrow}>‹</Text>
+      </TouchableOpacity>
 
       <View style={styles.body}>
         <Text style={styles.title}>What's your name?</Text>
@@ -79,6 +109,8 @@ const styles = StyleSheet.create({
   progressTrack: { height: 3, backgroundColor: 'rgba(0,0,0,0.08)', borderRadius: 2, overflow: 'hidden' },
   progressFill: { height: '100%', borderRadius: 2 },
   stepLabel: { fontFamily: 'SpaceMono_400Regular', fontSize: 10, color: colors.placeholder, letterSpacing: 1.2, textAlign: 'right' },
+  back: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center', marginLeft: 16, marginTop: 4 },
+  backArrow: { fontSize: 28, color: colors.ink, lineHeight: 32 },
   body: { flex: 1, paddingHorizontal: 28, paddingTop: 32 },
   title: { fontFamily: 'SpaceGrotesk_700Bold', fontSize: 32, color: colors.ink, letterSpacing: -1, lineHeight: 38, marginBottom: 8 },
   subtitle: { fontSize: 14, color: colors.slate, lineHeight: 22, marginBottom: 32 },
