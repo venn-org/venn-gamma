@@ -54,25 +54,27 @@ export function useOnboarding() {
     // Upload photos if any
     let profilePhotoUrl = null;
 
-    // Upload profile photo
+    // Upload profile photo. Errors are allowed to propagate (instead of being
+    // swallowed) so a failed upload aborts onboarding with a visible error
+    // instead of silently completing with photos: null.
     if (onboardingState.photos?.profile) {
       const uri = onboardingState.photos.profile;
       if (uri.startsWith('http')) {
         profilePhotoUrl = uri;
       } else {
-        try {
-          const res = await fetch(uri);
-          const blob = await res.blob();
-          const ext = uri.split('.').pop() || 'jpg';
-          const filename = `${uid}/profile-${Date.now()}.${ext}`;
-          const { error } = await supabase.storage.from('photos').upload(filename, blob, { upsert: true });
-          if (!error) {
-            const { data } = supabase.storage.from('photos').getPublicUrl(filename);
-            profilePhotoUrl = data.publicUrl;
-          }
-        } catch (e) {
-          console.error("Profile photo upload failed", e);
-        }
+        const res = await fetch(uri);
+        const blob = await res.blob();
+        // Web's ImagePicker returns a blob: URL with no file extension in
+        // it, so uri.split('.').pop() would grab the whole URL instead —
+        // derive the extension from the blob's actual MIME type, falling
+        // back to parsing the URI only for native file:// URIs.
+        const mimeExt = blob.type?.startsWith('image/') ? blob.type.split('/')[1] : null;
+        const ext = mimeExt || uri.split('.').pop() || 'jpg';
+        const filename = `${uid}/profile-${Date.now()}.${ext}`;
+        const { error } = await supabase.storage.from('photos').upload(filename, blob, { upsert: true });
+        if (error) throw error;
+        const { data } = supabase.storage.from('photos').getPublicUrl(filename);
+        profilePhotoUrl = data.publicUrl;
       }
     }
 
@@ -90,7 +92,8 @@ export function useOnboarding() {
           try {
             const res = await fetch(uri);
             const blob = await res.blob();
-            const ext = uri.split('.').pop() || 'jpg';
+            const mimeExt = blob.type?.startsWith('image/') ? blob.type.split('/')[1] : null;
+            const ext = mimeExt || uri.split('.').pop() || 'jpg';
             const filename = `${uid}/flat-${FLAT_ROOM_LABELS[i]}-${Date.now()}.${ext}`;
             const { error } = await supabase.storage.from('photos').upload(filename, blob, { upsert: true });
             if (!error) {

@@ -77,41 +77,6 @@ export default function FeedScreen() {
     }
     fetchFeed();
     if (!uid) return;
-
-    // Listen for new matches in real-time. `matches` is a client-facing view
-    // (active matches only); realtime only fires on the real table matches
-    // are created on, `matches_log`.
-    const matchSub = supabase
-      .channel("feed_matches")
-      .on(
-        "postgres_changes",
-        { event: "INSERT", schema: "public", table: "matches_log" },
-        (payload) => {
-          const { user1_id, user2_id, id } = payload.new;
-          if (user1_id === uid || user2_id === uid) {
-            const otherId = user1_id === uid ? user2_id : user1_id;
-            supabase
-              .from("profiles")
-              .select("name, photos")
-              .eq("id", otherId)
-              .single()
-              .then(({ data }) => {
-                if (data) {
-                  setMatchData({
-                    name: data.name,
-                    photo: data.photos?.[0] || null,
-                    matchId: id,
-                  });
-                }
-              });
-          }
-        },
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(matchSub);
-    };
   }, []);
 
   // Keep the completion banner in sync with edits made elsewhere
@@ -281,10 +246,30 @@ export default function FeedScreen() {
       const remaining = await getRemainingLikes(uid);
       setRemainingLikes(remaining);
 
-      // Quick feedback loop — auto-dismisses so it doesn't block swiping
-      setLikeSent({ name: currentProfile.name, photo: currentProfile.photos?.[0] || null });
-      clearTimeout(likeSentTimer.current);
-      likeSentTimer.current = setTimeout(() => setLikeSent(null), 1500);
+      // The mutual-like trigger (create_match_on_mutual_like) runs
+      // synchronously as part of the insert above, so if this like just
+      // completed a match, it's already visible here — checking this way
+      // (instead of a broad realtime subscription on all match events) keeps
+      // the full-screen celebration tied to this user's own action, not to
+      // matches that land while they're elsewhere in the app.
+      const { data: matchRow } = await supabase
+        .from("matches")
+        .select("id")
+        .or(`and(user1_id.eq.${uid},user2_id.eq.${targetId}),and(user1_id.eq.${targetId},user2_id.eq.${uid})`)
+        .maybeSingle();
+
+      if (matchRow) {
+        setMatchData({
+          name: currentProfile.name,
+          photo: currentProfile.photos?.[0] || null,
+          matchId: matchRow.id,
+        });
+      } else {
+        // Quick feedback loop — auto-dismisses so it doesn't block swiping
+        setLikeSent({ name: currentProfile.name, photo: currentProfile.photos?.[0] || null });
+        clearTimeout(likeSentTimer.current);
+        likeSentTimer.current = setTimeout(() => setLikeSent(null), 1500);
+      }
     }
   };
 
