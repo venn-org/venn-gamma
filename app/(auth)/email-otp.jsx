@@ -4,12 +4,15 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors } from '../../lib/theme';
-import { sendEmailOtp, verifyEmailOtp, ensureProfile } from '../../lib/auth';
+import { sendEmailOtp, verifyEmailOtp, ensureProfile, getPendingEmail } from '../../lib/auth';
 
 export default function EmailOtpScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { email, mode } = useLocalSearchParams();
+  const { mode } = useLocalSearchParams();
+  // Held in module scope rather than a route param so the address never lands
+  // in the web build's URL bar or history (see lib/auth.js).
+  const email = getPendingEmail();
 
   const [otp, setOtp] = useState(['', '', '', '', '', '']);
   const inputs = useRef([]);
@@ -28,6 +31,12 @@ export default function EmailOtpScreen() {
       Animated.spring(slideY, { toValue: 0, friction: 8, tension: 50, useNativeDriver: true })
     ]).start();
   }, []);
+
+  // A hard reload on web drops the module-scope address, and there's nothing
+  // to verify a code against without it — send the user back a step.
+  useEffect(() => {
+    if (!email) router.replace('/(auth)/email');
+  }, [email]);
 
   useEffect(() => {
     let timer;
