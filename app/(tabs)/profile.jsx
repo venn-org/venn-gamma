@@ -5,12 +5,10 @@ import { useFocusEffect, useRouter } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
     ActivityIndicator,
-    Alert,
     Animated,
     Dimensions,
     Image,
     Modal,
-    Platform,
     Pressable,
     ScrollView,
     StyleSheet,
@@ -18,7 +16,8 @@ import {
     Text,
     TouchableOpacity,
     View,
-} from "react-native";
+} from 'react-native';
+import { Alert } from '../../lib/alert';
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Svg, { Circle } from "react-native-svg";
 import FlatDetailsModal from "../../components/FlatDetailsModal";
@@ -266,16 +265,10 @@ export default function ProfileScreen() {
       setProfile((p) => ({ ...p, photos: nextPhotos }));
     };
 
-    if (Platform.OS === "web") {
-      if (window.confirm("Remove this photo from your profile?")) {
-        await doRemove();
-      }
-    } else {
-      Alert.alert("Remove photo", "Remove this photo from your profile?", [
-        { text: "Cancel", style: "cancel" },
-        { text: "Remove", style: "destructive", onPress: doRemove },
-      ]);
-    }
+    Alert.alert("Remove photo", "Remove this photo from your profile?", [
+      { text: "Cancel", style: "cancel" },
+      { text: "Remove", style: "destructive", onPress: doRemove },
+    ]);
   };
 
   const handleSetProfilePhoto = async (index) => {
@@ -361,16 +354,10 @@ export default function ProfileScreen() {
       }
     };
 
-    if (Platform.OS === "web") {
-      if (window.confirm("Remove this photo from your flat?")) {
-        await doRemove();
-      }
-    } else {
-      Alert.alert("Remove photo", "Remove this photo from your flat?", [
-        { text: "Cancel", style: "cancel" },
-        { text: "Remove", style: "destructive", onPress: doRemove },
-      ]);
-    }
+    Alert.alert("Remove photo", "Remove this photo from your flat?", [
+      { text: "Cancel", style: "cancel" },
+      { text: "Remove", style: "destructive", onPress: doRemove },
+    ]);
   };
 
   const handleFlatPhotoSlotPress = (index) => {
@@ -453,22 +440,16 @@ export default function ProfileScreen() {
   };
 
   const handleSignOut = async () => {
-    if (Platform.OS === "web") {
-      if (window.confirm("Are you sure you want to sign out?")) {
-        await signOutUser();
-      }
-    } else {
-      Alert.alert("Sign Out", "Are you sure you want to sign out?", [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Sign Out",
-          style: "destructive",
-          onPress: async () => {
-            await signOutUser();
-          },
+    Alert.alert("Sign Out", "Are you sure you want to sign out?", [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Sign Out",
+        style: "destructive",
+        onPress: async () => {
+          await signOutUser();
         },
-      ]);
-    }
+      },
+    ]);
   };
 
   const handleDeleteAccount = () => {

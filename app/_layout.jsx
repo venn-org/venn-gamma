@@ -19,11 +19,6 @@ LogBox.ignoreLogs([
 // Prevent auto-hiding the splash screen until fonts & auth are ready
 SplashScreen.preventAutoHideAsync();
 
-// Web alert polyfill
-if (Platform.OS === 'web' && typeof window !== 'undefined') {
-  window.Alert = require('../lib/alert').Alert;
-}
-
 export default function RootLayout() {
   return (
     <ThemeProvider>
