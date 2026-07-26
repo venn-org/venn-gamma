@@ -1,4 +1,4 @@
-import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
+import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect, useRouter } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -16,6 +16,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import MatchCelebration from "../../components/MatchCelebration";
+import OptionIcon from "../../components/OptionIcon";
 import PreferencesSheet from "../../components/PreferencesSheet";
 import { getCurrentUserId } from "../../lib/auth";
 import { getBlockedIds } from "../../lib/blocks";
@@ -25,7 +26,7 @@ import {
   getTodayViewedProfileIds,
   recordProfileView,
 } from "../../lib/dailyLimits";
-import { formatBudgetRange, formatMoveInDate, mapDbPrefsToUI, mapUIPrefsToDb, toDb, toUI } from "../../lib/enums";
+import { formatBudgetRange, formatMoveInDate, mapDbPrefsToUI, mapUIPrefsToDb, optionDisplay, stripLabelEmoji, toDb, toUI } from "../../lib/enums";
 import { PREF_ROWS, calculateOverlapScore, getPrefDisplay, isPrefSet, matchesPrefs } from "../../lib/prefs";
 import { buildProfileCardBlocks, buildProfileTraits, calculateProfileCompletion, isFeedReady } from "../../lib/profileUtils";
 import { supabase } from "../../lib/supabase";
@@ -339,6 +340,13 @@ export default function FeedScreen() {
       >
         {FILTER_CHIPS.map((chip) => {
           const active = isPrefSet(userPrefs, chip.key, chip.multi);
+          const chipValue = !active
+            ? null
+            : chip.multi ? userPrefs?.[chip.key]?.[0] : userPrefs?.[chip.key];
+          const chipIcon = optionDisplay(chip.enumKey, chipValue).icon;
+          const chipText = active
+            ? getPrefDisplay(userPrefs, chip.key, chip.label, chip.multi)
+            : chip.label;
           return (
             <TouchableOpacity
               key={chip.key}
@@ -346,10 +354,13 @@ export default function FeedScreen() {
               activeOpacity={0.8}
               onPress={() => { setPrefsSection(chip.key); setPrefsVisible(true); }}
             >
+              <OptionIcon
+                name={chipIcon}
+                size={13}
+                color={active ? "#fff" : colors.ink}
+              />
               <Text style={[s.filterChipText, active && s.filterChipTextActive]}>
-                {active
-                  ? getPrefDisplay(userPrefs, chip.key, chip.label, chip.multi)
-                  : chip.label}
+                {chipIcon ? stripLabelEmoji(chipText) : chipText}
               </Text>
               <Ionicons
                 name="chevron-down"
@@ -633,15 +644,12 @@ export default function FeedScreen() {
                   <View style={s.traitCard}>
                     <Text style={s.traitTitle}>Lifestyle</Text>
                     <View style={s.traitChips}>
-                      {traits.map((t) => {
-                        const Icon = t.iconSet === "mci" ? MaterialCommunityIcons : Ionicons;
-                        return (
-                          <View key={t.group} style={s.traitChip}>
-                            <Icon name={t.icon} size={14} color="#9AA0B2" />
-                            <Text style={s.traitChipText}>{t.label}</Text>
-                          </View>
-                        );
-                      })}
+                      {traits.map((t) => (
+                        <View key={t.group} style={s.traitChip}>
+                          <OptionIcon name={t.icon} size={14} color="#9AA0B2" />
+                          <Text style={s.traitChipText}>{t.label}</Text>
+                        </View>
+                      ))}
                     </View>
                   </View>
                 )}
@@ -817,6 +825,7 @@ const makeStyles = (colors) => StyleSheet.create({
   filterChip: {
     flexDirection: "row",
     alignItems: "center",
+    gap: 4,
     paddingHorizontal: 12,
     paddingVertical: 7,
     borderRadius: 50,

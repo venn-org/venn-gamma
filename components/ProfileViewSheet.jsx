@@ -1,9 +1,10 @@
 import { useRef, useEffect, useMemo } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, Modal, Pressable, StyleSheet, Image, Dimensions, Animated } from 'react-native';
-import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme, useThemedStyles } from '../lib/ThemeContext';
 import { buildProfileCardBlocks, buildProfileTraits } from '../lib/profileUtils';
+import OptionIcon from './OptionIcon';
 
 const { height: SCREEN_H } = Dimensions.get('window');
 
@@ -111,15 +112,12 @@ export default function ProfileViewSheet({ visible, profile, onClose, onPass, on
               <View style={s.traitCard}>
                 <Text style={s.traitTitle}>Lifestyle</Text>
                 <View style={s.traitChips}>
-                  {traits.map((t) => {
-                    const Icon = t.iconSet === 'mci' ? MaterialCommunityIcons : Ionicons;
-                    return (
-                      <View key={t.group} style={s.traitChip}>
-                        <Icon name={t.icon} size={14} color="#9AA0B2" />
-                        <Text style={s.traitChipText}>{t.label}</Text>
-                      </View>
-                    );
-                  })}
+                  {traits.map((t) => (
+                    <View key={t.group} style={s.traitChip}>
+                      <OptionIcon name={t.icon} size={14} color="#9AA0B2" />
+                      <Text style={s.traitChipText}>{t.label}</Text>
+                    </View>
+                  ))}
                 </View>
               </View>
             )}

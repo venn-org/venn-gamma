@@ -4,6 +4,8 @@ import { useRouter } from 'expo-router';
 import { colors } from '../../lib/theme';
 import { useOnboarding, totalSteps } from '../../hooks/useOnboarding';
 import OnboardingShell from '../../components/OnboardingShell';
+import OptionIcon from '../../components/OptionIcon';
+import { optionIcon } from '../../lib/enums';
 
 const QUESTIONS = [
   { key: 'drink', label: 'Do you drink?' },
@@ -66,6 +68,7 @@ export default function LifestyleScreen() {
                 const on = answers[q.key] === opt;
                 return (
                   <TouchableOpacity key={opt} style={[styles.chip, on && styles.chipOn]} onPress={() => setAnswer(q.key, opt)} activeOpacity={0.8}>
+                    <OptionIcon name={optionIcon('lifestyle', opt)} size={14} color={on ? '#fff' : colors.slate} />
                     <Text style={[styles.chipText, on && styles.chipTextOn]}>{opt}</Text>
                   </TouchableOpacity>
                 );
@@ -84,7 +87,7 @@ const styles = StyleSheet.create({
   question: { marginBottom: 24, borderBottomWidth: 1, borderColor: colors.mist, paddingBottom: 20 },
   qLabel: { fontSize: 15, fontWeight: '600', color: colors.ink, marginBottom: 12 },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  chip: { paddingHorizontal: 16, paddingVertical: 11, borderRadius: 50, borderWidth: 1.5, borderColor: colors.mist, backgroundColor: '#fff' },
+  chip: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 16, paddingVertical: 11, borderRadius: 50, borderWidth: 1.5, borderColor: colors.mist, backgroundColor: '#fff' },
   chipOn: { backgroundColor: colors.blue, borderColor: colors.blue },
   chipText: { fontSize: 14, fontWeight: '500', color: colors.slate },
   chipTextOn: { color: '#fff' },

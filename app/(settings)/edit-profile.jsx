@@ -6,7 +6,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { supabase } from '../../lib/supabase';
 import { getCurrentUserId } from '../../lib/auth';
 import { useTheme, useThemedStyles } from '../../lib/ThemeContext';
-import { toUI, toDb } from '../../lib/enums';
+import { toUI, toDb, optionDisplay } from '../../lib/enums';
+import OptionIcon from '../../components/OptionIcon';
 import { getAge } from '../../lib/age';
 import { CITIES, ZONES_BY_CITY } from '../../lib/locations';
 import Calendar from '../../components/Calendar';
@@ -75,20 +76,25 @@ const PROMPT_CATEGORIES = [
 ];
 const LIFESTYLE_OPTIONS = ['Yes', 'Sometimes', 'No', 'Prefer not to say'];
 
-const ChipSelector = ({ options, selected, onSelect }) => {
+// `group` is an enum group name (lib/enums) — when given, each chip picks up
+// that group's icon. Groups without icons (cities, zones) just omit it.
+const ChipSelector = ({ options, selected, onSelect, group }) => {
   const s = useThemedStyles(makeStyles);
+  const { colors } = useTheme();
   return (
   <View style={s.chipContainer}>
     {options.map(opt => {
       const isSelected = typeof selected === 'string' && selected.toLowerCase() === opt.toLowerCase();
+      const { icon, text } = optionDisplay(group, opt);
       return (
-        <TouchableOpacity 
-          key={opt} 
-          style={[s.chip, isSelected && s.chipSelected]} 
+        <TouchableOpacity
+          key={opt}
+          style={[s.chip, isSelected && s.chipSelected]}
           onPress={() => onSelect(opt)}
           activeOpacity={0.8}
         >
-          <Text style={[s.chipText, isSelected && s.chipTextSelected]}>{opt}</Text>
+          <OptionIcon name={icon} size={14} color={isSelected ? '#fff' : colors.slate} />
+          <Text style={[s.chipText, isSelected && s.chipTextSelected]}>{text}</Text>
         </TouchableOpacity>
       );
     })}
@@ -523,7 +529,7 @@ export default function EditProfileScreen() {
                 />
 
                 <Text style={s.label}>Gender</Text>
-                <ChipSelector options={GENDER_OPTIONS} selected={gender} onSelect={setGender} />
+                <ChipSelector options={GENDER_OPTIONS} selected={gender} onSelect={setGender} group="gender" />
 
                 <Text style={s.label}>Bio</Text>
                 <TextInput
@@ -611,13 +617,13 @@ export default function EditProfileScreen() {
                 <Text style={s.sectionTitle}>Lifestyle</Text>
                 
                 <Text style={s.label}>Do you drink?</Text>
-                <ChipSelector options={LIFESTYLE_OPTIONS} selected={drink} onSelect={setDrink} />
-                
+                <ChipSelector options={LIFESTYLE_OPTIONS} selected={drink} onSelect={setDrink} group="lifestyle" />
+
                 <Text style={s.label}>Do you smoke tobacco?</Text>
-                <ChipSelector options={LIFESTYLE_OPTIONS} selected={tobacco} onSelect={setTobacco} />
-                
+                <ChipSelector options={LIFESTYLE_OPTIONS} selected={tobacco} onSelect={setTobacco} group="lifestyle" />
+
                 <Text style={s.label}>Do you smoke weed?</Text>
-                <ChipSelector options={LIFESTYLE_OPTIONS} selected={weed} onSelect={setWeed} />
+                <ChipSelector options={LIFESTYLE_OPTIONS} selected={weed} onSelect={setWeed} group="lifestyle" />
               </View>
 
               {/* Prompts Section */}
@@ -716,7 +722,7 @@ const makeStyles = (colors) => StyleSheet.create({
   },
   
   chipContainer: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 4 },
-  chip: { paddingHorizontal: 14, paddingVertical: 10, borderRadius: 50, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.card },
+  chip: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 10, borderRadius: 50, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.card },
   chipSelected: { backgroundColor: colors.blue, borderColor: colors.blue },
   chipText: { fontFamily: 'HankenGrotesk_600SemiBold', fontSize: 13, color: colors.slate },
   chipTextSelected: { color: '#fff' },

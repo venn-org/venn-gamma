@@ -4,6 +4,8 @@ import { useRouter } from 'expo-router';
 import { colors } from '../../lib/theme';
 import { useOnboarding, totalSteps } from '../../hooks/useOnboarding';
 import OnboardingShell from '../../components/OnboardingShell';
+import OptionIcon from '../../components/OptionIcon';
+import { optionIcon } from '../../lib/enums';
 
 const OPTIONS = ['Woman', 'Man', 'Non-binary', 'Transgender', 'Other'];
 
@@ -48,7 +50,10 @@ export default function GenderScreen() {
         const on = selected === opt;
         return (
           <TouchableOpacity key={opt} style={[styles.row, on && styles.rowOn]} onPress={() => setSelected(opt)} activeOpacity={0.8}>
-            <Text style={styles.rowLabel}>{opt}</Text>
+            <View style={styles.rowLabelWrap}>
+              <OptionIcon name={optionIcon('gender', opt)} size={18} color={on ? colors.blue : colors.slate} />
+              <Text style={styles.rowLabel}>{opt}</Text>
+            </View>
             <View style={[styles.radio, on && styles.radioOn]}>
               {on && <View style={styles.radioDot} />}
             </View>
@@ -64,6 +69,7 @@ const styles = StyleSheet.create({
   subtitle: { fontSize: 14, color: colors.slate, lineHeight: 22, marginBottom: 24 },
   row: { backgroundColor: '#fff', borderRadius: 18, padding: 18, marginBottom: 10, borderWidth: 2, borderColor: 'transparent', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   rowOn: { borderColor: colors.blue, backgroundColor: '#EEF1FF' },
+  rowLabelWrap: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   rowLabel: { fontSize: 17, color: colors.ink },
   radio: { width: 24, height: 24, borderRadius: 12, borderWidth: 2, borderColor: '#C8CAD2', backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center' },
   radioOn: { borderColor: colors.blue },
