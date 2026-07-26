@@ -1153,7 +1153,7 @@ export default function ProfileScreen() {
           separate flat_details row, which the sheet expects inlined. */}
       <ProfileViewSheet
         visible={previewVisible}
-        profile={profile ? { ...profile, flat_photos: flatDetails?.photos ?? [] } : null}
+        profile={profile ? { ...profile, flat_photos: flatDetails?.photos ?? [], flat_description: flatDetails?.description ?? null } : null}
         showActions={false}
         onClose={() => setPreviewVisible(false)}
       />

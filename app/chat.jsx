@@ -97,12 +97,14 @@ export default function ChatScreen() {
     // flat_details is a separate table (not embeddable through the `profiles`
     // view), so owners' flat photos need their own fetch — same as likes.jsx.
     let flatPhotos = [];
+    let flatDescription = null;
     if (data.user_type === 'owner') {
       const { data: flatRow } = await supabase
-        .from('flat_details').select('photos').eq('profile_id', otherUserId).maybeSingle();
+        .from('flat_details').select('photos, description').eq('profile_id', otherUserId).maybeSingle();
       flatPhotos = flatRow?.photos ?? [];
+      flatDescription = flatRow?.description ?? null;
     }
-    setOtherProfile({ ...data, flat_photos: flatPhotos });
+    setOtherProfile({ ...data, flat_photos: flatPhotos, flat_description: flatDescription });
   };
 
   useEffect(() => {

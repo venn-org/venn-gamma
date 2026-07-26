@@ -1,10 +1,11 @@
-import { useRef, useEffect, useMemo } from 'react';
+import { Fragment, useRef, useEffect, useMemo, useState } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, Modal, Pressable, StyleSheet, Image, Dimensions, Animated } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme, useThemedStyles } from '../lib/ThemeContext';
-import { buildProfileCardBlocks, buildProfileTraits } from '../lib/profileUtils';
+import { buildFlatFacts, buildFlatGallery, buildProfileCardBlocks, buildProfileTraits } from '../lib/profileUtils';
 import OptionIcon from './OptionIcon';
+import PhotoLightbox from './PhotoLightbox';
 
 const { height: SCREEN_H } = Dimensions.get('window');
 
@@ -30,16 +31,22 @@ export default function ProfileViewSheet({ visible, profile, onClose, onPass, on
     } else {
       backdropOpacity.setValue(0);
       sheetY.setValue(SCREEN_H);
+      setLightboxIndex(null);
     }
   }, [visible]);
 
   // Before the early return — hooks can't run conditionally.
   const cardBlocks = useMemo(() => buildProfileCardBlocks(profile), [profile]);
   const traits = useMemo(() => buildProfileTraits(profile), [profile]);
+  const flatFacts = useMemo(() => buildFlatFacts(profile), [profile]);
+  const flatGallery = useMemo(() => buildFlatGallery(profile), [profile]);
+  // Which flat photo the lightbox opened on; null while it's closed.
+  const [lightboxIndex, setLightboxIndex] = useState(null);
 
   if (!profile) return null;
 
   return (
+    <Fragment>
     <Modal visible={visible} transparent animationType="none" onRequestClose={onClose}>
       <View style={{ flex: 1, justifyContent: 'flex-end' }}>
         <Animated.View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.6)', opacity: backdropOpacity }]} />
@@ -145,6 +152,43 @@ export default function ProfileViewSheet({ visible, profile, onClose, onPass, on
               ),
             )}
 
+            {/* Owners' flat: facts, then the room photos as one gallery —
+                mirrors the feed card's placement after the prompts. */}
+            {(flatFacts.length > 0 || flatGallery.length > 0) && (
+              <View style={s.flatSection}>
+                <Text style={s.flatSectionTitle}>The flat</Text>
+                {flatFacts.map((f) => (
+                  <View key={f.key} style={s.flatFactRow}>
+                    <Ionicons name={f.icon} size={15} color="#9AA0B2" />
+                    <Text style={s.flatFactText}>{f.text}</Text>
+                  </View>
+                ))}
+                {profile.flat_description ? (
+                  <Text style={s.flatDescription}>{profile.flat_description}</Text>
+                ) : null}
+
+                {flatGallery.length > 0 && (
+                  <View style={s.galleryGrid}>
+                    {flatGallery.map((photo, i) => (
+                      <TouchableOpacity
+                        key={`flat-${i}`}
+                        style={s.galleryTile}
+                        activeOpacity={0.85}
+                        onPress={() => setLightboxIndex(i)}
+                      >
+                        <Image source={{ uri: photo.url }} style={s.galleryPhoto} resizeMode="cover" />
+                        {photo.label && (
+                          <View style={[s.flatLabel, s.galleryLabel]}>
+                            <Text style={s.flatLabelText}>{photo.label}</Text>
+                          </View>
+                        )}
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                )}
+              </View>
+            )}
+
           </ScrollView>
 
           {/* Action Footer */}
@@ -168,6 +212,16 @@ export default function ProfileViewSheet({ visible, profile, onClose, onPass, on
         </Animated.View>
       </View>
     </Modal>
+
+    {/* Sibling of the sheet rather than nested inside it, so it layers on top
+        the same way PreferencesSheet stacks its confirm dialog. */}
+    <PhotoLightbox
+      visible={lightboxIndex !== null}
+      photos={flatGallery}
+      startIndex={lightboxIndex ?? 0}
+      onClose={() => setLightboxIndex(null)}
+    />
+    </Fragment>
   );
 }
 
@@ -218,6 +272,17 @@ const makeStyles = (colors) => StyleSheet.create({
   blockPhotoWrap: { position: 'relative', borderRadius: 20, overflow: 'hidden', height: 260, marginBottom: 10, marginHorizontal: 16 },
   blockPhoto: { width: '100%', height: '100%' },
   flatLabel: { position: 'absolute', bottom: 14, left: 14, backgroundColor: 'rgba(0,0,0,0.42)', borderRadius: 50, paddingHorizontal: 12, paddingVertical: 6 },
+  galleryLabel: { bottom: 8, left: 8, paddingHorizontal: 10, paddingVertical: 4 },
+
+  flatSection: { backgroundColor: colors.card, borderRadius: 20, padding: 18, marginBottom: 10, marginHorizontal: 16 },
+  flatSectionTitle: { fontFamily: 'SpaceGrotesk_700Bold', fontSize: 18, color: colors.ink, letterSpacing: -0.3, marginBottom: 12 },
+  flatFactRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 },
+  flatFactText: { fontFamily: 'HankenGrotesk_600SemiBold', fontSize: 14, color: colors.ink },
+  flatDescription: { fontFamily: 'HankenGrotesk_400Regular', fontSize: 14, color: colors.slate, lineHeight: 21, marginTop: 4 },
+  // Two-up tiles; flexGrow lets a lone trailing photo take the full width.
+  galleryGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 14 },
+  galleryTile: { position: 'relative', flexGrow: 1, flexBasis: '47%', aspectRatio: 1, borderRadius: 14, overflow: 'hidden', backgroundColor: colors.mist },
+  galleryPhoto: { width: '100%', height: '100%' },
   flatLabelText: { fontFamily: 'HankenGrotesk_600SemiBold', fontSize: 12, color: '#fff' },
 
   actions: { flexDirection: 'row', justifyContent: 'center', gap: 20, paddingTop: 16, paddingHorizontal: 20, borderTopWidth: 1, borderTopColor: colors.border },
