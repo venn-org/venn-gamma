@@ -29,6 +29,7 @@ import {
 } from "../../lib/dailyLimits";
 import { formatBudgetRange, formatMoveInDate, mapDbPrefsToUI, mapUIPrefsToDb, optionDisplay, stripLabelEmoji, toDb, toUI } from "../../lib/enums";
 import { PREF_ROWS, calculateOverlapScore, getPrefDisplay, isPrefSet, matchesPrefs } from "../../lib/prefs";
+import { REPORT_REASONS, reportUser } from "../../lib/reports";
 import { buildFlatFacts, buildFlatGallery, buildProfileCardBlocks, buildProfileTraits, calculateProfileCompletion, isFeedReady } from "../../lib/profileUtils";
 import { supabase } from "../../lib/supabase";
 import { useTheme, useThemedStyles } from "../../lib/ThemeContext";
@@ -59,6 +60,8 @@ export default function FeedScreen() {
   const [myProfile, setMyProfile] = useState(null);
 
   const [menuOpen, setMenuOpen] = useState(false);
+  // The profile a report is being filed against; null while the sheet is shut.
+  const [reportTarget, setReportTarget] = useState(null);
   const [showBanner, setShowBanner] = useState(true);
   const [remainingLikes, setRemainingLikes] = useState(5);
 
@@ -317,7 +320,28 @@ export default function FeedScreen() {
 
   const handleReport = () => {
     setMenuOpen(false);
-    Alert.alert("Reported", "Thank you for keeping Venn safe.");
+    // Capture the profile now — submitting advances the card, and the sheet
+    // needs to know who it was filed against after that.
+    setReportTarget(currentProfile);
+  };
+
+  const submitReport = async (reasonCode) => {
+    const uid = getCurrentUserId();
+    const target = reportTarget;
+    setReportTarget(null);
+    if (!uid || !target) return;
+
+    const { error } = await reportUser(uid, target.id, reasonCode);
+    if (error) {
+      console.error("reportUser failed:", error);
+      Alert.alert("Error", "Couldn't submit that report. Please try again.");
+      return;
+    }
+
+    Alert.alert(
+      "Report submitted",
+      "Our safety team will review this. Thanks for keeping Venn safe.",
+    );
     handlePass();
   };
 
@@ -500,6 +524,48 @@ export default function FeedScreen() {
                         <Text style={s.menuItemText}>Block</Text>
                       </TouchableOpacity>
                     </View>
+                  </Pressable>
+                </Modal>
+              )}
+
+              {reportTarget && (
+                <Modal
+                  visible
+                  transparent
+                  animationType="fade"
+                  onRequestClose={() => setReportTarget(null)}
+                >
+                  <Pressable
+                    style={s.reportBackdrop}
+                    onPress={() => setReportTarget(null)}
+                  >
+                    {/* Stop taps inside the sheet from dismissing it. */}
+                    <Pressable style={s.reportBox} onPress={() => {}}>
+                      <Text style={s.reportTitle}>
+                        Report {reportTarget.name || "this profile"}
+                      </Text>
+                      <Text style={s.reportSub}>
+                        What's going on? Your report is anonymous.
+                      </Text>
+                      {REPORT_REASONS.map((r) => (
+                        <TouchableOpacity
+                          key={r.code}
+                          style={s.menuItem}
+                          onPress={() => submitReport(r.code)}
+                        >
+                          <Text style={s.menuItemText}>{r.label}</Text>
+                        </TouchableOpacity>
+                      ))}
+                      <View style={s.menuDivider} />
+                      <TouchableOpacity
+                        style={s.menuItem}
+                        onPress={() => setReportTarget(null)}
+                      >
+                        <Text style={[s.menuItemText, { color: colors.slate }]}>
+                          Cancel
+                        </Text>
+                      </TouchableOpacity>
+                    </Pressable>
                   </Pressable>
                 </Modal>
               )}
@@ -992,6 +1058,39 @@ const makeStyles = (colors) => StyleSheet.create({
     color: colors.ink,
   },
   menuDivider: { height: 1, backgroundColor: colors.border },
+
+  // The report sheet is a centred dialog rather than the anchored popover
+  // menuBackdrop positions, so it gets its own backdrop.
+  reportBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.4)",
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 24,
+  },
+  reportBox: {
+    backgroundColor: colors.card,
+    borderRadius: 18,
+    width: "100%",
+    maxWidth: 360,
+    paddingVertical: 8,
+    overflow: "hidden",
+  },
+  reportTitle: {
+    fontFamily: "SpaceGrotesk_700Bold",
+    fontSize: 17,
+    color: colors.ink,
+    paddingHorizontal: 16,
+    paddingTop: 12,
+  },
+  reportSub: {
+    fontFamily: "HankenGrotesk_400Regular",
+    fontSize: 13,
+    color: colors.slate,
+    paddingHorizontal: 16,
+    paddingTop: 4,
+    paddingBottom: 8,
+  },
 
   empty: { flex: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: 32 },
   emptyText: {
