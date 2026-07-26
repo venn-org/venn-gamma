@@ -1,23 +1,25 @@
 import { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Image, Dimensions, RefreshControl, Modal } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Image, useWindowDimensions, RefreshControl, Modal } from 'react-native';
 import { Alert } from '../../lib/alert';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { supabase } from '../../lib/supabase';
 import { useTheme, useThemedStyles } from '../../lib/ThemeContext';
 import { getCurrentUserId } from '../../lib/auth';
+import { getBlockedIds } from '../../lib/blocks';
 import ProfileViewSheet from '../../components/ProfileViewSheet';
 import MatchCelebration from '../../components/MatchCelebration';
 import { useRouter } from 'expo-router';
 
-const { width } = Dimensions.get('window');
-const CARD_W = (width - 32 - 12) / 2;
 
 export default function LikesScreen() {
   const s = useThemedStyles(makeStyles);
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  // Recomputed on rotation / web resize, unlike a module-scope Dimensions read.
+  const { width } = useWindowDimensions();
+  const cardW = (width - 32 - 12) / 2;
   
   const [likes, setLikes] = useState([]);
   const [refreshing, setRefreshing] = useState(false);
@@ -31,11 +33,16 @@ export default function LikesScreen() {
     setRefreshing(true);
     
     // Fetch who liked the current user along with their full profile
-    const { data } = await supabase
-      .from('likes')
-      .select('id, created_at, from_user_id, profiles!from_user_id(*)')
-      .eq('to_user_id', uid)
-      .order('created_at', { ascending: false });
+    const [{ data }, blocked] = await Promise.all([
+      supabase
+        .from('likes')
+        .select('id, created_at, from_user_id, profiles!from_user_id(*)')
+        .eq('to_user_id', uid)
+        .order('created_at', { ascending: false }),
+      // Blocking is bidirectional; without this a blocked user's like kept
+      // showing here even though they're filtered out of feed/messages.
+      getBlockedIds(uid),
+    ]);
 
     // A mutual like already turned into a match — the likes row for it is
     // never cleaned up server-side (and RLS won't let this user delete the
@@ -55,7 +62,7 @@ export default function LikesScreen() {
           userId: l.from_user_id,
           profile: l.profiles // The full profile row
         }))
-        .filter(l => l.profile && !matchedUserIds.has(l.userId));
+        .filter(l => l.profile && !matchedUserIds.has(l.userId) && !blocked.has(l.userId));
 
       // flat_details is a separate table (not embeddable through the
       // `profiles` view), so fetch owners' flat photos in one extra query.
@@ -152,8 +159,8 @@ export default function LikesScreen() {
             refreshControl={<RefreshControl refreshing={refreshing} onRefresh={fetchLikes} tintColor={colors.blue} />}
           >
             {likes.map((l) => (
-              <TouchableOpacity key={l.likeId} style={s.likeCard} activeOpacity={0.85} onPress={() => setSelectedLike(l)}>
-                <View style={s.likePhotoWrap}>
+              <TouchableOpacity key={l.likeId} style={[s.likeCard, { width: cardW }]} activeOpacity={0.85} onPress={() => setSelectedLike(l)}>
+                <View style={[s.likePhotoWrap, { height: cardW * 1.25 }]}>
                   {l.profile?.photos?.[0] ? (
                     <Image source={{ uri: l.profile.photos[0] }} style={s.likePhoto} resizeMode="cover" />
                   ) : (
@@ -223,8 +230,8 @@ const makeStyles = (colors) => StyleSheet.create({
   emptySub: { fontFamily: 'HankenGrotesk_400Regular', fontSize: 14, color: colors.placeholder, textAlign: 'center', lineHeight: 22, marginBottom: 28 },
 
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, padding: 16, paddingBottom: 100 },
-  likeCard: { width: CARD_W, borderRadius: 18, overflow: 'hidden', backgroundColor: colors.card },
-  likePhotoWrap: { width: '100%', height: CARD_W * 1.25, position: 'relative' },
+  likeCard: { borderRadius: 18, overflow: 'hidden', backgroundColor: colors.card },
+  likePhotoWrap: { width: '100%', position: 'relative' },
   likePhoto: { width: '100%', height: '100%' },
   likePhotoPlaceholder: { backgroundColor: colors.canvas, alignItems: 'center', justifyContent: 'center' },
   likeInfo: { padding: 12 },

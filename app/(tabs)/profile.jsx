@@ -6,13 +6,13 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
     ActivityIndicator,
     Animated,
-    Dimensions,
     Image,
     Modal,
     Pressable,
     ScrollView,
     StyleSheet,
     Switch,
+    useWindowDimensions,
     Text,
     TouchableOpacity,
     View,
@@ -87,8 +87,6 @@ const ThemeToggle = ({ isDark, onToggle }) => {
   );
 };
 
-const PHOTO_SLOT = (Dimensions.get("window").width - 40 - 16) / 3;
-
 const SettingsRow = ({
   icon,
   iconBg,
@@ -141,6 +139,9 @@ export default function ProfileScreen() {
   const s = useThemedStyles(makeStyles);
   const { colors, setMode, isDark } = useTheme();
   const insets = useSafeAreaInsets();
+  // Recomputed on rotation / web resize, unlike a module-scope Dimensions read.
+  const { width: windowW } = useWindowDimensions();
+  const photoSlotSize = (windowW - 40 - 16) / 3;
   const router = useRouter();
 
   const [profile, setProfile] = useState(null);
@@ -208,7 +209,7 @@ export default function ProfileScreen() {
     }
 
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      mediaTypes: ['images'],
       allowsEditing: true,
       aspect: index === 0 ? [1, 1] : [4, 3],
       quality: 0.8,
@@ -305,7 +306,7 @@ export default function ProfileScreen() {
     }
 
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      mediaTypes: ['images'],
       allowsEditing: true,
       aspect: [4, 3],
       quality: 0.8,
@@ -482,7 +483,7 @@ export default function ProfileScreen() {
   const renderPhotoSlot = (i) => (
     <Pressable
       key={i}
-      style={({ pressed }) => [s.photoSlot, pressed && { opacity: 0.8 }]}
+      style={({ pressed }) => [s.photoSlot, { width: photoSlotSize, height: photoSlotSize }, pressed && { opacity: 0.8 }]}
       onPress={() => handlePhotoSlotPress(i)}
     >
       {photos[i] ? (
@@ -521,7 +522,7 @@ export default function ProfileScreen() {
     return (
       <Pressable
         key={i}
-        style={({ pressed }) => [s.photoSlot, pressed && { opacity: 0.8 }]}
+        style={({ pressed }) => [s.photoSlot, { width: photoSlotSize, height: photoSlotSize }, pressed && { opacity: 0.8 }]}
         onPress={() => handleFlatPhotoSlotPress(i)}
       >
         {url ? (
@@ -1276,8 +1277,6 @@ const makeStyles = (colors) =>
     },
     photoGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
     photoSlot: {
-      width: PHOTO_SLOT,
-      height: PHOTO_SLOT,
       borderRadius: 14,
       backgroundColor: colors.card,
       borderWidth: 1,

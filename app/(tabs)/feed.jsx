@@ -3,7 +3,6 @@ import { useFocusEffect, useRouter } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
     Animated,
-    Dimensions,
     Image,
     Modal,
     Pressable,
@@ -29,12 +28,11 @@ import {
 } from "../../lib/dailyLimits";
 import { formatBudgetRange, formatMoveInDate, mapDbPrefsToUI, mapUIPrefsToDb, optionDisplay, stripLabelEmoji, toDb, toUI } from "../../lib/enums";
 import { PREF_ROWS, calculateOverlapScore, getPrefDisplay, isPrefSet, matchesPrefs } from "../../lib/prefs";
+import { activeStatusText, isOnline } from "../../lib/presence";
 import { REPORT_REASONS, reportUser } from "../../lib/reports";
 import { buildFlatFacts, buildFlatGallery, buildProfileCardBlocks, buildProfileTraits, calculateProfileCompletion, isFeedReady } from "../../lib/profileUtils";
 import { supabase } from "../../lib/supabase";
 import { useTheme, useThemedStyles } from "../../lib/ThemeContext";
-
-const { width: SCREEN_W } = Dimensions.get("window");
 
 // TEMP: daily view limit disabled for today — profiles cycle (wrap around)
 // instead of dead-ending at "come back tomorrow" once you've seen them all.
@@ -603,7 +601,14 @@ export default function FeedScreen() {
                         {currentProfile.pronouns?.[0] || "-"}
                       </Text>
                       <Text style={s.dot}> • </Text>
-                      <Text style={s.active}>Active now</Text>
+                      <Text
+                        style={[
+                          s.active,
+                          !isOnline(currentProfile.last_active_at) && { color: colors.slate },
+                        ]}
+                      >
+                        {activeStatusText(currentProfile.last_active_at)}
+                      </Text>
                       <View
                         style={[
                           s.rolePill,

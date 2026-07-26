@@ -8,6 +8,7 @@ import { supabase } from '../../lib/supabase';
 import { useTheme, useThemedStyles } from '../../lib/ThemeContext';
 import { getCurrentUserId } from '../../lib/auth';
 import { getBlockedIds } from '../../lib/blocks';
+import { isOnline } from '../../lib/presence';
 
 const Avatar = ({ photo, name, size = 48, online }) => {
   const { colors } = useTheme();
@@ -49,13 +50,18 @@ export default function MessagesScreen() {
     const blocked = await getBlockedIds(uid);
 
     // Fetch matches with messages
+    // Only the newest message per match is rendered, so fetch exactly that —
+    // the unbounded embed pulled every conversation's full history on each
+    // load just to read its last row.
     const { data: matchesData, error } = await supabase
       .from('matches')
       .select(`
         id, user1_id, user2_id,
         messages(id, content, sender_id, read, created_at)
       `)
-      .or(`user1_id.eq.${uid},user2_id.eq.${uid}`);
+      .or(`user1_id.eq.${uid},user2_id.eq.${uid}`)
+      .order('created_at', { referencedTable: 'messages', ascending: false })
+      .limit(1, { referencedTable: 'messages' });
 
     if (error) {
       console.error('Error fetching matches:', error);
@@ -99,7 +105,7 @@ export default function MessagesScreen() {
     // Fetch profiles for the other users
     const { data: profilesData } = await supabase
       .from('profiles')
-      .select('id, name, photos')
+      .select('id, name, photos, last_active_at')
       .in('id', otherUserIds);
 
     const profileMap = {};
@@ -117,10 +123,9 @@ export default function MessagesScreen() {
       const profile = profileMap[m.otherId];
       if (!profile) return; // shouldn't happen, but safe
 
-      const msgs = m.messages || [];
-      msgs.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
-      
-      const lastMsg = msgs.length > 0 ? msgs[msgs.length - 1] : null;
+      // The embed is ordered newest-first and capped at 1, so index 0 is the
+      // latest message (or the array is empty for a match with no messages).
+      const lastMsg = (m.messages || [])[0] ?? null;
 
       const matchObj = {
         id: m.id,
@@ -128,7 +133,7 @@ export default function MessagesScreen() {
         photo: Array.isArray(profile.photos) ? profile.photos[0] : null,
         lastMsg: lastMsg ? lastMsg.content : 'Say hi!',
         hasNewMsg: lastMsg ? (!lastMsg.read && lastMsg.sender_id !== uid) : true,
-        online: false, // mock
+        online: isOnline(profile.last_active_at),
         lastActivity: lastMsg ? new Date(lastMsg.created_at).getTime() : 0,
       };
 
