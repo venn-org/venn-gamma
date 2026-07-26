@@ -15,7 +15,10 @@ const formatTime = (iso) => {
   return new Date(iso).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
 };
 
-const POLL_INTERVAL_MS = 3000;
+// Realtime subscription is the primary update path for messages; this only
+// covers delayed/dropped realtime delivery and other-user presence, so it
+// doesn't need to be aggressive.
+const POLL_INTERVAL_MS = 10000;
 const TYPING_TIMEOUT_MS = 3000;
 
 export default function ChatScreen() {
