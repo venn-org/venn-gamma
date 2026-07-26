@@ -5,20 +5,19 @@ import { useFocusEffect, useRouter } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
     ActivityIndicator,
-    Alert,
     Animated,
-    Dimensions,
     Image,
     Modal,
-    Platform,
     Pressable,
     ScrollView,
     StyleSheet,
     Switch,
+    useWindowDimensions,
     Text,
     TouchableOpacity,
     View,
-} from "react-native";
+} from 'react-native';
+import { Alert } from '../../lib/alert';
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Svg, { Circle } from "react-native-svg";
 import FlatDetailsModal from "../../components/FlatDetailsModal";
@@ -88,8 +87,6 @@ const ThemeToggle = ({ isDark, onToggle }) => {
   );
 };
 
-const PHOTO_SLOT = (Dimensions.get("window").width - 40 - 16) / 3;
-
 const SettingsRow = ({
   icon,
   iconBg,
@@ -142,6 +139,9 @@ export default function ProfileScreen() {
   const s = useThemedStyles(makeStyles);
   const { colors, setMode, isDark } = useTheme();
   const insets = useSafeAreaInsets();
+  // Recomputed on rotation / web resize, unlike a module-scope Dimensions read.
+  const { width: windowW } = useWindowDimensions();
+  const photoSlotSize = (windowW - 40 - 16) / 3;
   const router = useRouter();
 
   const [profile, setProfile] = useState(null);
@@ -209,7 +209,7 @@ export default function ProfileScreen() {
     }
 
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      mediaTypes: ['images'],
       allowsEditing: true,
       aspect: index === 0 ? [1, 1] : [4, 3],
       quality: 0.8,
@@ -266,16 +266,10 @@ export default function ProfileScreen() {
       setProfile((p) => ({ ...p, photos: nextPhotos }));
     };
 
-    if (Platform.OS === "web") {
-      if (window.confirm("Remove this photo from your profile?")) {
-        await doRemove();
-      }
-    } else {
-      Alert.alert("Remove photo", "Remove this photo from your profile?", [
-        { text: "Cancel", style: "cancel" },
-        { text: "Remove", style: "destructive", onPress: doRemove },
-      ]);
-    }
+    Alert.alert("Remove photo", "Remove this photo from your profile?", [
+      { text: "Cancel", style: "cancel" },
+      { text: "Remove", style: "destructive", onPress: doRemove },
+    ]);
   };
 
   const handleSetProfilePhoto = async (index) => {
@@ -312,7 +306,7 @@ export default function ProfileScreen() {
     }
 
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      mediaTypes: ['images'],
       allowsEditing: true,
       aspect: [4, 3],
       quality: 0.8,
@@ -361,16 +355,10 @@ export default function ProfileScreen() {
       }
     };
 
-    if (Platform.OS === "web") {
-      if (window.confirm("Remove this photo from your flat?")) {
-        await doRemove();
-      }
-    } else {
-      Alert.alert("Remove photo", "Remove this photo from your flat?", [
-        { text: "Cancel", style: "cancel" },
-        { text: "Remove", style: "destructive", onPress: doRemove },
-      ]);
-    }
+    Alert.alert("Remove photo", "Remove this photo from your flat?", [
+      { text: "Cancel", style: "cancel" },
+      { text: "Remove", style: "destructive", onPress: doRemove },
+    ]);
   };
 
   const handleFlatPhotoSlotPress = (index) => {
@@ -453,22 +441,16 @@ export default function ProfileScreen() {
   };
 
   const handleSignOut = async () => {
-    if (Platform.OS === "web") {
-      if (window.confirm("Are you sure you want to sign out?")) {
-        await signOutUser();
-      }
-    } else {
-      Alert.alert("Sign Out", "Are you sure you want to sign out?", [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Sign Out",
-          style: "destructive",
-          onPress: async () => {
-            await signOutUser();
-          },
+    Alert.alert("Sign Out", "Are you sure you want to sign out?", [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Sign Out",
+        style: "destructive",
+        onPress: async () => {
+          await signOutUser();
         },
-      ]);
-    }
+      },
+    ]);
   };
 
   const handleDeleteAccount = () => {
@@ -501,7 +483,7 @@ export default function ProfileScreen() {
   const renderPhotoSlot = (i) => (
     <Pressable
       key={i}
-      style={({ pressed }) => [s.photoSlot, pressed && { opacity: 0.8 }]}
+      style={({ pressed }) => [s.photoSlot, { width: photoSlotSize, height: photoSlotSize }, pressed && { opacity: 0.8 }]}
       onPress={() => handlePhotoSlotPress(i)}
     >
       {photos[i] ? (
@@ -540,7 +522,7 @@ export default function ProfileScreen() {
     return (
       <Pressable
         key={i}
-        style={({ pressed }) => [s.photoSlot, pressed && { opacity: 0.8 }]}
+        style={({ pressed }) => [s.photoSlot, { width: photoSlotSize, height: photoSlotSize }, pressed && { opacity: 0.8 }]}
         onPress={() => handleFlatPhotoSlotPress(i)}
       >
         {url ? (
@@ -1295,8 +1277,6 @@ const makeStyles = (colors) =>
     },
     photoGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
     photoSlot: {
-      width: PHOTO_SLOT,
-      height: PHOTO_SLOT,
       borderRadius: 14,
       backgroundColor: colors.card,
       borderWidth: 1,

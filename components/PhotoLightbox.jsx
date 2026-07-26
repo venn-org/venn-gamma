@@ -1,9 +1,7 @@
 import { useEffect, useState } from 'react';
-import { View, Text, TouchableOpacity, Modal, StyleSheet, Image, Dimensions, Pressable } from 'react-native';
+import { View, Text, TouchableOpacity, Modal, StyleSheet, Image, useWindowDimensions, Pressable } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-
-const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
 
 /**
  * Full-screen viewer for a set of `{url, label}` photos, opened from a gallery
@@ -14,6 +12,8 @@ const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
  */
 export default function PhotoLightbox({ visible, photos = [], startIndex = 0, onClose }) {
   const insets = useSafeAreaInsets();
+  // Follows rotation / web resize rather than freezing at import time.
+  const { width: screenW, height: screenH } = useWindowDimensions();
   const [index, setIndex] = useState(startIndex);
 
   useEffect(() => {
@@ -33,7 +33,7 @@ export default function PhotoLightbox({ visible, photos = [], startIndex = 0, on
         {/* Tapping the background closes; the image sits above it. */}
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
 
-        <Image source={{ uri: photo.url }} style={styles.image} resizeMode="contain" />
+        <Image source={{ uri: photo.url }} style={{ width: screenW, height: screenH * 0.72 }} resizeMode="contain" />
 
         <View style={[styles.topBar, { top: insets.top + 10 }]}>
           <Text style={styles.counter}>
@@ -69,7 +69,7 @@ export default function PhotoLightbox({ visible, photos = [], startIndex = 0, on
 
 const styles = StyleSheet.create({
   backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.94)', alignItems: 'center', justifyContent: 'center' },
-  image: { width: SCREEN_W, height: SCREEN_H * 0.72 },
+
 
   topBar: {
     position: 'absolute', left: 16, right: 16,

@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, TextInput, ScrollView, Alert, KeyboardAvoidingView, Platform, ActivityIndicator, Modal, Pressable, Animated, Dimensions } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, TextInput, ScrollView, KeyboardAvoidingView, Platform, ActivityIndicator, Modal, Pressable, Animated, Dimensions } from 'react-native';
+import { Alert } from '../../lib/alert';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -423,8 +424,8 @@ export default function EditProfileScreen() {
     setSaving(true);
     try {
       const uid = getCurrentUserId();
-      if (!uid) return;
-      
+      if (!uid) throw new Error('You appear to be signed out. Please sign in again.');
+
       const newPrompts = [];
       if (prompt1Q.trim() || prompt1A.trim()) {
         newPrompts.push({ q: prompt1Q.trim(), a: prompt1A.trim() });
@@ -436,12 +437,13 @@ export default function EditProfileScreen() {
         newPrompts.push({ q: prompt3Q.trim(), a: prompt3A.trim() });
       }
 
-      // Try to construct valid ISO string for birthday if provided
-      let isoBirthday = null;
-      if (birthday) {
-        isoBirthday = new Date(birthday).toISOString();
-      }
-      
+      // `birthday` is already a plain YYYY-MM-DD calendar date and the column
+      // is a `date`, so it's stored verbatim. Round-tripping through
+      // toISOString() reinterpreted it as local midnight and converted to UTC,
+      // which in any timezone east of UTC (IST included) shifted the stored
+      // date a day earlier and could knock a year off the computed age.
+      const isoBirthday = /^\d{4}-\d{2}-\d{2}$/.test(birthday) ? birthday : null;
+
       const updatePayload = {
         name: name.trim(),
         gender: toDb('gender', gender) || null,

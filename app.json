@@ -6,7 +6,7 @@
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "venn",
-    "userInterfaceStyle": "light",
+    "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "splash": {
       "image": "./assets/images/splash-icon.png",
@@ -15,7 +15,11 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.venn.app"
+      "bundleIdentifier": "com.venn.app",
+      "infoPlist": {
+        "NSPhotoLibraryUsageDescription": "Venn needs access to your photos so you can add pictures of yourself and your flat to your profile.",
+        "NSLocationWhenInUseUsageDescription": "Venn uses your location to suggest the neighbourhood you're searching in."
+      }
     },
     "android": {
       "adaptiveIcon": {

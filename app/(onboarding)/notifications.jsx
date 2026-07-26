@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Switch, Platform, ImageBackground, Alert } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Switch, Platform, ImageBackground } from 'react-native';
+import { Alert } from '../../lib/alert';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';

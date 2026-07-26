@@ -22,10 +22,20 @@ let onboardingState = {
   photos: { profile: null, flat: [null, null, null] },
 };
 
-// Restore from local storage to survive HMR during dev
-if (typeof window !== 'undefined') {
+const DRAFT_KEY = 'venn_onboarding_state';
+
+// React Native defines a global `window` but no `window.localStorage`, so a
+// bare `typeof window !== 'undefined'` guard passes on native and then throws
+// on the property access. Test for the storage object itself, not the window.
+const draftStore = typeof window !== 'undefined' && window.localStorage
+  ? window.localStorage
+  : null;
+
+// Restore the draft to survive HMR during dev (web only — on native the
+// module stays resident across screen unmounts, which is all this needs to do).
+if (draftStore) {
   try {
-    const saved = window.localStorage.getItem('venn_onboarding_state');
+    const saved = draftStore.getItem(DRAFT_KEY);
     if (saved) onboardingState = { ...onboardingState, ...JSON.parse(saved) };
   } catch (e) {}
 }
@@ -42,9 +52,9 @@ export function useOnboarding() {
   const updateData = useCallback((newData) => {
     onboardingState = { ...onboardingState, ...newData };
     setState(onboardingState);
-    if (typeof window !== 'undefined') {
-      window.localStorage.setItem('venn_onboarding_state', JSON.stringify(onboardingState));
-    }
+    try {
+      draftStore?.setItem(DRAFT_KEY, JSON.stringify(onboardingState));
+    } catch (e) { /* quota exceeded / storage disabled — the draft is best-effort */ }
   }, []);
 
   const submitData = async () => {
@@ -167,9 +177,9 @@ export function useOnboarding() {
     }
 
     notifyOnboardingComplete();
-    if (typeof window !== 'undefined') {
-      window.localStorage.removeItem('venn_onboarding_state');
-    }
+    try {
+      draftStore?.removeItem(DRAFT_KEY);
+    } catch (e) { /* nothing to clean up if storage is unavailable */ }
     return true;
   };
 

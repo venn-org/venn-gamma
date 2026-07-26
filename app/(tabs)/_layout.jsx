@@ -82,6 +82,17 @@ export default function TabsLayout() {
 
     fetchCounts();
 
+    // `messages` can't be filtered server-side to "rows in my matches" — a
+    // realtime filter only takes one column, and match membership needs a
+    // join. RLS still keeps other people's messages from being delivered, but
+    // a busy conversation would otherwise fire fetchCounts (three queries) per
+    // row. Collapse bursts into a single refresh.
+    let refreshTimer = null;
+    const scheduleRefresh = () => {
+      clearTimeout(refreshTimer);
+      refreshTimer = setTimeout(fetchCounts, 400);
+    };
+
     // Subscribe to realtime updates. `likes`/`matches` are client-facing views
     // (active rows only) with INSTEAD OF triggers fanning writes into the
     // real `likes_log`/`matches_log` tables — Postgres logical replication
@@ -90,10 +101,10 @@ export default function TabsLayout() {
     // Unliking/dismissing now soft-revokes (UPDATE revoked_at) instead of
     // deleting the row, so this listens for UPDATE instead of DELETE.
     channel = supabase.channel('tab-badges')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'likes_log', filter: `to_user_id=eq.${uid}` }, fetchCounts)
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'likes_log' }, fetchCounts)
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, fetchCounts)
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'messages' }, fetchCounts)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'likes_log', filter: `to_user_id=eq.${uid}` }, scheduleRefresh)
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'likes_log' }, scheduleRefresh)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, scheduleRefresh)
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'messages' }, scheduleRefresh)
       .subscribe();
 
     // Fallback poll: realtime delivery can be delayed/dropped, so periodically
@@ -103,6 +114,7 @@ export default function TabsLayout() {
     return () => {
       cancelled = true;
       clearInterval(pollInterval);
+      clearTimeout(refreshTimer);
       if (channel) supabase.removeChannel(channel);
     };
   }, [uid]);

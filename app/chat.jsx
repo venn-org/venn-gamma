@@ -21,6 +21,9 @@ const formatTime = (iso) => {
 // doesn't need to be aggressive.
 const POLL_INTERVAL_MS = 10000;
 const TYPING_TIMEOUT_MS = 3000;
+// Must stay comfortably below TYPING_TIMEOUT_MS so the indicator never lapses
+// between pings while the other person is still typing.
+const TYPING_PING_INTERVAL_MS = 1500;
 
 export default function ChatScreen() {
   const s = useThemedStyles(makeStyles);
@@ -245,8 +248,18 @@ export default function ChatScreen() {
     setMessages(prev => prev.map(m => m.id === tempId ? data : m));
   };
 
+  // The receiver holds "Typing…" for TYPING_TIMEOUT_MS after each broadcast, so
+  // one every TYPING_PING_INTERVAL_MS is enough to keep it lit. Sending on
+  // every keystroke put a realtime message on the wire per character typed.
+  const lastTypingPingRef = useRef(0);
+
   const handleInputChange = (text) => {
     setInputText(text);
+
+    const now = Date.now();
+    if (now - lastTypingPingRef.current < TYPING_PING_INTERVAL_MS) return;
+    lastTypingPingRef.current = now;
+
     channelRef.current?.send({
       type: 'broadcast',
       event: 'typing',

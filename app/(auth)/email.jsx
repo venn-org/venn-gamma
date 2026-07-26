@@ -11,7 +11,7 @@ import {
     View
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { isValidEmail, sendEmailOtp } from "../../lib/auth";
+import { isValidEmail, sendEmailOtp, setPendingEmail } from "../../lib/auth";
 import { colors } from "../../lib/theme";
 
 export default function EmailScreen() {
@@ -50,7 +50,10 @@ export default function EmailScreen() {
     const address = email.trim().toLowerCase();
     try {
       await sendEmailOtp(address, mode);
-      router.push(`/(auth)/email-otp?email=${encodeURIComponent(address)}&mode=${mode ?? 'signup'}`);
+      // The address goes through module scope, not the query string — it would
+      // otherwise sit in the web build's URL bar and history (see lib/auth.js).
+      setPendingEmail(address);
+      router.push(`/(auth)/email-otp?mode=${mode ?? 'signup'}`);
     } catch (e) {
       console.error('sendEmailOtp failed:', e);
       // "Sign in" uses shouldCreateUser:false, so an unknown address is a real

@@ -21,9 +21,9 @@ export default function StandoutsScreen() {
 }
 
 const makeStyles = (colors) => StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#111' },
+  root: { flex: 1, backgroundColor: colors.canvas },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 10, paddingHorizontal: 32 },
-  iconWrap: { width: 64, height: 64, borderRadius: 32, backgroundColor: 'rgba(138,91,255,0.15)', alignItems: 'center', justifyContent: 'center', marginBottom: 6 },
-  title: { fontFamily: 'SpaceGrotesk_700Bold', fontSize: 22, color: '#fff' },
-  subtitle: { fontFamily: 'HankenGrotesk_400Regular', fontSize: 14, color: 'rgba(255,255,255,0.5)' },
+  iconWrap: { width: 64, height: 64, borderRadius: 32, backgroundColor: colors.tintViolet, alignItems: 'center', justifyContent: 'center', marginBottom: 6 },
+  title: { fontFamily: 'SpaceGrotesk_700Bold', fontSize: 22, color: colors.ink },
+  subtitle: { fontFamily: 'HankenGrotesk_400Regular', fontSize: 14, color: colors.placeholder },
 });

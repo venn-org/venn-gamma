@@ -1,23 +1,28 @@
 import { useState, useRef, useEffect } from 'react';
-import { View, Text, StyleSheet, Modal, TouchableOpacity, Pressable, ScrollView, Dimensions, Animated } from 'react-native';
+import { View, Text, StyleSheet, Modal, TouchableOpacity, Pressable, ScrollView, useWindowDimensions, Animated } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { colors } from '../lib/theme';
+import { useTheme, useThemedStyles } from '../lib/ThemeContext';
 import { COOKIE_DOC } from '../lib/legal';
 import LegalDoc from './LegalDoc';
-
-const { height: SCREEN_H } = Dimensions.get('window');
 
 // Shown once on the landing screen before the user signs up/in. Persistence
 // (so it never shows again after a decision) is handled by the caller via
 // lib/cookieConsent.js — this component is just the accept/reject UI.
 export default function CookieConsentBanner({ visible, onAccept, onReject }) {
+  // The login screen this sits on is themed, and the sheet embeds LegalDoc
+  // (also themed) — a hardcoded white card left dark-mode body text on white.
+  const s = useThemedStyles(makeStyles);
+  const { colors } = useTheme();
   const [showPolicy, setShowPolicy] = useState(false);
+  // Drives the off-screen resting position; follows resize rather than
+  // freezing at import time.
+  const { height: screenH } = useWindowDimensions();
 
   // Manual backdrop-fade + sheet-slide (decoupled) so the backdrop doesn't
   // ride along with the sheet's slide transform, which reads as a solid
   // black panel growing up the screen instead of an instant dim.
   const backdropOpacity = useRef(new Animated.Value(0)).current;
-  const sheetY = useRef(new Animated.Value(SCREEN_H)).current;
+  const sheetY = useRef(new Animated.Value(screenH)).current;
 
   useEffect(() => {
     if (visible) {
@@ -27,9 +32,9 @@ export default function CookieConsentBanner({ visible, onAccept, onReject }) {
       ]).start();
     } else {
       backdropOpacity.setValue(0);
-      sheetY.setValue(SCREEN_H);
+      sheetY.setValue(screenH);
     }
-  }, [visible]);
+  }, [visible, screenH]);
 
   return (
     <Modal visible={visible} transparent animationType="none" onRequestClose={onReject}>
@@ -75,8 +80,8 @@ export default function CookieConsentBanner({ visible, onAccept, onReject }) {
   );
 }
 
-const s = StyleSheet.create({
-  card: { backgroundColor: '#fff', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, paddingBottom: 32, maxHeight: '80%' },
+const makeStyles = (colors) => StyleSheet.create({
+  card: { backgroundColor: colors.card, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, paddingBottom: 32, maxHeight: '80%' },
   title: { fontFamily: 'SpaceGrotesk_700Bold', fontSize: 18, color: colors.ink, marginBottom: 8 },
   body: { fontFamily: 'HankenGrotesk_400Regular', fontSize: 14, color: colors.slate, lineHeight: 21 },
   link: { color: colors.blue, textDecorationLine: 'underline' },
