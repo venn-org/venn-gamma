@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from 'react';
-import { View, StyleSheet, Text, AppState, Platform, LogBox } from 'react-native';
+import { View, StyleSheet, Text, AppState, LogBox } from 'react-native';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { useFonts, SpaceGrotesk_700Bold, SpaceGrotesk_600SemiBold } from '@expo-google-fonts/space-grotesk';
 import { SpaceMono_400Regular } from '@expo-google-fonts/space-mono';
