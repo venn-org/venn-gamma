@@ -23,8 +23,9 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Svg, { Circle } from "react-native-svg";
 import FlatDetailsModal from "../../components/FlatDetailsModal";
 import PreferencesSheet from "../../components/PreferencesSheet";
+import ProfileViewSheet from "../../components/ProfileViewSheet";
 import { getCurrentUserId, signOutUser } from "../../lib/auth";
-import { mapDbPrefsToUI, mapUIPrefsToDb, toDb, toUI } from "../../lib/enums";
+import { formatBudgetRange, formatMoveInDate, mapDbPrefsToUI, mapUIPrefsToDb, toDb, toUI } from "../../lib/enums";
 import { fetchFlatDetails, upsertFlatDetails } from "../../lib/flatDetails";
 import {
     FLAT_ROOM_LABELS,
@@ -147,6 +148,7 @@ export default function ProfileScreen() {
   const [flatDetails, setFlatDetails] = useState(null);
   const [incognito, setIncognito] = useState(false);
   const [prefsVisible, setPrefsVisible] = useState(false);
+  const [previewVisible, setPreviewVisible] = useState(false);
   const [userPrefs, setUserPrefs] = useState(null);
   const [flatDetailsModalVisible, setFlatDetailsModalVisible] = useState(false);
 
@@ -394,15 +396,38 @@ export default function ProfileScreen() {
   const handleSavePrefs = async (newPrefs, housing) => {
     const uid = getCurrentUserId();
     if (!uid) return;
-    setUserPrefs(newPrefs);
     const updates = mapUIPrefsToDb(newPrefs);
+    // "I am" (pref_role) declares the user's own account type, not just a
+    // match filter — keep user_type in sync so switching it actually flips
+    // Feed/Standouts placement and unlocks the Flat Details section.
+    if (updates.pref_role) {
+      updates.user_type = updates.pref_role;
+    }
+    // newPrefs (the sheet's draft) never touches budget/moveIn directly
+    // anymore — those live in `housing` (slider/calendar) — so merge the
+    // fresh values in here, otherwise userPrefs would keep showing whatever
+    // budget/moveIn was current before this save.
+    let mergedPrefs = newPrefs;
     if (housing) {
       updates.budget_min = housing.budgetMin;
       updates.budget_max = housing.budgetMax;
       updates.move_in_date = housing.moveInDate || null;
+      mergedPrefs = {
+        ...newPrefs,
+        budget: formatBudgetRange(housing.budgetMin, housing.budgetMax),
+        budgetMin: housing.budgetMin,
+        budgetMax: housing.budgetMax,
+        moveIn: formatMoveInDate(housing.moveInDate),
+        moveInDate: housing.moveInDate || null,
+      };
     }
+    setUserPrefs(mergedPrefs);
     await supabase.from("profiles").update(updates).eq("id", uid);
-    if (housing) {
+    if (updates.user_type && updates.user_type !== profile?.user_type) {
+      // Re-fetch rather than patch local state by hand — switching type
+      // also needs the Flat Details fetch/clear that fetchProfile() already does.
+      await fetchProfile();
+    } else if (housing) {
       setProfile((p) => ({
         ...p,
         budget_min: housing.budgetMin,
@@ -704,6 +729,19 @@ export default function ProfileScreen() {
               <Ionicons name="options-outline" size={18} color="#335CFF" />
             </View>
             <Text style={s.actionText}>Preferences</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* See the profile exactly as it appears to other people */}
+        <View style={{ paddingHorizontal: 20, marginBottom: 24 }}>
+          <TouchableOpacity
+            style={s.previewBtn}
+            activeOpacity={0.85}
+            onPress={() => setPreviewVisible(true)}
+            disabled={!profile}
+          >
+            <Ionicons name="eye-outline" size={18} color={colors.ink} />
+            <Text style={s.previewBtnText}>Preview my profile</Text>
           </TouchableOpacity>
         </View>
 
@@ -1110,6 +1148,16 @@ export default function ProfileScreen() {
         onSave={handleSavePrefs}
       />
 
+      {/* Own profile rendered through the same sheet other users see, so the
+          preview can't drift from the real thing. flat_photos lives on the
+          separate flat_details row, which the sheet expects inlined. */}
+      <ProfileViewSheet
+        visible={previewVisible}
+        profile={profile ? { ...profile, flat_photos: flatDetails?.photos ?? [] } : null}
+        showActions={false}
+        onClose={() => setPreviewVisible(false)}
+      />
+
       <FlatDetailsModal
         visible={flatDetailsModalVisible}
         flatType={toUI("flat_type", profile?.flat_type)}
@@ -1198,6 +1246,22 @@ const makeStyles = (colors) =>
       borderRadius: 18,
       alignItems: "center",
       justifyContent: "center",
+    },
+    previewBtn: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 8,
+      paddingVertical: 14,
+      borderRadius: 16,
+      borderWidth: 1.5,
+      borderColor: colors.border,
+      backgroundColor: colors.card,
+    },
+    previewBtnText: {
+      fontFamily: "HankenGrotesk_600SemiBold",
+      fontSize: 15,
+      color: colors.ink,
     },
     actionText: {
       fontFamily: "HankenGrotesk_700Bold",
