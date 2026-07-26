@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme, useThemedStyles } from '../lib/ThemeContext';
 import { PREF_SECTIONS, getPrefDisplay, isPrefSet, prefOptions } from '../lib/prefs';
+import { formatBudgetRange, formatMoveInDate as formatMoveInDisplay } from '../lib/enums';
 import RangeSlider from './RangeSlider';
 import Calendar from './Calendar';
 
@@ -99,35 +100,6 @@ export default function PreferencesSheet({ visible, prefs, city, housing, showRo
           <Text style={pref.subtitle}>Set what you need — we'll show you the right matches.</Text>
 
           <ScrollView style={{ maxHeight: SCREEN_H * 0.6 }} showsVerticalScrollIndicator={false}>
-            {!only && (
-              <View style={{ paddingHorizontal: 20 }}>
-                <View style={pref.sectionHeader}>
-                  <Text style={pref.sectionTitle}>Housing</Text>
-                  <View style={pref.sectionLine} />
-                </View>
-
-                <Text style={pref.housingLabel}>Budget range (₹ / month)</Text>
-                <RangeSlider
-                  min={BUDGET_MIN}
-                  max={BUDGET_MAX}
-                  step={BUDGET_STEP}
-                  valueMin={housingDraft.budgetMin}
-                  valueMax={housingDraft.budgetMax}
-                  onChange={(lo, hi) => setHousingDraft((h) => ({ ...h, budgetMin: lo, budgetMax: hi }))}
-                />
-
-                <Text style={pref.housingLabel}>Move-in date</Text>
-                <View style={{ marginBottom: 16 }}>
-                  <Calendar
-                    value={housingDraft.moveInDate}
-                    onChange={(d) => setHousingDraft((h) => ({ ...h, moveInDate: d }))}
-                    minDate={todayStr()}
-                    placeholder="Select a move-in date"
-                  />
-                </View>
-              </View>
-            )}
-
             {sections.map((section) => (
               <View key={section.title} style={{ paddingHorizontal: 20 }}>
                 <View style={pref.sectionHeader}>
@@ -137,8 +109,19 @@ export default function PreferencesSheet({ visible, prefs, city, housing, showRo
 
                 {section.rows.map((row) => {
                   const isOpen = openKey === row.key;
-                  const options = prefOptions(row, city);
-                  const set = isPrefSet(draft, row.key, row.multi);
+                  const isRange = row.type === 'range';
+                  const isDate = row.type === 'date';
+                  const options = isRange || isDate ? [] : prefOptions(row, city);
+                  const set = isRange
+                    ? housingDraft.budgetMin !== BUDGET_MIN || housingDraft.budgetMax !== 20000
+                    : isDate
+                      ? !!housingDraft.moveInDate
+                      : isPrefSet(draft, row.key, row.multi);
+                  const displayText = isRange
+                    ? formatBudgetRange(housingDraft.budgetMin, housingDraft.budgetMax) || row.placeholder
+                    : isDate
+                      ? formatMoveInDisplay(housingDraft.moveInDate) || row.placeholder
+                      : getPrefDisplay(draft, row.key, row.placeholder, row.multi);
                   return (
                     <View key={row.key}>
                       <TouchableOpacity
@@ -149,13 +132,37 @@ export default function PreferencesSheet({ visible, prefs, city, housing, showRo
                         <View style={{ flex: 1 }}>
                           <Text style={pref.prefTitle}>{row.label}</Text>
                           <Text style={[pref.prefVal, set && pref.prefValSet]}>
-                            {getPrefDisplay(draft, row.key, row.placeholder, row.multi)}
+                            {displayText}
                           </Text>
                         </View>
                         <Ionicons name={isOpen ? 'chevron-up' : 'chevron-down'} size={16} color={colors.placeholder} />
                       </TouchableOpacity>
 
-                      {isOpen && (
+                      {isOpen && isRange && (
+                        <View style={[pref.optsWrap, pref.optsWrapStacked]}>
+                          <RangeSlider
+                            min={BUDGET_MIN}
+                            max={BUDGET_MAX}
+                            step={BUDGET_STEP}
+                            valueMin={housingDraft.budgetMin}
+                            valueMax={housingDraft.budgetMax}
+                            onChange={(lo, hi) => setHousingDraft((h) => ({ ...h, budgetMin: lo, budgetMax: hi }))}
+                          />
+                        </View>
+                      )}
+
+                      {isOpen && isDate && (
+                        <View style={[pref.optsWrap, pref.optsWrapStacked]}>
+                          <Calendar
+                            value={housingDraft.moveInDate}
+                            onChange={(d) => setHousingDraft((h) => ({ ...h, moveInDate: d }))}
+                            minDate={todayStr()}
+                            placeholder="Select a move-in date"
+                          />
+                        </View>
+                      )}
+
+                      {isOpen && !isRange && !isDate && (
                         <View style={pref.optsWrap}>
                           {options.length === 0 ? (
                             <Text style={pref.emptyZones}>No zones available for your city yet.</Text>
@@ -228,8 +235,6 @@ const makeStyles = (colors) => StyleSheet.create({
   sectionTitle: { fontFamily: 'SpaceMono_400Regular', fontSize: 10, letterSpacing: 1.5, color: colors.placeholder, textTransform: 'uppercase' },
   sectionLine: { flex: 1, height: 1, backgroundColor: colors.border },
 
-  housingLabel: { fontFamily: 'HankenGrotesk_600SemiBold', fontSize: 13, color: colors.slate, marginTop: 12, marginBottom: 8 },
-
   prefRow: {
     flexDirection: 'row', alignItems: 'center', paddingVertical: 12, paddingHorizontal: 14,
     marginTop: 10, borderRadius: 12, borderWidth: 1.5, borderColor: colors.border, backgroundColor: colors.canvas,
@@ -239,7 +244,11 @@ const makeStyles = (colors) => StyleSheet.create({
   prefVal: { fontFamily: 'HankenGrotesk_400Regular', fontSize: 13, color: colors.placeholder, marginTop: 2 },
   prefValSet: { color: colors.blue },
 
-  optsWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingBottom: 16 },
+  optsWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingTop: 10, paddingBottom: 16 },
+  // Full-width single-column layout for the slider/calendar rows. flexWrap
+  // has to go back to 'nowrap' — wrapping in a column axis stops children
+  // from stretching, which left the slider shrunk and off-centre.
+  optsWrapStacked: { flexDirection: 'column', flexWrap: 'nowrap', alignItems: 'stretch' },
   chip: { paddingHorizontal: 16, paddingVertical: 10, borderRadius: 50, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.card },
   chipOn: { backgroundColor: colors.blue, borderColor: colors.blue },
   chipText: { fontFamily: 'HankenGrotesk_600SemiBold', fontSize: 14, color: colors.ink },

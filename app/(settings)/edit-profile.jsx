@@ -8,7 +8,7 @@ import { getCurrentUserId } from '../../lib/auth';
 import { useTheme, useThemedStyles } from '../../lib/ThemeContext';
 import { toUI, toDb } from '../../lib/enums';
 import { getAge } from '../../lib/age';
-import { ZONES_BY_CITY } from '../../lib/locations';
+import { CITIES, ZONES_BY_CITY } from '../../lib/locations';
 import Calendar from '../../components/Calendar';
 
 const { height: SCREEN_H } = Dimensions.get('window');
@@ -302,7 +302,7 @@ export default function EditProfileScreen() {
   const [pronouns, setPronouns] = useState([]);
   const [bio, setBio] = useState('');
   const [location, setLocation] = useState('');
-  const [profileCity, setProfileCity] = useState(''); // read-only, just scopes the location chip options
+  const [profileCity, setProfileCity] = useState(''); // also scopes the location chip options
 
   // Work & Education
   const [jobTitle, setJobTitle] = useState('');
@@ -441,6 +441,11 @@ export default function EditProfileScreen() {
         gender: toDb('gender', gender) || null,
         pronouns,
         bio: bio.trim() || null,
+        city: profileCity || null,
+        // `location` holds the zone's display name; `zone` holds its id, and
+        // the two must stay consistent or the feed's zone filtering silently
+        // targets a zone from the user's previous city.
+        zone: (ZONES_BY_CITY[profileCity] || []).find(z => z.name === location)?.id ?? null,
         location: location.trim() || null,
         job_title: jobTitle.trim() || null,
         job_company: jobCompany.trim() || null,
@@ -531,7 +536,24 @@ export default function EditProfileScreen() {
                   textAlignVertical="top"
                 />
 
-                <Text style={s.label}>Location</Text>
+                <Text style={s.label}>City</Text>
+                {/* Chips show city names, but `city` is stored as the slug
+                    (CITIES[].id) — that's what onboarding writes and what
+                    ZONES_BY_CITY is keyed by, so the two must not diverge. */}
+                <ChipSelector
+                  options={CITIES.map(c => c.name)}
+                  selected={CITIES.find(c => c.id === profileCity)?.name || ''}
+                  onSelect={(cityName) => {
+                    const next = CITIES.find(c => c.name === cityName);
+                    if (!next || next.id === profileCity) return;
+                    // Zones are city-scoped, so a stale location from the old
+                    // city would no longer be a valid option here.
+                    setProfileCity(next.id);
+                    setLocation('');
+                  }}
+                />
+
+                <Text style={[s.label, { marginTop: 14 }]}>Location</Text>
                 {ZONES_BY_CITY[profileCity]?.length > 0 ? (
                   <ChipSelector
                     options={ZONES_BY_CITY[profileCity].map(z => z.name)}
@@ -539,7 +561,7 @@ export default function EditProfileScreen() {
                     onSelect={setLocation}
                   />
                 ) : (
-                  <Text style={s.infoText}>Set your city during onboarding to choose a location.</Text>
+                  <Text style={s.infoText}>Pick a city above to choose a location.</Text>
                 )}
               </View>
 

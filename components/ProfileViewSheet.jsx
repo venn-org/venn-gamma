@@ -6,7 +6,9 @@ import { useTheme, useThemedStyles } from '../lib/ThemeContext';
 
 const { height: SCREEN_H } = Dimensions.get('window');
 
-export default function ProfileViewSheet({ visible, profile, onClose, onPass, onLike }) {
+// `showActions` is off for read-only uses — previewing your own profile, or
+// viewing a match you're already chatting with — where pass/like make no sense.
+export default function ProfileViewSheet({ visible, profile, onClose, onPass, onLike, showActions = true }) {
   const s = useThemedStyles(makeStyles);
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
@@ -124,14 +126,22 @@ export default function ProfileViewSheet({ visible, profile, onClose, onPass, on
           </ScrollView>
 
           {/* Action Footer */}
-          <View style={s.actions}>
-            <TouchableOpacity style={s.navBtn} onPress={() => { onClose(); onPass?.(); }}>
-              <Ionicons name="close" size={24} color={colors.ink} />
-            </TouchableOpacity>
-            <TouchableOpacity style={s.navBtnHeart} onPress={() => { onClose(); onLike?.(); }}>
-              <Ionicons name="heart" size={24} color="#fff" />
-            </TouchableOpacity>
-          </View>
+          {showActions ? (
+            <View style={s.actions}>
+              <TouchableOpacity style={s.navBtn} onPress={() => { onClose(); onPass?.(); }}>
+                <Ionicons name="close" size={24} color={colors.ink} />
+              </TouchableOpacity>
+              <TouchableOpacity style={s.navBtnHeart} onPress={() => { onClose(); onLike?.(); }}>
+                <Ionicons name="heart" size={24} color="#fff" />
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <View style={s.actions}>
+              <TouchableOpacity style={s.closeBtn} onPress={onClose} activeOpacity={0.85}>
+                <Text style={s.closeBtnText}>Close</Text>
+              </TouchableOpacity>
+            </View>
+          )}
 
         </Animated.View>
       </View>
@@ -191,5 +201,11 @@ const makeStyles = (colors) => StyleSheet.create({
     width: 60, height: 60, borderRadius: 30, backgroundColor: colors.violet,
     alignItems: 'center', justifyContent: 'center',
     shadowColor: '#000', shadowOpacity: 0.15, shadowRadius: 8, shadowOffset: { width: 0, height: 2 }, elevation: 4,
-  }
+  },
+
+  closeBtn: {
+    flex: 1, borderRadius: 50, paddingVertical: 16, alignItems: 'center',
+    backgroundColor: colors.card,
+  },
+  closeBtnText: { fontFamily: 'HankenGrotesk_700Bold', fontSize: 16, color: colors.ink },
 });

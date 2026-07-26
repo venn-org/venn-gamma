@@ -101,10 +101,11 @@ export default function Calendar({ value, onChange, minDate, maxDate, placeholde
               textDayFontFamily: 'HankenGrotesk_400Regular',
               textMonthFontFamily: 'HankenGrotesk_700Bold',
               textDayHeaderFontFamily: 'HankenGrotesk_600SemiBold',
-              textDayFontSize: 13,
-              textMonthFontSize: 14,
-              textDayHeaderFontSize: 11,
+              textDayFontSize: 16,
+              textMonthFontSize: 18,
+              textDayHeaderFontSize: 13,
             }}
+            style={s.calendar}
           />
         </View>
       )}
@@ -125,6 +126,10 @@ const makeStyles = (colors) => StyleSheet.create({
     marginTop: 8, borderRadius: 12, overflow: 'hidden',
     borderWidth: 1, borderColor: colors.border,
   },
+
+  // Roomier day cells — the default grid is cramped once the day/month text
+  // is scaled up, and the tap targets were smaller than a comfortable touch.
+  calendar: { paddingBottom: 10 },
 
   yearNav: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',

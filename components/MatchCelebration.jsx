@@ -58,6 +58,10 @@ export default function MatchCelebration({ visible, mode = 'match', matchedName,
           />
         ))}
 
+        <TouchableOpacity style={ms.closeBtn} onPress={onDismiss} activeOpacity={0.7} hitSlop={12}>
+          <Ionicons name="close" size={22} color="#fff" />
+        </TouchableOpacity>
+
         {/* Card — stop propagation so tapping card doesn't dismiss */}
         <Pressable onPress={e => e.stopPropagation()} style={ms.card}>
           <Text style={ms.eyebrow}>{isMatch ? 'YOUR VENN OVERLAPS ✦' : 'LIKE SENT ✦'}</Text>
@@ -117,6 +121,7 @@ export default function MatchCelebration({ visible, mode = 'match', matchedName,
 
 const ms = StyleSheet.create({
   bg: { flex: 1, backgroundColor: 'rgba(10,10,20,0.92)', alignItems: 'center', justifyContent: 'center', padding: 24 },
+  closeBtn: { position: 'absolute', top: 56, right: 24, zIndex: 3, width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.12)', alignItems: 'center', justifyContent: 'center' },
   card: { width: '100%', alignItems: 'center', zIndex: 2 },
   eyebrow: { fontFamily: 'SpaceMono_400Regular', fontSize: 11, color: '#8A5BFF', letterSpacing: 2, marginBottom: 12, textTransform: 'uppercase' },
   heading: { fontFamily: 'SpaceGrotesk_700Bold', fontSize: 28, color: 'rgba(255,255,255,0.7)', textAlign: 'center', letterSpacing: -0.8, lineHeight: 34, marginBottom: 10 },

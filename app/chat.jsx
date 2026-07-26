@@ -7,6 +7,7 @@ import { supabase } from '../lib/supabase';
 import { getCurrentUserId } from '../lib/auth';
 import { useTheme, useThemedStyles } from '../lib/ThemeContext';
 import { activeStatusText, isOnline } from '../lib/presence';
+import ProfileViewSheet from '../components/ProfileViewSheet';
 
 const GROUP_WINDOW_MS = 5 * 60 * 1000;
 
@@ -40,6 +41,8 @@ export default function ChatScreen() {
   const [otherUserId, setOtherUserId] = useState(null);
   const [otherLastActive, setOtherLastActive] = useState(null);
   const [otherTyping, setOtherTyping] = useState(false);
+  const [otherProfile, setOtherProfile] = useState(null);
+  const [profileVisible, setProfileVisible] = useState(false);
 
   const channelRef = useRef(null);
   const typingTimeoutRef = useRef(null);
@@ -64,6 +67,27 @@ export default function ChatScreen() {
     if (!otherUserId) return;
     const { data } = await supabase.from('profiles').select('last_active_at').eq('id', otherUserId).single();
     if (data) setOtherLastActive(data.last_active_at);
+  };
+
+  // Fetched on demand rather than up front — most chat visits never open the
+  // profile sheet, and this is one more query per visit otherwise.
+  const openOtherProfile = async () => {
+    if (!otherUserId) return;
+    setProfileVisible(true);
+    if (otherProfile) return;
+
+    const { data } = await supabase.from('profiles').select('*').eq('id', otherUserId).single();
+    if (!data) return;
+
+    // flat_details is a separate table (not embeddable through the `profiles`
+    // view), so owners' flat photos need their own fetch — same as likes.jsx.
+    let flatPhotos = [];
+    if (data.user_type === 'owner') {
+      const { data: flatRow } = await supabase
+        .from('flat_details').select('photos').eq('profile_id', otherUserId).maybeSingle();
+      flatPhotos = flatRow?.photos ?? [];
+    }
+    setOtherProfile({ ...data, flat_photos: flatPhotos });
   };
 
   useEffect(() => {
@@ -267,7 +291,12 @@ export default function ChatScreen() {
         <TouchableOpacity style={s.backBtn} onPress={() => router.canGoBack() ? router.back() : router.replace('/(tabs)/messages')} activeOpacity={0.8}>
           <Ionicons name="chevron-back" size={24} color={colors.headerText} />
         </TouchableOpacity>
-        <View style={s.headerInfo}>
+        <TouchableOpacity
+          style={s.headerInfo}
+          onPress={openOtherProfile}
+          disabled={!otherUserId}
+          activeOpacity={0.7}
+        >
           {photo ? (
             <Image source={{ uri: photo }} style={s.headerAvatar} />
           ) : (
@@ -281,7 +310,17 @@ export default function ChatScreen() {
               {otherTyping ? 'Typing…' : activeStatusText(otherLastActive)}
             </Text>
           </View>
-        </View>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={s.viewProfileBtn}
+          onPress={openOtherProfile}
+          disabled={!otherUserId}
+          activeOpacity={0.7}
+          accessibilityLabel={`View ${name}'s profile`}
+        >
+          <Ionicons name="person-circle-outline" size={26} color={colors.headerText} />
+        </TouchableOpacity>
       </View>
 
       {loading ? (
@@ -325,6 +364,14 @@ export default function ChatScreen() {
           <Ionicons name="send" size={16} color="#fff" style={{ marginLeft: 2 }} />
         </TouchableOpacity>
       </View>
+
+      {/* Already matched, so pass/like would be meaningless here. */}
+      <ProfileViewSheet
+        visible={profileVisible && !!otherProfile}
+        profile={otherProfile}
+        showActions={false}
+        onClose={() => setProfileVisible(false)}
+      />
     </KeyboardAvoidingView>
   );
 }
@@ -333,7 +380,8 @@ const makeStyles = (colors) => StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.canvas },
   topBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-start', paddingHorizontal: 12, paddingVertical: 12, backgroundColor: colors.header, borderBottomWidth: 1, borderBottomColor: colors.border, zIndex: 10 },
   backBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
-  headerInfo: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  headerInfo: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10 },
+  viewProfileBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
   headerAvatar: { width: 36, height: 36, borderRadius: 18 },
   headerName: { fontFamily: 'SpaceGrotesk_700Bold', fontSize: 17, color: colors.headerText },
   headerStatus: { fontFamily: 'HankenGrotesk_400Regular', fontSize: 12, color: colors.slate, marginTop: 1 },

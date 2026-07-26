@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect, useRouter } from "expo-router";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
   Animated,
@@ -25,7 +25,7 @@ import {
   getTodayViewedProfileIds,
   recordProfileView,
 } from "../../lib/dailyLimits";
-import { mapDbPrefsToUI, mapUIPrefsToDb, toDb, toUI } from "../../lib/enums";
+import { formatBudgetRange, formatMoveInDate, mapDbPrefsToUI, mapUIPrefsToDb, toDb, toUI } from "../../lib/enums";
 import { PREF_ROWS, calculateOverlapScore, getPrefDisplay, isPrefSet, matchesPrefs } from "../../lib/prefs";
 import { calculateProfileCompletion, isFeedReady } from "../../lib/profileUtils";
 import { supabase } from "../../lib/supabase";
@@ -77,41 +77,6 @@ export default function FeedScreen() {
     }
     fetchFeed();
     if (!uid) return;
-
-    // Listen for new matches in real-time. `matches` is a client-facing view
-    // (active matches only); realtime only fires on the real table matches
-    // are created on, `matches_log`.
-    const matchSub = supabase
-      .channel("feed_matches")
-      .on(
-        "postgres_changes",
-        { event: "INSERT", schema: "public", table: "matches_log" },
-        (payload) => {
-          const { user1_id, user2_id, id } = payload.new;
-          if (user1_id === uid || user2_id === uid) {
-            const otherId = user1_id === uid ? user2_id : user1_id;
-            supabase
-              .from("profiles")
-              .select("name, photos")
-              .eq("id", otherId)
-              .single()
-              .then(({ data }) => {
-                if (data) {
-                  setMatchData({
-                    name: data.name,
-                    photo: data.photos?.[0] || null,
-                    matchId: id,
-                  });
-                }
-              });
-          }
-        },
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(matchSub);
-    };
   }, []);
 
   // Keep the completion banner in sync with edits made elsewhere
@@ -153,13 +118,26 @@ export default function FeedScreen() {
   const handleSavePrefs = async (newPrefs, housing) => {
     const uid = getCurrentUserId();
     if (!uid) return;
-    setUserPrefs(newPrefs);
     const updates = mapUIPrefsToDb(newPrefs);
+    // newPrefs (the sheet's draft) never touches budget/moveIn directly
+    // anymore — those live in `housing` (slider/calendar) — so merge the
+    // fresh values in here, otherwise userPrefs/fetchFeed would keep using
+    // whatever budget/moveIn was current before this save.
+    let mergedPrefs = newPrefs;
     if (housing) {
       updates.budget_min = housing.budgetMin;
       updates.budget_max = housing.budgetMax;
       updates.move_in_date = housing.moveInDate || null;
+      mergedPrefs = {
+        ...newPrefs,
+        budget: formatBudgetRange(housing.budgetMin, housing.budgetMax),
+        budgetMin: housing.budgetMin,
+        budgetMax: housing.budgetMax,
+        moveIn: formatMoveInDate(housing.moveInDate),
+        moveInDate: housing.moveInDate || null,
+      };
     }
+    setUserPrefs(mergedPrefs);
     await supabase.from("profiles").update(updates).eq("id", uid);
     if (housing) {
       setMyProfile((p) => (p ? {
@@ -169,7 +147,7 @@ export default function FeedScreen() {
         move_in_date: housing.moveInDate || null,
       } : p));
     }
-    fetchFeed(newPrefs);
+    fetchFeed(mergedPrefs);
   };
 
   const fetchFeed = async (currentPrefs = userPrefs) => {
@@ -212,12 +190,65 @@ export default function FeedScreen() {
 
         return matchesPrefs(currentPrefs, p);
       });
+
+      // flat_details is a separate table (not embeddable through the
+      // `profiles` view), so owners' labelled flat photos need their own
+      // query — same as likes.jsx does.
+      const ownerIds = filtered.filter((p) => p.user_type === "owner").map((p) => p.id);
+      if (ownerIds.length > 0) {
+        const { data: flatRows } = await supabase
+          .from("flat_details")
+          .select("profile_id, photos")
+          .in("profile_id", ownerIds);
+        const photosByProfile = new Map((flatRows ?? []).map((r) => [r.profile_id, r.photos]));
+        filtered.forEach((p) => {
+          p.flat_photos = photosByProfile.get(p.id) ?? [];
+        });
+      }
+
       setProfiles(filtered);
     }
   };
 
   const currentProfile = profiles[currentIndex];
   const overlapScore = currentProfile ? calculateOverlapScore(userPrefs, currentProfile) : null;
+
+  // The card body alternates prompt → photo → prompt → …, but a profile can
+  // have any mix of the two. Build the sequence from what actually exists so
+  // nothing renders an empty placeholder slot, and so a third prompt (which
+  // the old fixed layout had no room for) still shows up.
+  const cardBlocks = useMemo(() => {
+    if (!currentProfile) return [];
+
+    const prompts = (currentProfile.prompts ?? []).filter((p) => p?.a?.trim());
+
+    // photos[0] is the hero shot above the info card; the rest interleave
+    // below. Only flat photos carry a room label — the extra photos in
+    // `photos` are just more pictures of the person, which is why every
+    // profile used to get a bogus "Living Room" caption.
+    const media = [
+      ...(currentProfile.photos ?? []).slice(1).filter(Boolean).map((url) => ({ url, label: null })),
+      ...(Array.isArray(currentProfile.flat_photos) ? currentProfile.flat_photos : [])
+        .filter((f) => f?.url)
+        .map((f) => ({ url: f.url, label: f.label ?? null })),
+    ];
+
+    const blocks = [];
+    let promptCount = 0;
+    for (let i = 0; i < Math.max(prompts.length, media.length); i++) {
+      if (prompts[i]) {
+        blocks.push({
+          kind: "prompt",
+          q: prompts[i].q,
+          a: prompts[i].a,
+          accent: promptCount % 2 === 1,
+        });
+        promptCount++;
+      }
+      if (media[i]) blocks.push({ kind: "photo", ...media[i] });
+    }
+    return blocks;
+  }, [currentProfile]);
 
   // TEMP: with the view limit off, wrap back to the start instead of
   // dead-ending once the list runs out, so profiles cycle like before.
@@ -281,10 +312,30 @@ export default function FeedScreen() {
       const remaining = await getRemainingLikes(uid);
       setRemainingLikes(remaining);
 
-      // Quick feedback loop — auto-dismisses so it doesn't block swiping
-      setLikeSent({ name: currentProfile.name, photo: currentProfile.photos?.[0] || null });
-      clearTimeout(likeSentTimer.current);
-      likeSentTimer.current = setTimeout(() => setLikeSent(null), 1500);
+      // The mutual-like trigger (create_match_on_mutual_like) runs
+      // synchronously as part of the insert above, so if this like just
+      // completed a match, it's already visible here — checking this way
+      // (instead of a broad realtime subscription on all match events) keeps
+      // the full-screen celebration tied to this user's own action, not to
+      // matches that land while they're elsewhere in the app.
+      const { data: matchRow } = await supabase
+        .from("matches")
+        .select("id")
+        .or(`and(user1_id.eq.${uid},user2_id.eq.${targetId}),and(user1_id.eq.${targetId},user2_id.eq.${uid})`)
+        .maybeSingle();
+
+      if (matchRow) {
+        setMatchData({
+          name: currentProfile.name,
+          photo: currentProfile.photos?.[0] || null,
+          matchId: matchRow.id,
+        });
+      } else {
+        // Quick feedback loop — auto-dismisses so it doesn't block swiping
+        setLikeSent({ name: currentProfile.name, photo: currentProfile.photos?.[0] || null });
+        clearTimeout(likeSentTimer.current);
+        likeSentTimer.current = setTimeout(() => setLikeSent(null), 1500);
+      }
     }
   };
 
@@ -611,61 +662,54 @@ export default function FeedScreen() {
                   </View>
                 </View>
 
-                {/* First Prompt (White) */}
-                <View style={s.promptWhite}>
-                  <Text style={s.promptQ}>
-                    {currentProfile.prompts?.[0]?.q || "-"}
-                  </Text>
-                  <Text style={s.promptA}>
-                    {currentProfile.prompts?.[0]?.a || "-"}
-                  </Text>
-                  <TouchableOpacity
-                    style={s.promptHeartGray}
-                    activeOpacity={0.9}
-                    onPress={handleLike}
-                  >
-                    <Ionicons name="heart" size={20} color="#C0C5D0" />
-                  </TouchableOpacity>
-                </View>
-
-                {/* Flat Photo */}
-                <View style={s.flatPhotoWrap}>
-                  {currentProfile.photos?.[1] ? (
-                    <Image
-                      source={{ uri: currentProfile.photos[1] }}
-                      style={s.flatPhoto}
-                      resizeMode="cover"
-                    />
-                  ) : (
-                    <View style={[s.flatPhoto, s.photoPlaceholder]}>
-                      <Text style={{ color: "#9AA0B2" }}>No Flat Photo</Text>
+                {/* Prompts and remaining photos, interleaved — see cardBlocks */}
+                {cardBlocks.map((block, i) =>
+                  block.kind === "prompt" ? (
+                    <View
+                      key={`prompt-${i}`}
+                      style={
+                        block.accent
+                          ? [s.promptAccent, { backgroundColor: colors.tintViolet }]
+                          : s.promptWhite
+                      }
+                    >
+                      <Text style={block.accent ? s.promptAccentQ : s.promptQ}>
+                        {block.q}
+                      </Text>
+                      <Text style={s.promptA}>{block.a}</Text>
+                      <TouchableOpacity
+                        style={block.accent ? s.promptHeartViolet : s.promptHeartGray}
+                        activeOpacity={0.9}
+                        onPress={handleLike}
+                      >
+                        <Ionicons
+                          name="heart"
+                          size={20}
+                          color={
+                            block.accent
+                              ? remainingLikes > 0
+                                ? colors.violet
+                                : colors.placeholder
+                              : "#C0C5D0"
+                          }
+                        />
+                      </TouchableOpacity>
                     </View>
-                  )}
-                  <View style={s.flatLabel}>
-                    <Text style={s.flatLabelText}>Living Room</Text>
-                  </View>
-                </View>
-
-                {/* Second Prompt (Accent) */}
-                <View style={[s.promptAccent, { backgroundColor: colors.tintViolet }]}>
-                  <Text style={s.promptAccentQ}>
-                    {currentProfile.prompts?.[1]?.q || "-"}
-                  </Text>
-                  <Text style={s.promptA}>
-                    {currentProfile.prompts?.[1]?.a || "-"}
-                  </Text>
-                  <TouchableOpacity
-                    style={s.promptHeartViolet}
-                    activeOpacity={0.9}
-                    onPress={handleLike}
-                  >
-                    <Ionicons
-                      name="heart"
-                      size={20}
-                      color={remainingLikes > 0 ? colors.violet : colors.placeholder}
-                    />
-                  </TouchableOpacity>
-                </View>
+                  ) : (
+                    <View key={`photo-${i}`} style={s.flatPhotoWrap}>
+                      <Image
+                        source={{ uri: block.url }}
+                        style={s.flatPhoto}
+                        resizeMode="cover"
+                      />
+                      {block.label && (
+                        <View style={s.flatLabel}>
+                          <Text style={s.flatLabelText}>{block.label}</Text>
+                        </View>
+                      )}
+                    </View>
+                  ),
+                )}
               </ScrollView>
             </Animated.View>
             <TouchableOpacity style={s.skipBtn} onPress={handlePass}>

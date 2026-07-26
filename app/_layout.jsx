@@ -10,7 +10,6 @@ import { StatusBar } from 'expo-status-bar';
 import { supabase, getCurrentUserId, ensureProfile, isOnboardingComplete, subscribeOnboardingComplete, loadSession, onAuthChange } from '../lib';
 import { loadLocations } from '../lib/locations';
 import { ThemeProvider, useTheme } from '../lib/ThemeContext';
-import MatchCelebration from '../components/MatchCelebration';
 
 LogBox.ignoreLogs([
   '"shadow*" style props are deprecated',
@@ -49,7 +48,6 @@ function RootLayoutInner() {
   const [locationsReady, setLocationsReady] = useState(false);
   const [session, setSession] = useState(null);
   const [onboardingDone, setOnboardingDone] = useState(null); // null = unknown, true/false
-  const [incomingMatch, setIncomingMatch] = useState(null); // { matchId, name, photo }
 
   const router = useRouter();
   const segments = useSegments();
@@ -173,39 +171,6 @@ function RootLayoutInner() {
     };
   }, [session, onboardingDone]);
 
-  // Realtime matches listener
-  useEffect(() => {
-    if (!session || !onboardingDone) return;
-
-    const uid = getCurrentUserId();
-    if (!uid) return;
-
-    // `matches` is a client-facing view (active matches only); realtime
-    // (Postgres logical replication) only fires on real tables, so this has
-    // to subscribe to `matches_log`, the table matches are actually created on.
-    const channel = supabase
-      .channel('public:matches')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'matches_log' }, async (payload) => {
-        const { user1_id, user2_id, id } = payload.new;
-        if (user1_id === uid || user2_id === uid) {
-          const otherId = user1_id === uid ? user2_id : user1_id;
-          const { data } = await supabase.from('profiles').select('name, photos').eq('id', otherId).single();
-          if (data) {
-            setIncomingMatch({
-              matchId: id,
-              name: data.name,
-              photo: data.photos?.[0] ?? null,
-            });
-          }
-        }
-      })
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [session, onboardingDone]);
-
   if (!fontsLoaded || !authReady || !locationsReady) {
     // Show splash screen manually while checking auth state if fonts are loaded but auth is slow
     return (
@@ -231,19 +196,6 @@ function RootLayoutInner() {
       >
         <Stack.Screen name="(tabs)" options={{ animation: 'none' }} />
       </Stack>
-      
-      {/* Global match celebration modal */}
-      <MatchCelebration
-        visible={incomingMatch !== null}
-        matchedName={incomingMatch?.name}
-        matchedPhoto={incomingMatch?.photo}
-        onChat={() => {
-          const d = incomingMatch;
-          setIncomingMatch(null);
-          router.push(`/chat?matchId=${d.matchId}`);
-        }}
-        onDismiss={() => setIncomingMatch(null)}
-      />
     </>
   );
 }
