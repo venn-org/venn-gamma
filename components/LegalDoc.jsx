@@ -39,9 +39,9 @@ const makeStyles = (colors) => StyleSheet.create({
   effective: { fontFamily: 'SpaceMono_400Regular', fontSize: 11, color: colors.placeholder, marginBottom: 20 },
   h: { fontFamily: 'SpaceGrotesk_600SemiBold', fontSize: 16, color: colors.ink, marginTop: 20, marginBottom: 8 },
   sub: { fontFamily: 'HankenGrotesk_700Bold', fontSize: 14, color: colors.ink, marginTop: 10, marginBottom: 4 },
-  p: { fontFamily: 'HankenGrotesk_400Regular', fontSize: 14, color: '#3A3F4C', lineHeight: 22, marginBottom: 8 },
+  p: { fontFamily: 'HankenGrotesk_400Regular', fontSize: 14, color: colors.slate, lineHeight: 22, marginBottom: 8 },
   ul: { marginBottom: 8, marginTop: 2 },
   li: { flexDirection: 'row', marginBottom: 6, paddingRight: 4 },
   bullet: { fontFamily: 'HankenGrotesk_400Regular', fontSize: 14, color: colors.violet, marginRight: 8, lineHeight: 22 },
-  liText: { flex: 1, fontFamily: 'HankenGrotesk_400Regular', fontSize: 14, color: '#3A3F4C', lineHeight: 22 },
+  liText: { flex: 1, fontFamily: 'HankenGrotesk_400Regular', fontSize: 14, color: colors.slate, lineHeight: 22 },
 });
