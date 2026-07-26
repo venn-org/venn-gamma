@@ -1,9 +1,9 @@
 import { useRef, useEffect, useMemo } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, Modal, Pressable, StyleSheet, Image, Dimensions, Animated } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme, useThemedStyles } from '../lib/ThemeContext';
-import { buildProfileCardBlocks } from '../lib/profileUtils';
+import { buildProfileCardBlocks, buildProfileTraits } from '../lib/profileUtils';
 
 const { height: SCREEN_H } = Dimensions.get('window');
 
@@ -34,6 +34,7 @@ export default function ProfileViewSheet({ visible, profile, onClose, onPass, on
 
   // Before the early return — hooks can't run conditionally.
   const cardBlocks = useMemo(() => buildProfileCardBlocks(profile), [profile]);
+  const traits = useMemo(() => buildProfileTraits(profile), [profile]);
 
   if (!profile) return null;
 
@@ -100,10 +101,28 @@ export default function ProfileViewSheet({ visible, profile, onClose, onPass, on
                 <View style={s.infoDivider} />
                 <View style={[s.infoItem, { paddingLeft: 12 }]}>
                   <Ionicons name="cash-outline" size={16} color="#9AA0B2" />
-                  <Text style={s.infoItemText}>{(profile.budget_max || profile.budget) ? `£${profile.budget_max || profile.budget}/mo` : '-'}</Text>
+                  <Text style={s.infoItemText}>{(profile.budget_max || profile.budget) ? `₹${profile.budget_max || profile.budget}/mo` : '-'}</Text>
                 </View>
               </View>
             </View>
+
+            {/* Lifestyle traits — only the ones this profile has set */}
+            {traits.length > 0 && (
+              <View style={s.traitCard}>
+                <Text style={s.traitTitle}>Lifestyle</Text>
+                <View style={s.traitChips}>
+                  {traits.map((t) => {
+                    const Icon = t.iconSet === 'mci' ? MaterialCommunityIcons : Ionicons;
+                    return (
+                      <View key={t.group} style={s.traitChip}>
+                        <Icon name={t.icon} size={14} color="#9AA0B2" />
+                        <Text style={s.traitChipText}>{t.label}</Text>
+                      </View>
+                    );
+                  })}
+                </View>
+              </View>
+            )}
 
             {/* Prompts and remaining photos, interleaved — shares the feed
                 card's builder so the preview can't drift from the real card */}
@@ -182,6 +201,12 @@ const makeStyles = (colors) => StyleSheet.create({
   infoItemText: { fontFamily: 'HankenGrotesk_600SemiBold', fontSize: 14, color: colors.ink },
   infoDivider: { width: 1, height: 20, backgroundColor: colors.divider },
   infoHorizDivider: { height: 1, backgroundColor: colors.divider, marginVertical: 8 },
+
+  traitCard: { backgroundColor: colors.card, borderRadius: 20, padding: 18, marginBottom: 10, marginHorizontal: 16 },
+  traitTitle: { fontFamily: 'HankenGrotesk_600SemiBold', fontSize: 13, color: colors.slate, marginBottom: 12 },
+  traitChips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  traitChip: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: colors.mist, borderRadius: 50, paddingHorizontal: 12, paddingVertical: 7 },
+  traitChipText: { fontFamily: 'HankenGrotesk_600SemiBold', fontSize: 13, color: colors.ink },
 
   promptWhite: { position: 'relative', backgroundColor: colors.card, borderRadius: 20, padding: 24, paddingBottom: 30, marginBottom: 10, marginHorizontal: 16 },
   promptQ: { fontFamily: 'HankenGrotesk_600SemiBold', fontSize: 14, color: colors.slate, marginBottom: 10 },

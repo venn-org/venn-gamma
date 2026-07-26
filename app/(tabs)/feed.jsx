@@ -1,4 +1,4 @@
-import { Ionicons } from "@expo/vector-icons";
+import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useFocusEffect, useRouter } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -27,7 +27,7 @@ import {
 } from "../../lib/dailyLimits";
 import { formatBudgetRange, formatMoveInDate, mapDbPrefsToUI, mapUIPrefsToDb, toDb, toUI } from "../../lib/enums";
 import { PREF_ROWS, calculateOverlapScore, getPrefDisplay, isPrefSet, matchesPrefs } from "../../lib/prefs";
-import { buildProfileCardBlocks, calculateProfileCompletion, isFeedReady } from "../../lib/profileUtils";
+import { buildProfileCardBlocks, buildProfileTraits, calculateProfileCompletion, isFeedReady } from "../../lib/profileUtils";
 import { supabase } from "../../lib/supabase";
 import { useTheme, useThemedStyles } from "../../lib/ThemeContext";
 
@@ -214,6 +214,7 @@ export default function FeedScreen() {
   const overlapScore = currentProfile ? calculateOverlapScore(userPrefs, currentProfile) : null;
 
   const cardBlocks = useMemo(() => buildProfileCardBlocks(currentProfile), [currentProfile]);
+  const traits = useMemo(() => buildProfileTraits(currentProfile), [currentProfile]);
 
   // TEMP: with the view limit off, wrap back to the start instead of
   // dead-ending once the list runs out, so profiles cycle like before.
@@ -626,6 +627,24 @@ export default function FeedScreen() {
                     </View>
                   </View>
                 </View>
+
+                {/* Lifestyle traits — only the ones this profile has set */}
+                {traits.length > 0 && (
+                  <View style={s.traitCard}>
+                    <Text style={s.traitTitle}>Lifestyle</Text>
+                    <View style={s.traitChips}>
+                      {traits.map((t) => {
+                        const Icon = t.iconSet === "mci" ? MaterialCommunityIcons : Ionicons;
+                        return (
+                          <View key={t.group} style={s.traitChip}>
+                            <Icon name={t.icon} size={14} color="#9AA0B2" />
+                            <Text style={s.traitChipText}>{t.label}</Text>
+                          </View>
+                        );
+                      })}
+                    </View>
+                  </View>
+                )}
 
                 {/* Prompts and remaining photos, interleaved — see cardBlocks */}
                 {cardBlocks.map((block, i) =>
@@ -1074,6 +1093,34 @@ const makeStyles = (colors) => StyleSheet.create({
     height: 1,
     backgroundColor: colors.divider,
     marginVertical: 8,
+  },
+
+  traitCard: {
+    backgroundColor: colors.card,
+    borderRadius: 20,
+    padding: 18,
+    marginBottom: 10,
+  },
+  traitTitle: {
+    fontFamily: "HankenGrotesk_600SemiBold",
+    fontSize: 13,
+    color: colors.slate,
+    marginBottom: 12,
+  },
+  traitChips: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  traitChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: colors.mist,
+    borderRadius: 50,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+  },
+  traitChipText: {
+    fontFamily: "HankenGrotesk_600SemiBold",
+    fontSize: 13,
+    color: colors.ink,
   },
 
   promptWhite: {
