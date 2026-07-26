@@ -426,9 +426,9 @@ export default function FeedScreen() {
       {/* Feed Content */}
       <View style={[s.feedContent, { flex: 1 }, !currentProfile && { paddingTop: 0 }]}>
         {!currentProfile ? (
-          <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
+          <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40, flexGrow: 1 }}>
             {renderScrollTopSection()}
-            <View style={s.empty}>
+            <View style={[s.empty, { flex: 1 }]}>
               <Text style={s.emptyText}>
                 No more profiles found. Come back tomorrow.
               </Text>
