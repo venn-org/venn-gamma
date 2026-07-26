@@ -139,7 +139,7 @@ CREATE INDEX idx_zones_city ON public.zones USING btree (city_id, sort_order) WH
 -- ============================================================================
 
 CREATE TABLE public.profile_core (
-    id                text NOT NULL PRIMARY KEY,           -- Firebase UID
+    id                text NOT NULL PRIMARY KEY,           -- Supabase Auth user id (auth.jwt() ->> 'sub'), stored as text
     name              text,
     bio               text,
     location          text,                                 -- free-text, edit-profile.jsx's "Location" field (distinct from city/zone/lat/lng)
