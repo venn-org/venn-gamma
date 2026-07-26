@@ -56,7 +56,7 @@ export default function PhotosScreen() {
     : profilePhoto;
 
   return (
-    <OnboardingShell step={totalSteps(data.type)} total={totalSteps(data.type)}>
+    <OnboardingShell step={8} total={totalSteps(data.type)}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 20 }}>
         {isOwner ? (
           <>

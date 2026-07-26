@@ -6,7 +6,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors } from '../../lib/theme';
 import { useOnboarding, totalSteps } from '../../hooks/useOnboarding';
-import { CITIES } from '../../lib/locations';
+import { CITIES, ZONES_BY_CITY } from '../../lib/locations';
 import OnboardingShell from '../../components/OnboardingShell';
 
 export default function CityScreen() {
@@ -15,16 +15,31 @@ export default function CityScreen() {
   const { data, updateData } = useOnboarding();
 
   const [city, setCity] = useState(data.city || null);
+  const [areas, setAreas] = useState(data.prefs?.areas || []);
   const [loading, setLoading] = useState(false);
 
+  const zones = ZONES_BY_CITY[city] || [];
+
+  const selectCity = (id) => {
+    if (id === city) return;
+    setCity(id);
+    setAreas([]); // zones are city-scoped, so the old picks no longer apply
+  };
+
+  const toggleArea = (name) =>
+    setAreas((prev) => (prev.includes(name) ? prev.filter((a) => a !== name) : [...prev, name]));
+
+  const valid = !!city && areas.length > 0;
+
   const handleContinue = async () => {
-    if (!city) return;
+    if (!valid) return;
     setLoading(true);
-    updateData({ city });
+    // Budget / flat type / preferred gender aren't asked during onboarding
+    // anymore — they're set later from the Preferences sheet, which has the
+    // full slider + calendar controls.
+    updateData({ city, prefs: { ...data.prefs, areas } });
     setLoading(false);
-    // City sits directly before the housing/preferences screens — an owner's
-    // flat location and a seeker's preferred zones are both city-scoped.
-    router.push(data.type === 'owner' ? '/(onboarding)/location' : '/(onboarding)/seeker-preferences');
+    router.push('/(onboarding)/photos');
   };
 
   return (
@@ -32,9 +47,9 @@ export default function CityScreen() {
       step={7} total={totalSteps(data.type)}
       footer={
         <TouchableOpacity
-          style={[styles.btn, (!city || loading) && styles.btnDisabled]}
+          style={[styles.btn, (!valid || loading) && styles.btnDisabled]}
           onPress={handleContinue}
-          disabled={!city || loading}
+          disabled={!valid || loading}
           activeOpacity={0.85}
         >
           <Text style={styles.btnText}>{loading ? 'Saving…' : 'Continue'}</Text>
@@ -42,15 +57,19 @@ export default function CityScreen() {
       }
     >
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 24 }}>
-        <Text style={styles.title}>Where are you based?</Text>
-        <Text style={styles.subtitle}>You can always change this later.</Text>
+        <Text style={styles.title}>Where are you looking?</Text>
+        <Text style={styles.subtitle}>
+          {data.type === 'owner'
+            ? 'Pick your city, then the areas your flat is in.'
+            : 'Pick your city, then the areas you want to live in.'}
+        </Text>
 
         <View style={styles.cards}>
           {CITIES.map((c) => (
             <TouchableOpacity
               key={c.id}
               style={[styles.card, city === c.id && styles.cardActive]}
-              onPress={() => setCity(c.id)}
+              onPress={() => selectCity(c.id)}
               activeOpacity={0.8}
             >
               <View style={styles.cardContent}>
@@ -63,6 +82,31 @@ export default function CityScreen() {
             </TouchableOpacity>
           ))}
         </View>
+
+        {!!city && (
+          <>
+            <Text style={styles.sectionLabel}>AREAS (SELECT ALL THAT APPLY)</Text>
+            {zones.length === 0 ? (
+              <Text style={styles.emptyZones}>No areas listed for this city yet.</Text>
+            ) : (
+              <View style={styles.chips}>
+                {zones.map((z) => {
+                  const on = areas.includes(z.name);
+                  return (
+                    <TouchableOpacity
+                      key={z.id}
+                      style={[styles.chip, on && styles.chipOn]}
+                      onPress={() => toggleArea(z.name)}
+                      activeOpacity={0.8}
+                    >
+                      <Text style={[styles.chipText, on && styles.chipTextOn]}>{z.name}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            )}
+          </>
+        )}
       </ScrollView>
     </OnboardingShell>
   );
@@ -89,6 +133,14 @@ const styles = StyleSheet.create({
   cardNameActive: { color: colors.blue },
   cardCountry: { fontSize: 12, color: colors.slate },
   cardCountryActive: { color: colors.ink },
+
+  sectionLabel: { fontFamily: 'SpaceMono_400Regular', fontSize: 10, letterSpacing: 1.5, color: colors.slate, marginTop: 28, marginBottom: 12 },
+  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  chip: { paddingHorizontal: 16, paddingVertical: 11, borderRadius: 50, borderWidth: 1.5, borderColor: colors.mist, backgroundColor: '#fff' },
+  chipOn: { backgroundColor: colors.blue, borderColor: colors.blue },
+  chipText: { fontSize: 14, fontWeight: '500', color: colors.slate },
+  chipTextOn: { color: '#fff' },
+  emptyZones: { fontSize: 13, color: colors.placeholder },
 
   btn: { backgroundColor: colors.ink, borderRadius: 50, paddingVertical: 18, alignItems: 'center' },
   btnDisabled: { opacity: 0.32 },
