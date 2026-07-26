@@ -20,7 +20,7 @@ let onboardingState = {
   pronouns: [],
   gender: null,
   lifestyle: { drink: null, tobacco: null, weed: null },
-  prefs: { areas: [], budget: null, flatType: null, gender: null },
+  prefs: { areas: [], budgetMin: null, budgetMax: null, flatType: null, gender: null },
   photos: { profile: null, flat: [null, null, null] },
 };
 
@@ -136,7 +136,10 @@ export function useOnboarding() {
       weed: toDb('lifestyle', onboardingState.lifestyle?.weed) || null,
 
       areas: onboardingState.prefs?.areas || null,
-      budget: toDb('pref_budget', onboardingState.prefs?.budget) || null,
+      // Budget is a precise ₹ range now (budget_min/budget_max), not the old
+      // bucketed `budget` enum — see lib/prefs.js#matchesPrefs.
+      budget_min: onboardingState.prefs?.budgetMin ?? null,
+      budget_max: onboardingState.prefs?.budgetMax ?? null,
       flat_type: onboardingState.type === 'owner' ? toDb('flat_type', onboardingState.prefs?.flatType) : null,
 
       ...dbPrefs,

@@ -1,8 +1,9 @@
-import { useRef, useEffect } from 'react';
+import { useRef, useEffect, useMemo } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, Modal, Pressable, StyleSheet, Image, Dimensions, Animated } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme, useThemedStyles } from '../lib/ThemeContext';
+import { buildProfileCardBlocks } from '../lib/profileUtils';
 
 const { height: SCREEN_H } = Dimensions.get('window');
 
@@ -30,6 +31,9 @@ export default function ProfileViewSheet({ visible, profile, onClose, onPass, on
       sheetY.setValue(SCREEN_H);
     }
   }, [visible]);
+
+  // Before the early return — hooks can't run conditionally.
+  const cardBlocks = useMemo(() => buildProfileCardBlocks(profile), [profile]);
 
   if (!profile) return null;
 
@@ -101,27 +105,28 @@ export default function ProfileViewSheet({ visible, profile, onClose, onPass, on
               </View>
             </View>
 
-            {/* Flat Photos (owners only, labeled by room) */}
-            {profile.user_type === 'owner' && Array.isArray(profile.flat_photos) && profile.flat_photos.length > 0 && (
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.flatPhotoScroll} contentContainerStyle={{ paddingHorizontal: 16, gap: 10 }}>
-                {profile.flat_photos.filter(Boolean).map((fp, i) => (
-                  <View key={i} style={s.flatPhotoWrap}>
-                    <Image source={{ uri: fp.url }} style={s.flatPhoto} resizeMode="cover" />
+            {/* Prompts and remaining photos, interleaved — shares the feed
+                card's builder so the preview can't drift from the real card */}
+            {cardBlocks.map((block, i) =>
+              block.kind === 'prompt' ? (
+                <View
+                  key={`prompt-${i}`}
+                  style={block.accent ? [s.promptAccent, { backgroundColor: colors.tintViolet }] : s.promptWhite}
+                >
+                  <Text style={block.accent ? s.promptAccentQ : s.promptQ}>{block.q}</Text>
+                  <Text style={s.promptA}>{block.a}</Text>
+                </View>
+              ) : (
+                <View key={`photo-${i}`} style={s.blockPhotoWrap}>
+                  <Image source={{ uri: block.url }} style={s.blockPhoto} resizeMode="cover" />
+                  {block.label && (
                     <View style={s.flatLabel}>
-                      <Text style={s.flatLabelText}>{fp.label}</Text>
+                      <Text style={s.flatLabelText}>{block.label}</Text>
                     </View>
-                  </View>
-                ))}
-              </ScrollView>
+                  )}
+                </View>
+              ),
             )}
-
-            {/* Prompts */}
-            {Array.isArray(profile.prompts) && profile.prompts.map((p, i) => (
-              <View key={i} style={i % 2 === 0 ? s.promptWhite : [s.promptAccent, { backgroundColor: colors.tintViolet }]}>
-                <Text style={i % 2 === 0 ? s.promptQ : s.promptAccentQ}>{p.q}</Text>
-                <Text style={s.promptA}>{p.a}</Text>
-              </View>
-            ))}
 
           </ScrollView>
 
@@ -185,9 +190,10 @@ const makeStyles = (colors) => StyleSheet.create({
   promptAccent: { position: 'relative', borderRadius: 20, padding: 24, paddingBottom: 30, marginBottom: 10, marginHorizontal: 16 },
   promptAccentQ: { fontFamily: 'HankenGrotesk_600SemiBold', fontSize: 14, color: colors.violet, marginBottom: 10 },
 
-  flatPhotoScroll: { marginBottom: 10 },
-  flatPhotoWrap: { position: 'relative', borderRadius: 20, overflow: 'hidden', width: 240, height: 200 },
-  flatPhoto: { width: '100%', height: '100%' },
+  // Full-width stacked photos, matching the feed card's interleaved layout
+  // (the old horizontal strip only ever showed owners' flat photos).
+  blockPhotoWrap: { position: 'relative', borderRadius: 20, overflow: 'hidden', height: 260, marginBottom: 10, marginHorizontal: 16 },
+  blockPhoto: { width: '100%', height: '100%' },
   flatLabel: { position: 'absolute', bottom: 14, left: 14, backgroundColor: 'rgba(0,0,0,0.42)', borderRadius: 50, paddingHorizontal: 12, paddingVertical: 6 },
   flatLabelText: { fontFamily: 'HankenGrotesk_600SemiBold', fontSize: 12, color: '#fff' },
 
