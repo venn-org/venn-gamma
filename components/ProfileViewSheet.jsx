@@ -1,8 +1,9 @@
-import { useRef, useEffect } from 'react';
+import { useRef, useEffect, useMemo } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, Modal, Pressable, StyleSheet, Image, Dimensions, Animated } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme, useThemedStyles } from '../lib/ThemeContext';
+import { buildProfileCardBlocks, buildProfileTraits } from '../lib/profileUtils';
 
 const { height: SCREEN_H } = Dimensions.get('window');
 
@@ -30,6 +31,10 @@ export default function ProfileViewSheet({ visible, profile, onClose, onPass, on
       sheetY.setValue(SCREEN_H);
     }
   }, [visible]);
+
+  // Before the early return — hooks can't run conditionally.
+  const cardBlocks = useMemo(() => buildProfileCardBlocks(profile), [profile]);
+  const traits = useMemo(() => buildProfileTraits(profile), [profile]);
 
   if (!profile) return null;
 
@@ -96,32 +101,51 @@ export default function ProfileViewSheet({ visible, profile, onClose, onPass, on
                 <View style={s.infoDivider} />
                 <View style={[s.infoItem, { paddingLeft: 12 }]}>
                   <Ionicons name="cash-outline" size={16} color="#9AA0B2" />
-                  <Text style={s.infoItemText}>{(profile.budget_max || profile.budget) ? `£${profile.budget_max || profile.budget}/mo` : '-'}</Text>
+                  <Text style={s.infoItemText}>{(profile.budget_max || profile.budget) ? `₹${profile.budget_max || profile.budget}/mo` : '-'}</Text>
                 </View>
               </View>
             </View>
 
-            {/* Flat Photos (owners only, labeled by room) */}
-            {profile.user_type === 'owner' && Array.isArray(profile.flat_photos) && profile.flat_photos.length > 0 && (
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.flatPhotoScroll} contentContainerStyle={{ paddingHorizontal: 16, gap: 10 }}>
-                {profile.flat_photos.filter(Boolean).map((fp, i) => (
-                  <View key={i} style={s.flatPhotoWrap}>
-                    <Image source={{ uri: fp.url }} style={s.flatPhoto} resizeMode="cover" />
-                    <View style={s.flatLabel}>
-                      <Text style={s.flatLabelText}>{fp.label}</Text>
-                    </View>
-                  </View>
-                ))}
-              </ScrollView>
+            {/* Lifestyle traits — only the ones this profile has set */}
+            {traits.length > 0 && (
+              <View style={s.traitCard}>
+                <Text style={s.traitTitle}>Lifestyle</Text>
+                <View style={s.traitChips}>
+                  {traits.map((t) => {
+                    const Icon = t.iconSet === 'mci' ? MaterialCommunityIcons : Ionicons;
+                    return (
+                      <View key={t.group} style={s.traitChip}>
+                        <Icon name={t.icon} size={14} color="#9AA0B2" />
+                        <Text style={s.traitChipText}>{t.label}</Text>
+                      </View>
+                    );
+                  })}
+                </View>
+              </View>
             )}
 
-            {/* Prompts */}
-            {Array.isArray(profile.prompts) && profile.prompts.map((p, i) => (
-              <View key={i} style={i % 2 === 0 ? s.promptWhite : [s.promptAccent, { backgroundColor: colors.tintViolet }]}>
-                <Text style={i % 2 === 0 ? s.promptQ : s.promptAccentQ}>{p.q}</Text>
-                <Text style={s.promptA}>{p.a}</Text>
-              </View>
-            ))}
+            {/* Prompts and remaining photos, interleaved — shares the feed
+                card's builder so the preview can't drift from the real card */}
+            {cardBlocks.map((block, i) =>
+              block.kind === 'prompt' ? (
+                <View
+                  key={`prompt-${i}`}
+                  style={block.accent ? [s.promptAccent, { backgroundColor: colors.tintViolet }] : s.promptWhite}
+                >
+                  <Text style={block.accent ? s.promptAccentQ : s.promptQ}>{block.q}</Text>
+                  <Text style={s.promptA}>{block.a}</Text>
+                </View>
+              ) : (
+                <View key={`photo-${i}`} style={s.blockPhotoWrap}>
+                  <Image source={{ uri: block.url }} style={s.blockPhoto} resizeMode="cover" />
+                  {block.label && (
+                    <View style={s.flatLabel}>
+                      <Text style={s.flatLabelText}>{block.label}</Text>
+                    </View>
+                  )}
+                </View>
+              ),
+            )}
 
           </ScrollView>
 
@@ -178,6 +202,12 @@ const makeStyles = (colors) => StyleSheet.create({
   infoDivider: { width: 1, height: 20, backgroundColor: colors.divider },
   infoHorizDivider: { height: 1, backgroundColor: colors.divider, marginVertical: 8 },
 
+  traitCard: { backgroundColor: colors.card, borderRadius: 20, padding: 18, marginBottom: 10, marginHorizontal: 16 },
+  traitTitle: { fontFamily: 'HankenGrotesk_600SemiBold', fontSize: 13, color: colors.slate, marginBottom: 12 },
+  traitChips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  traitChip: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: colors.mist, borderRadius: 50, paddingHorizontal: 12, paddingVertical: 7 },
+  traitChipText: { fontFamily: 'HankenGrotesk_600SemiBold', fontSize: 13, color: colors.ink },
+
   promptWhite: { position: 'relative', backgroundColor: colors.card, borderRadius: 20, padding: 24, paddingBottom: 30, marginBottom: 10, marginHorizontal: 16 },
   promptQ: { fontFamily: 'HankenGrotesk_600SemiBold', fontSize: 14, color: colors.slate, marginBottom: 10 },
   promptA: { fontFamily: 'SpaceGrotesk_700Bold', fontSize: 22, color: colors.ink, letterSpacing: -0.4, lineHeight: 30 },
@@ -185,9 +215,10 @@ const makeStyles = (colors) => StyleSheet.create({
   promptAccent: { position: 'relative', borderRadius: 20, padding: 24, paddingBottom: 30, marginBottom: 10, marginHorizontal: 16 },
   promptAccentQ: { fontFamily: 'HankenGrotesk_600SemiBold', fontSize: 14, color: colors.violet, marginBottom: 10 },
 
-  flatPhotoScroll: { marginBottom: 10 },
-  flatPhotoWrap: { position: 'relative', borderRadius: 20, overflow: 'hidden', width: 240, height: 200 },
-  flatPhoto: { width: '100%', height: '100%' },
+  // Full-width stacked photos, matching the feed card's interleaved layout
+  // (the old horizontal strip only ever showed owners' flat photos).
+  blockPhotoWrap: { position: 'relative', borderRadius: 20, overflow: 'hidden', height: 260, marginBottom: 10, marginHorizontal: 16 },
+  blockPhoto: { width: '100%', height: '100%' },
   flatLabel: { position: 'absolute', bottom: 14, left: 14, backgroundColor: 'rgba(0,0,0,0.42)', borderRadius: 50, paddingHorizontal: 12, paddingVertical: 6 },
   flatLabelText: { fontFamily: 'HankenGrotesk_600SemiBold', fontSize: 12, color: '#fff' },
 

@@ -24,7 +24,7 @@ export default function GenderScreen() {
 
   return (
     <OnboardingShell 
-      step={6} total={totalSteps(data.type)}
+      step={5} total={totalSteps(data.type)}
       footer={
         <View style={styles.footerInner}>
           <Text style={styles.visible}>Visible on profile</Text>

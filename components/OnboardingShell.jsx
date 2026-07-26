@@ -1,16 +1,24 @@
-import { View, Text, TouchableOpacity, StyleSheet, Animated, Platform } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Animated, Platform, KeyboardAvoidingView } from 'react-native';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors } from '../lib/theme';
 
-export default function OnboardingShell({ step, total, children, footer, slideX = 0, opacity = 1 }) {
+// `avoidKeyboard` is opt-in: only the screens with a text input need the
+// footer button to ride up with the keyboard, and wrapping every screen in a
+// KeyboardAvoidingView would shift layouts that have nothing to avoid.
+export default function OnboardingShell({ step, total, children, footer, slideX = 0, opacity = 1, avoidKeyboard = false }) {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const pct = `${Math.round((step / total) * 100)}%`;
 
+  const Container = avoidKeyboard ? KeyboardAvoidingView : View;
+  const containerProps = avoidKeyboard
+    ? { behavior: Platform.OS === 'ios' ? 'padding' : 'height', keyboardVerticalOffset: 0 }
+    : {};
+
   return (
-    <View style={[styles.container, { paddingTop: insets.top }]}>
+    <Container {...containerProps} style={[styles.container, { paddingTop: insets.top }]}>
       <View style={styles.topBar}>
         <View style={styles.progressTrack}>
           <LinearGradient colors={[colors.blue, colors.violet]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={[styles.progressFill, { width: pct }]} />
@@ -31,7 +39,7 @@ export default function OnboardingShell({ step, total, children, footer, slideX 
           {footer}
         </Animated.View>
       )}
-    </View>
+    </Container>
   );
 }
 

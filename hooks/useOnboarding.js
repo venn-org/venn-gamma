@@ -4,6 +4,7 @@ import { getCurrentUserId, notifyOnboardingComplete } from '../lib/auth';
 import { mapUIPrefsToDb, toDb, toUI } from '../lib/enums';
 import { upsertFlatDetails } from '../lib/flatDetails';
 import { FLAT_ROOM_LABELS } from '../lib/photos';
+import { ZONES_BY_CITY } from '../lib/locations';
 import { getAge } from '../lib/age';
 
 // Shared state object instance outside the hook so it persists across screen unmounts/mounts
@@ -13,14 +14,11 @@ let onboardingState = {
   lastName: '',
   type: null, // 'seeking' | 'owner'
   city: null,
-  zone: null,
-  lat: null,
-  lng: null,
   birthday: null,
   pronouns: [],
   gender: null,
   lifestyle: { drink: null, tobacco: null, weed: null },
-  prefs: { areas: [], budget: null, flatType: null, gender: null },
+  prefs: { areas: [], budgetMin: null, budgetMax: null, flatType: null, gender: null },
   photos: { profile: null, flat: [null, null, null] },
 };
 
@@ -32,9 +30,11 @@ if (typeof window !== 'undefined') {
   } catch (e) {}
 }
 
-// Owners get two extra screens (flat location + flat details) where seekers get
-// one (what they're looking for), so the two paths have different lengths.
-export const totalSteps = (type) => (type === 'owner' ? 10 : 9);
+// Both roles now walk the same 9 screens: name, account type, birthday,
+// pronouns, gender, lifestyle, where-you're-looking, photos, notifications.
+// Budget / flat type / preferred gender moved out of onboarding into the
+// Preferences sheet; owners set flat type and photos from Flat Details.
+export const totalSteps = () => 9;
 
 export function useOnboarding() {
   const [state, setState] = useState(onboardingState);
@@ -119,13 +119,21 @@ export function useOnboarding() {
       flatType: flatType ? [flatType] : [], // mapUIPrefsToDb expects an array
     });
 
+    // The city screen collects area *names*; `zone` stores the matching zone
+    // id and `location` its display name (same pairing edit-profile.jsx keeps).
+    // Onboarding no longer has a GPS step, so these come from the first
+    // selected area rather than detected coordinates.
+    const primaryArea = onboardingState.prefs?.areas?.[0] ?? null;
+    const primaryZone = (ZONES_BY_CITY[onboardingState.city] || []).find(z => z.name === primaryArea);
+
     const updatePayload = {
       name: `${onboardingState.firstName} ${onboardingState.lastName}`.trim(),
       user_type: onboardingState.type,
       city: onboardingState.city,
-      zone: onboardingState.zone,
-      lat: onboardingState.lat,
-      lng: onboardingState.lng,
+      zone: primaryZone?.id ?? null,
+      location: primaryArea,
+      lat: primaryZone?.lat ?? null,
+      lng: primaryZone?.lng ?? null,
       birthday: onboardingState.birthday,
       age: getAge(onboardingState.birthday),
       pronouns: onboardingState.pronouns,
@@ -136,7 +144,10 @@ export function useOnboarding() {
       weed: toDb('lifestyle', onboardingState.lifestyle?.weed) || null,
 
       areas: onboardingState.prefs?.areas || null,
-      budget: toDb('pref_budget', onboardingState.prefs?.budget) || null,
+      // Budget is a precise ₹ range now (budget_min/budget_max), not the old
+      // bucketed `budget` enum — see lib/prefs.js#matchesPrefs.
+      budget_min: onboardingState.prefs?.budgetMin ?? null,
+      budget_max: onboardingState.prefs?.budgetMax ?? null,
       flat_type: onboardingState.type === 'owner' ? toDb('flat_type', onboardingState.prefs?.flatType) : null,
 
       ...dbPrefs,

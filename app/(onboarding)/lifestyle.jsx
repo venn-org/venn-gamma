@@ -32,12 +32,12 @@ export default function LifestyleScreen() {
     setLoading(false);
     // Owners describe their flat (location + flat details); seekers set
     // what they're looking for (areas, budget, flatmate gender).
-    router.push(data.type === 'owner' ? '/(onboarding)/location' : '/(onboarding)/seeker-preferences');
+    router.push('/(onboarding)/city');
   };
 
   return (
     <OnboardingShell
-      step={7} total={totalSteps(data.type)}
+      step={6} total={totalSteps(data.type)}
       footer={
         <View style={styles.footerInner}>
           <Text style={styles.visible}>Visible on profile</Text>

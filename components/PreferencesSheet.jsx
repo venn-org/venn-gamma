@@ -3,16 +3,15 @@ import { View, Text, TouchableOpacity, ScrollView, Modal, Pressable, StyleSheet,
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme, useThemedStyles } from '../lib/ThemeContext';
-import { PREF_SECTIONS, getPrefDisplay, isPrefSet, prefOptions } from '../lib/prefs';
+import {
+  BUDGET_DEFAULT_MAX, BUDGET_MAX, BUDGET_MIN, BUDGET_STEP,
+  PREF_SECTIONS, getPrefDisplay, isPrefSet, prefOptions,
+} from '../lib/prefs';
 import { formatBudgetRange, formatMoveInDate as formatMoveInDisplay } from '../lib/enums';
 import RangeSlider from './RangeSlider';
 import Calendar from './Calendar';
 
 const { height: SCREEN_H } = Dimensions.get('window');
-
-const BUDGET_MIN = 0;
-const BUDGET_MAX = 100000;
-const BUDGET_STEP = 1000;
 
 const pad2 = (n) => String(n).padStart(2, '0');
 const todayStr = () => {
@@ -20,7 +19,7 @@ const todayStr = () => {
   return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
 };
 
-const defaultHousing = () => ({ budgetMin: BUDGET_MIN, budgetMax: 20000, moveInDate: '' });
+const defaultHousing = () => ({ budgetMin: BUDGET_MIN, budgetMax: BUDGET_DEFAULT_MAX, moveInDate: '' });
 
 export default function PreferencesSheet({ visible, prefs, city, housing, showRole = false, only = null, onClose, onSave }) {
   const insets = useSafeAreaInsets();
@@ -113,7 +112,7 @@ export default function PreferencesSheet({ visible, prefs, city, housing, showRo
                   const isDate = row.type === 'date';
                   const options = isRange || isDate ? [] : prefOptions(row, city);
                   const set = isRange
-                    ? housingDraft.budgetMin !== BUDGET_MIN || housingDraft.budgetMax !== 20000
+                    ? housingDraft.budgetMin !== BUDGET_MIN || housingDraft.budgetMax !== BUDGET_DEFAULT_MAX
                     : isDate
                       ? !!housingDraft.moveInDate
                       : isPrefSet(draft, row.key, row.multi);
