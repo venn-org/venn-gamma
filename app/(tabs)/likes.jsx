@@ -62,11 +62,13 @@ export default function LikesScreen() {
       if (ownerIds.length > 0) {
         const { data: flatRows } = await supabase
           .from('flat_details')
-          .select('profile_id, photos')
+          .select('profile_id, photos, description')
           .in('profile_id', ownerIds);
-        const photosByProfile = new Map((flatRows || []).map(r => [r.profile_id, r.photos]));
+        const flatByProfile = new Map((flatRows || []).map(r => [r.profile_id, r]));
         mapped.forEach(l => {
-          l.profile.flat_photos = photosByProfile.get(l.userId) || [];
+          const flat = flatByProfile.get(l.userId);
+          l.profile.flat_photos = flat?.photos || [];
+          l.profile.flat_description = flat?.description || null;
         });
       }
 

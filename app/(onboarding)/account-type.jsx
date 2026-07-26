@@ -6,6 +6,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors } from '../../lib/theme';
 import { useOnboarding, totalSteps } from '../../hooks/useOnboarding';
+import OptionIcon from '../../components/OptionIcon';
+import { optionIcon } from '../../lib/enums';
 
 export default function AccountTypeScreen() {
   const router = useRouter();
@@ -51,7 +53,7 @@ export default function AccountTypeScreen() {
           activeOpacity={0.8}
         >
           <View style={[styles.cardIcon, type === 'seeking' && styles.cardIconActive]}>
-            <Text style={{ fontSize: 30 }}>🔍</Text>
+            <OptionIcon name={optionIcon('pref_role', 'seeking')} size={26} color={type === 'seeking' ? colors.blue : colors.slate} />
           </View>
           <View style={{ flex: 1 }}>
             <Text style={[styles.cardTitle, type === 'seeking' && styles.cardTitleActive]}>
@@ -72,7 +74,7 @@ export default function AccountTypeScreen() {
           activeOpacity={0.8}
         >
           <View style={[styles.cardIcon, type === 'owner' && styles.cardIconActive]}>
-            <Text style={{ fontSize: 30 }}>🏠</Text>
+            <OptionIcon name={optionIcon('pref_role', 'owner')} size={26} color={type === 'owner' ? colors.blue : colors.slate} />
           </View>
           <View style={{ flex: 1 }}>
             <Text style={[styles.cardTitle, type === 'owner' && styles.cardTitleActive]}>

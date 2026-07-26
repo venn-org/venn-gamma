@@ -1,4 +1,4 @@
-import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
+import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect, useRouter } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -16,6 +16,8 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import MatchCelebration from "../../components/MatchCelebration";
+import OptionIcon from "../../components/OptionIcon";
+import PhotoLightbox from "../../components/PhotoLightbox";
 import PreferencesSheet from "../../components/PreferencesSheet";
 import { getCurrentUserId } from "../../lib/auth";
 import { getBlockedIds } from "../../lib/blocks";
@@ -25,9 +27,9 @@ import {
   getTodayViewedProfileIds,
   recordProfileView,
 } from "../../lib/dailyLimits";
-import { formatBudgetRange, formatMoveInDate, mapDbPrefsToUI, mapUIPrefsToDb, toDb, toUI } from "../../lib/enums";
+import { formatBudgetRange, formatMoveInDate, mapDbPrefsToUI, mapUIPrefsToDb, optionDisplay, stripLabelEmoji, toDb, toUI } from "../../lib/enums";
 import { PREF_ROWS, calculateOverlapScore, getPrefDisplay, isPrefSet, matchesPrefs } from "../../lib/prefs";
-import { buildProfileCardBlocks, buildProfileTraits, calculateProfileCompletion, isFeedReady } from "../../lib/profileUtils";
+import { buildFlatFacts, buildFlatGallery, buildProfileCardBlocks, buildProfileTraits, calculateProfileCompletion, isFeedReady } from "../../lib/profileUtils";
 import { supabase } from "../../lib/supabase";
 import { useTheme, useThemedStyles } from "../../lib/ThemeContext";
 
@@ -198,11 +200,13 @@ export default function FeedScreen() {
       if (ownerIds.length > 0) {
         const { data: flatRows } = await supabase
           .from("flat_details")
-          .select("profile_id, photos")
+          .select("profile_id, photos, description")
           .in("profile_id", ownerIds);
-        const photosByProfile = new Map((flatRows ?? []).map((r) => [r.profile_id, r.photos]));
+        const flatByProfile = new Map((flatRows ?? []).map((r) => [r.profile_id, r]));
         filtered.forEach((p) => {
-          p.flat_photos = photosByProfile.get(p.id) ?? [];
+          const flat = flatByProfile.get(p.id);
+          p.flat_photos = flat?.photos ?? [];
+          p.flat_description = flat?.description ?? null;
         });
       }
 
@@ -215,6 +219,12 @@ export default function FeedScreen() {
 
   const cardBlocks = useMemo(() => buildProfileCardBlocks(currentProfile), [currentProfile]);
   const traits = useMemo(() => buildProfileTraits(currentProfile), [currentProfile]);
+  const flatFacts = useMemo(() => buildFlatFacts(currentProfile), [currentProfile]);
+  const flatGallery = useMemo(() => buildFlatGallery(currentProfile), [currentProfile]);
+  // Which flat photo the lightbox opened on; null while it's closed. Reset on
+  // card change so a pass/like never leaves the previous flat's photo open.
+  const [lightboxIndex, setLightboxIndex] = useState(null);
+  useEffect(() => setLightboxIndex(null), [currentIndex]);
 
   // TEMP: with the view limit off, wrap back to the start instead of
   // dead-ending once the list runs out, so profiles cycle like before.
@@ -339,6 +349,13 @@ export default function FeedScreen() {
       >
         {FILTER_CHIPS.map((chip) => {
           const active = isPrefSet(userPrefs, chip.key, chip.multi);
+          const chipValue = !active
+            ? null
+            : chip.multi ? userPrefs?.[chip.key]?.[0] : userPrefs?.[chip.key];
+          const chipIcon = optionDisplay(chip.enumKey, chipValue).icon;
+          const chipText = active
+            ? getPrefDisplay(userPrefs, chip.key, chip.label, chip.multi)
+            : chip.label;
           return (
             <TouchableOpacity
               key={chip.key}
@@ -346,10 +363,13 @@ export default function FeedScreen() {
               activeOpacity={0.8}
               onPress={() => { setPrefsSection(chip.key); setPrefsVisible(true); }}
             >
+              <OptionIcon
+                name={chipIcon}
+                size={13}
+                color={active ? "#fff" : colors.ink}
+              />
               <Text style={[s.filterChipText, active && s.filterChipTextActive]}>
-                {active
-                  ? getPrefDisplay(userPrefs, chip.key, chip.label, chip.multi)
-                  : chip.label}
+                {chipIcon ? stripLabelEmoji(chipText) : chipText}
               </Text>
               <Ionicons
                 name="chevron-down"
@@ -633,15 +653,12 @@ export default function FeedScreen() {
                   <View style={s.traitCard}>
                     <Text style={s.traitTitle}>Lifestyle</Text>
                     <View style={s.traitChips}>
-                      {traits.map((t) => {
-                        const Icon = t.iconSet === "mci" ? MaterialCommunityIcons : Ionicons;
-                        return (
-                          <View key={t.group} style={s.traitChip}>
-                            <Icon name={t.icon} size={14} color="#9AA0B2" />
-                            <Text style={s.traitChipText}>{t.label}</Text>
-                          </View>
-                        );
-                      })}
+                      {traits.map((t) => (
+                        <View key={t.group} style={s.traitChip}>
+                          <OptionIcon name={t.icon} size={14} color="#9AA0B2" />
+                          <Text style={s.traitChipText}>{t.label}</Text>
+                        </View>
+                      ))}
                     </View>
                   </View>
                 )}
@@ -694,6 +711,44 @@ export default function FeedScreen() {
                     </View>
                   ),
                 )}
+
+                {/* Owners' flat: the facts, then every room photo as one
+                    gallery — placed after the prompts so the six labelled
+                    rooms don't swamp the prompt sequence. */}
+                {(flatFacts.length > 0 || flatGallery.length > 0) && (
+                  <View style={s.flatSection}>
+                    <Text style={s.flatSectionTitle}>The flat</Text>
+                    {flatFacts.map((f) => (
+                      <View key={f.key} style={s.flatFactRow}>
+                        <Ionicons name={f.icon} size={15} color="#9AA0B2" />
+                        <Text style={s.flatFactText}>{f.text}</Text>
+                      </View>
+                    ))}
+                    {currentProfile.flat_description ? (
+                      <Text style={s.flatDescription}>{currentProfile.flat_description}</Text>
+                    ) : null}
+
+                    {flatGallery.length > 0 && (
+                      <View style={s.galleryGrid}>
+                        {flatGallery.map((photo, i) => (
+                          <TouchableOpacity
+                            key={`flat-${i}`}
+                            style={s.galleryTile}
+                            activeOpacity={0.85}
+                            onPress={() => setLightboxIndex(i)}
+                          >
+                            <Image source={{ uri: photo.url }} style={s.galleryPhoto} resizeMode="cover" />
+                            {photo.label && (
+                              <View style={[s.flatLabel, s.galleryLabel]}>
+                                <Text style={s.flatLabelText}>{photo.label}</Text>
+                              </View>
+                            )}
+                          </TouchableOpacity>
+                        ))}
+                      </View>
+                    )}
+                  </View>
+                )}
               </ScrollView>
             </Animated.View>
             <TouchableOpacity style={s.skipBtn} onPress={handlePass}>
@@ -702,6 +757,13 @@ export default function FeedScreen() {
           </>
         )}
       </View>
+
+      <PhotoLightbox
+        visible={lightboxIndex !== null}
+        photos={flatGallery}
+        startIndex={lightboxIndex ?? 0}
+        onClose={() => setLightboxIndex(null)}
+      />
 
       <PreferencesSheet
         visible={prefsVisible}
@@ -817,6 +879,7 @@ const makeStyles = (colors) => StyleSheet.create({
   filterChip: {
     flexDirection: "row",
     alignItems: "center",
+    gap: 4,
     paddingHorizontal: 12,
     paddingVertical: 7,
     borderRadius: 50,
@@ -1194,6 +1257,47 @@ const makeStyles = (colors) => StyleSheet.create({
     height: 280,
   },
   flatPhoto: { width: "100%", height: "100%" },
+
+  flatSection: {
+    backgroundColor: colors.card,
+    borderRadius: 20,
+    padding: 18,
+    marginBottom: 10,
+  },
+  flatSectionTitle: {
+    fontFamily: "SpaceGrotesk_700Bold",
+    fontSize: 18,
+    color: colors.ink,
+    letterSpacing: -0.3,
+    marginBottom: 12,
+  },
+  flatFactRow: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 8 },
+  flatFactText: {
+    fontFamily: "HankenGrotesk_600SemiBold",
+    fontSize: 14,
+    color: colors.ink,
+  },
+  flatDescription: {
+    fontFamily: "HankenGrotesk_400Regular",
+    fontSize: 14,
+    color: colors.slate,
+    lineHeight: 21,
+    marginTop: 4,
+  },
+  // Two-up tiles: flexBasis leaves room for the 8px gap, flexGrow lets a lone
+  // trailing photo stretch to the full width instead of sitting half-empty.
+  galleryGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 14 },
+  galleryTile: {
+    position: "relative",
+    flexGrow: 1,
+    flexBasis: "47%",
+    aspectRatio: 1,
+    borderRadius: 14,
+    overflow: "hidden",
+    backgroundColor: colors.mist,
+  },
+  galleryPhoto: { width: "100%", height: "100%" },
+  galleryLabel: { bottom: 8, left: 8, paddingHorizontal: 10, paddingVertical: 4 },
   flatLabel: {
     position: "absolute",
     bottom: 14,

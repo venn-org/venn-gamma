@@ -7,7 +7,8 @@ import {
   BUDGET_DEFAULT_MAX, BUDGET_MAX, BUDGET_MIN, BUDGET_STEP,
   PREF_SECTIONS, getPrefDisplay, isPrefSet, prefOptions,
 } from '../lib/prefs';
-import { formatBudgetRange, formatMoveInDate as formatMoveInDisplay } from '../lib/enums';
+import { formatBudgetRange, formatMoveInDate as formatMoveInDisplay, optionDisplay, stripLabelEmoji } from '../lib/enums';
+import OptionIcon from './OptionIcon';
 import RangeSlider from './RangeSlider';
 import Calendar from './Calendar';
 
@@ -121,6 +122,13 @@ export default function PreferencesSheet({ visible, prefs, city, housing, showRo
                     : isDate
                       ? formatMoveInDisplay(housingDraft.moveInDate) || row.placeholder
                       : getPrefDisplay(draft, row.key, row.placeholder, row.multi);
+                  // Icon for the collapsed summary — the first selected value
+                  // stands in for a multi row, matching its "A +2" text.
+                  const summaryValue = isRange || isDate || !set
+                    ? null
+                    : row.multi ? draft[row.key]?.[0] : draft[row.key];
+                  const summaryIcon = optionDisplay(row.enumKey, summaryValue).icon;
+                  const summaryText = summaryIcon ? stripLabelEmoji(displayText) : displayText;
                   return (
                     <View key={row.key}>
                       <TouchableOpacity
@@ -130,9 +138,12 @@ export default function PreferencesSheet({ visible, prefs, city, housing, showRo
                       >
                         <View style={{ flex: 1 }}>
                           <Text style={pref.prefTitle}>{row.label}</Text>
-                          <Text style={[pref.prefVal, set && pref.prefValSet]}>
-                            {displayText}
-                          </Text>
+                          <View style={pref.prefValRow}>
+                            <OptionIcon name={summaryIcon} size={13} color={set ? colors.blue : colors.placeholder} />
+                            <Text style={[pref.prefVal, set && pref.prefValSet]}>
+                              {summaryText}
+                            </Text>
+                          </View>
                         </View>
                         <Ionicons name={isOpen ? 'chevron-up' : 'chevron-down'} size={16} color={colors.placeholder} />
                       </TouchableOpacity>
@@ -174,9 +185,11 @@ export default function PreferencesSheet({ visible, prefs, city, housing, showRo
                               : row.key === 'role'
                                 ? () => opt !== draft.role && setPendingRole(opt)
                                 : () => setValue(row.key, on ? null : opt);
+                            const { icon, text } = optionDisplay(row.enumKey, opt);
                             return (
                               <TouchableOpacity key={opt} style={[pref.chip, on && pref.chipOn]} onPress={onPress} activeOpacity={0.8}>
-                                <Text style={[pref.chipText, on && pref.chipTextOn]}>{opt}</Text>
+                                <OptionIcon name={icon} size={15} color={on ? '#fff' : colors.slate} />
+                                <Text style={[pref.chipText, on && pref.chipTextOn]}>{text}</Text>
                               </TouchableOpacity>
                             );
                           })}
@@ -202,7 +215,7 @@ export default function PreferencesSheet({ visible, prefs, city, housing, showRo
     <Modal visible={!!pendingRole} transparent animationType="fade" onRequestClose={() => setPendingRole(null)}>
       <Pressable style={pref.confirmBackdrop} onPress={() => setPendingRole(null)}>
         <Pressable style={pref.confirmBox} onPress={() => {}}>
-          <Text style={pref.confirmTitle}>Switch to "{pendingRole}"?</Text>
+          <Text style={pref.confirmTitle}>Switch to "{stripLabelEmoji(pendingRole)}"?</Text>
           <Text style={pref.confirmSub}>This changes who you'll see and be shown to. You can switch back anytime.</Text>
           <View style={pref.confirmActions}>
             <TouchableOpacity style={[pref.confirmBtn, pref.confirmCancel]} onPress={() => setPendingRole(null)}>
@@ -240,7 +253,8 @@ const makeStyles = (colors) => StyleSheet.create({
   },
   prefRowOpen: { borderColor: colors.blue },
   prefTitle: { fontFamily: 'HankenGrotesk_600SemiBold', fontSize: 15, color: colors.ink },
-  prefVal: { fontFamily: 'HankenGrotesk_400Regular', fontSize: 13, color: colors.placeholder, marginTop: 2 },
+  prefValRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 2 },
+  prefVal: { fontFamily: 'HankenGrotesk_400Regular', fontSize: 13, color: colors.placeholder },
   prefValSet: { color: colors.blue },
 
   optsWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingTop: 10, paddingBottom: 16 },
@@ -248,7 +262,7 @@ const makeStyles = (colors) => StyleSheet.create({
   // has to go back to 'nowrap' — wrapping in a column axis stops children
   // from stretching, which left the slider shrunk and off-centre.
   optsWrapStacked: { flexDirection: 'column', flexWrap: 'nowrap', alignItems: 'stretch' },
-  chip: { paddingHorizontal: 16, paddingVertical: 10, borderRadius: 50, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.card },
+  chip: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 16, paddingVertical: 10, borderRadius: 50, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.card },
   chipOn: { backgroundColor: colors.blue, borderColor: colors.blue },
   chipText: { fontFamily: 'HankenGrotesk_600SemiBold', fontSize: 14, color: colors.ink },
   chipTextOn: { color: '#fff' },
