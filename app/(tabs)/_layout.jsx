@@ -8,7 +8,10 @@ import { supabase } from '../../lib/supabase';
 import { getCurrentUserId } from '../../lib/auth';
 import { getUnreadCount } from '../../lib/notifications';
 
-const POLL_INTERVAL_MS = 3000;
+// Realtime subscription below is the primary update path; this is only a
+// fallback for delayed/dropped realtime delivery, so it doesn't need to be
+// fast.
+const POLL_INTERVAL_MS = 15000;
 
 const TabIcon = ({ name, size, color, count, badgeRing }) => (
   <View>

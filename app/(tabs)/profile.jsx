@@ -701,7 +701,7 @@ export default function ProfileScreen() {
             onPress={() => setPrefsVisible(true)}
           >
             <View style={[s.actionIcon, { backgroundColor: colors.track }]}>
-              <Ionicons name="settings" size={18} color="#335CFF" />
+              <Ionicons name="options-outline" size={18} color="#335CFF" />
             </View>
             <Text style={s.actionText}>Preferences</Text>
           </TouchableOpacity>

@@ -161,7 +161,7 @@ function RootLayoutInner() {
     };
 
     updatePresence();
-    const interval = setInterval(updatePresence, 15000); // every 15s
+    const interval = setInterval(updatePresence, 30000); // every 30s
 
     const appStateSub = AppState.addEventListener('change', nextState => {
       if (nextState === 'active') updatePresence();
