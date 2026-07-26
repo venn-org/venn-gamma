@@ -22,12 +22,14 @@ export default function CityScreen() {
     setLoading(true);
     updateData({ city });
     setLoading(false);
-    router.push('/(onboarding)/birthday');
+    // City sits directly before the housing/preferences screens — an owner's
+    // flat location and a seeker's preferred zones are both city-scoped.
+    router.push(data.type === 'owner' ? '/(onboarding)/location' : '/(onboarding)/seeker-preferences');
   };
 
   return (
     <OnboardingShell
-      step={3} total={totalSteps(data.type)}
+      step={7} total={totalSteps(data.type)}
       footer={
         <TouchableOpacity
           style={[styles.btn, (!city || loading) && styles.btnDisabled]}

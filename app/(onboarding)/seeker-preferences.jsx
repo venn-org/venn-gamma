@@ -5,9 +5,10 @@ import { colors } from '../../lib/theme';
 import { useOnboarding, totalSteps } from '../../hooks/useOnboarding';
 import { ZONES_BY_CITY } from '../../lib/locations';
 import { ENUMS } from '../../lib/enums';
+import { BUDGET_DEFAULT_MAX, BUDGET_MAX, BUDGET_MIN, BUDGET_STEP } from '../../lib/prefs';
+import RangeSlider from '../../components/RangeSlider';
 import OnboardingShell from '../../components/OnboardingShell';
 
-const BUDGETS = Object.values(ENUMS.pref_budget.dbToUI);
 const GENDERS = Object.values(ENUMS.pref_gender.dbToUI);
 
 export default function SeekerPreferencesScreen() {
@@ -18,20 +19,22 @@ export default function SeekerPreferencesScreen() {
   const zones = ZONES_BY_CITY[data.city] || [];
 
   const [areas, setAreas] = useState(data.prefs?.areas || []);
-  const [budget, setBudget] = useState(data.prefs?.budget || null);
+  const [budgetMin, setBudgetMin] = useState(data.prefs?.budgetMin ?? BUDGET_MIN);
+  const [budgetMax, setBudgetMax] = useState(data.prefs?.budgetMax ?? BUDGET_DEFAULT_MAX);
   const [prefGender, setPrefGender] = useState(data.prefs?.gender || null);
 
   const toggleArea = (a) => {
     setAreas(prev => prev.includes(a) ? prev.filter(x => x !== a) : [...prev, a]);
   };
 
-  const valid = areas.length > 0 && budget && prefGender;
+  // The slider always holds a value, so budget can't gate Continue anymore.
+  const valid = areas.length > 0 && prefGender;
 
   const handleContinue = async () => {
     if (!valid) return;
     setLoading(true);
     updateData({
-      prefs: { ...data.prefs, areas, budget, flatType: null, gender: prefGender },
+      prefs: { ...data.prefs, areas, budgetMin, budgetMax, flatType: null, gender: prefGender },
     });
     setLoading(false);
     router.push('/(onboarding)/photos');
@@ -67,16 +70,16 @@ export default function SeekerPreferencesScreen() {
           })}
         </View>
 
-        <Text style={styles.sectionLabel}>MY BUDGET</Text>
-        <View style={[styles.chips, { marginBottom: 24 }]}>
-          {BUDGETS.map(b => {
-            const on = budget === b;
-            return (
-              <TouchableOpacity key={b} style={[styles.chip, on && styles.chipOn]} onPress={() => setBudget(b)} activeOpacity={0.8}>
-                <Text style={[styles.chipText, on && styles.chipTextOn]}>{b}</Text>
-              </TouchableOpacity>
-            );
-          })}
+        <Text style={styles.sectionLabel}>MY BUDGET (₹ / MONTH)</Text>
+        <View style={{ marginBottom: 24 }}>
+          <RangeSlider
+            min={BUDGET_MIN}
+            max={BUDGET_MAX}
+            step={BUDGET_STEP}
+            valueMin={budgetMin}
+            valueMax={budgetMax}
+            onChange={(lo, hi) => { setBudgetMin(lo); setBudgetMax(hi); }}
+          />
         </View>
 
         <Text style={styles.sectionLabel}>PREFERRED GENDER OF FLATMATE</Text>

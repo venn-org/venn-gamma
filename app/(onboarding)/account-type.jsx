@@ -21,7 +21,7 @@ export default function AccountTypeScreen() {
     setLoading(true);
     updateData({ type });
     setLoading(false);
-    router.push('/(onboarding)/city');
+    router.push('/(onboarding)/birthday');
   };
 
   return (
