@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { View, Text, TouchableOpacity, TextInput, FlatList, KeyboardAvoidingView, Platform, StyleSheet, Image, ActivityIndicator } from 'react-native';
+import { View, Text, TouchableOpacity, TextInput, FlatList, Keyboard, KeyboardAvoidingView, Platform, StyleSheet, Image, ActivityIndicator } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -43,6 +43,21 @@ export default function ChatScreen() {
   const [otherTyping, setOtherTyping] = useState(false);
   const [otherProfile, setOtherProfile] = useState(null);
   const [profileVisible, setProfileVisible] = useState(false);
+  const [keyboardOpen, setKeyboardOpen] = useState(false);
+
+  // The bottom safe-area inset only needs padding while the keyboard is
+  // closed — keeping it once the keyboard is up leaves a visible strip of
+  // empty space between the input bar and the top of the keyboard.
+  useEffect(() => {
+    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+    const showSub = Keyboard.addListener(showEvent, () => setKeyboardOpen(true));
+    const hideSub = Keyboard.addListener(hideEvent, () => setKeyboardOpen(false));
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, []);
 
   const channelRef = useRef(null);
   const typingTimeoutRef = useRef(null);
@@ -346,7 +361,7 @@ export default function ChatScreen() {
         />
       )}
 
-      <View style={[s.inputWrap, { paddingBottom: Math.max(insets.bottom, 12) }]}>
+      <View style={[s.inputWrap, { paddingBottom: keyboardOpen ? 12 : Math.max(insets.bottom, 12) }]}>
         <TextInput
           style={s.input}
           placeholder="Message..."

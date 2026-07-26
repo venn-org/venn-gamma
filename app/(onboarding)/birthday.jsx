@@ -62,7 +62,8 @@ export default function BirthdayScreen() {
 
   return (
     <OnboardingShell
-      step={4} total={totalSteps(data.type)}
+      step={3} total={totalSteps(data.type)}
+      avoidKeyboard
       footer={
         <TouchableOpacity
           style={[styles.btn, (!valid || loading) && styles.btnDisabled]}
