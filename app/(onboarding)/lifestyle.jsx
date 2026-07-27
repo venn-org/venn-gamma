@@ -5,6 +5,7 @@ import { colors } from '../../lib/theme';
 import { useOnboarding, totalSteps } from '../../hooks/useOnboarding';
 import OnboardingShell from '../../components/OnboardingShell';
 import OptionIcon from '../../components/OptionIcon';
+import VisibleOnProfileBadge from '../../components/VisibleOnProfileBadge';
 import { optionIcon } from '../../lib/enums';
 
 const QUESTIONS = [
@@ -42,7 +43,7 @@ export default function LifestyleScreen() {
       step={6} total={totalSteps(data.type)}
       footer={
         <View style={styles.footerInner}>
-          <Text style={styles.visible}>Visible on profile</Text>
+          <VisibleOnProfileBadge />
           <TouchableOpacity
             style={[styles.nextBtn, !valid && { opacity: 0.32 }]}
             onPress={handleContinue}
@@ -58,7 +59,7 @@ export default function LifestyleScreen() {
     >
       <ScrollView showsVerticalScrollIndicator={false}>
         <Text style={styles.title}>A bit about your lifestyle</Text>
-        <Text style={styles.subtitle}>Visible on profile — helps you find flatmates who match your vibe.</Text>
+        <Text style={styles.subtitle}>Helps you find flatmates who match your vibe.</Text>
 
         {QUESTIONS.map(q => (
           <View key={q.key} style={styles.question}>
@@ -92,7 +93,6 @@ const styles = StyleSheet.create({
   chipText: { fontSize: 14, fontWeight: '500', color: colors.slate },
   chipTextOn: { color: '#fff' },
   footerInner: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  visible: { fontSize: 14, color: colors.ink, fontWeight: '500' },
   nextBtn: { width: 52, height: 52, borderRadius: 26, overflow: 'hidden' },
   nextGrad: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   nextArrow: { color: '#fff', fontSize: 20, fontWeight: '700' },

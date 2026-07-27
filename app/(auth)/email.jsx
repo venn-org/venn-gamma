@@ -3,6 +3,7 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useRef, useState } from "react";
 import {
     Animated,
+    KeyboardAvoidingView,
     Platform,
     StyleSheet,
     Text,
@@ -72,7 +73,10 @@ export default function EmailScreen() {
 
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top }]}>
+    <KeyboardAvoidingView
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
+      style={[styles.container, { paddingTop: insets.top }]}
+    >
       <TouchableOpacity
         style={styles.back}
         onPress={() =>
@@ -111,6 +115,8 @@ export default function EmailScreen() {
           autoCapitalize="none"
           value={email}
           onChangeText={setEmail}
+          returnKeyType="send"
+          onSubmitEditing={handleSend}
           autoFocus
         />
       </Animated.View>
@@ -135,7 +141,7 @@ export default function EmailScreen() {
           </LinearGradient>
         </TouchableOpacity>
       </View>
-    </View>
+    </KeyboardAvoidingView>
   );
 }
 

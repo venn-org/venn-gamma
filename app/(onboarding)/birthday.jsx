@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
 import { colors } from '../../lib/theme';
@@ -14,6 +14,22 @@ export default function BirthdayScreen() {
   const [month, setMonth] = useState('');
   const [year, setYear] = useState('');
   const [error, setError] = useState('');
+
+  const dayRef = useRef(null);
+  const monthRef = useRef(null);
+  const yearRef = useRef(null);
+
+  // Each box jumps to the next one the moment it holds a full value, and a
+  // backspace on an empty box steps back — so the whole date is one typing run.
+  const handleDigits = (value, { max, set, next }) => {
+    const digits = value.replace(/\D/g, '').slice(0, max);
+    set(digits);
+    if (digits.length === max && next) next.current?.focus();
+  };
+
+  const backspaceTo = (e, value, prev) => {
+    if (e.nativeEvent.key === 'Backspace' && !value && prev) prev.current?.focus();
+  };
 
   // Pre-fill if we have it
   useState(() => {
@@ -81,15 +97,37 @@ export default function BirthdayScreen() {
       <View style={styles.row}>
         <View style={styles.field}>
           <Text style={styles.label}>DAY</Text>
-          <TextInput style={styles.numInput} placeholder="DD" placeholderTextColor={colors.placeholder} keyboardType="number-pad" maxLength={2} value={day} onChangeText={setDay} autoFocus />
+          <TextInput
+            ref={dayRef}
+            style={styles.numInput} placeholder="DD" placeholderTextColor={colors.placeholder}
+            keyboardType="number-pad" maxLength={2} value={day}
+            onChangeText={v => handleDigits(v, { max: 2, set: setDay, next: monthRef })}
+            returnKeyType="next"
+            autoFocus
+          />
         </View>
         <View style={styles.field}>
           <Text style={styles.label}>MONTH</Text>
-          <TextInput style={styles.numInput} placeholder="MM" placeholderTextColor={colors.placeholder} keyboardType="number-pad" maxLength={2} value={month} onChangeText={setMonth} />
+          <TextInput
+            ref={monthRef}
+            style={styles.numInput} placeholder="MM" placeholderTextColor={colors.placeholder}
+            keyboardType="number-pad" maxLength={2} value={month}
+            onChangeText={v => handleDigits(v, { max: 2, set: setMonth, next: yearRef })}
+            onKeyPress={e => backspaceTo(e, month, dayRef)}
+            returnKeyType="next"
+          />
         </View>
         <View style={[styles.field, { flex: 1.4 }]}>
           <Text style={styles.label}>YEAR</Text>
-          <TextInput style={styles.numInput} placeholder="YYYY" placeholderTextColor={colors.placeholder} keyboardType="number-pad" maxLength={4} value={year} onChangeText={setYear} />
+          <TextInput
+            ref={yearRef}
+            style={styles.numInput} placeholder="YYYY" placeholderTextColor={colors.placeholder}
+            keyboardType="number-pad" maxLength={4} value={year}
+            onChangeText={v => handleDigits(v, { max: 4, set: setYear })}
+            onKeyPress={e => backspaceTo(e, year, monthRef)}
+            returnKeyType="done"
+            onSubmitEditing={handleContinue}
+          />
         </View>
       </View>
       {!!error && <Text style={styles.error}>{error}</Text>}

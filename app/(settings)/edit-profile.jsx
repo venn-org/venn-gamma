@@ -244,10 +244,15 @@ const PromptEditorModal = ({ visible, index, question, answer, onSave, onClear, 
 
   return (
     <Modal visible={visible} transparent animationType="none" onRequestClose={onClose}>
-      <View style={{ flex: 1, justifyContent: 'flex-end' }}>
+      <View style={{ flex: 1 }}>
         <Animated.View style={[s.promptBackdrop, { opacity: backdropOpacity }]} />
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        {/* flex:1 on the avoider (not the parent) is what lets the sheet's Done
+            button ride above the keyboard on Android as well as iOS. */}
+        <KeyboardAvoidingView
+          style={{ flex: 1, justifyContent: 'flex-end' }}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        >
           <Animated.View style={[s.promptSheet, { transform: [{ translateY: sheetY }] }]}>
             <View style={s.promptSheetHeader}>
               <Text style={s.promptSheetTitle}>Prompt {index}</Text>

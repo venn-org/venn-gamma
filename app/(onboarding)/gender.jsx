@@ -5,6 +5,7 @@ import { colors } from '../../lib/theme';
 import { useOnboarding, totalSteps } from '../../hooks/useOnboarding';
 import OnboardingShell from '../../components/OnboardingShell';
 import OptionIcon from '../../components/OptionIcon';
+import VisibleOnProfileBadge from '../../components/VisibleOnProfileBadge';
 import { optionIcon } from '../../lib/enums';
 
 const OPTIONS = ['Woman', 'Man', 'Non-binary', 'Transgender', 'Other'];
@@ -29,7 +30,7 @@ export default function GenderScreen() {
       step={5} total={totalSteps(data.type)}
       footer={
         <View style={styles.footerInner}>
-          <Text style={styles.visible}>Visible on profile</Text>
+          <VisibleOnProfileBadge />
           <TouchableOpacity
             style={[styles.nextBtn, !selected && { opacity: 0.32 }]}
             onPress={handleContinue}
@@ -75,7 +76,6 @@ const styles = StyleSheet.create({
   radioOn: { borderColor: colors.blue },
   radioDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: colors.blue },
   footerInner: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  visible: { fontSize: 14, color: colors.ink, fontWeight: '500' },
   nextBtn: { width: 52, height: 52, borderRadius: 26, overflow: 'hidden' },
   nextGrad: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   nextArrow: { color: '#fff', fontSize: 20, fontWeight: '700' },

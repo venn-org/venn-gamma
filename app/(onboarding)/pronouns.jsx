@@ -4,6 +4,7 @@ import { useRouter } from 'expo-router';
 import { colors } from '../../lib/theme';
 import { useOnboarding, totalSteps } from '../../hooks/useOnboarding';
 import OnboardingShell from '../../components/OnboardingShell';
+import VisibleOnProfileBadge from '../../components/VisibleOnProfileBadge';
 
 const OPTIONS = ['She/her', 'He/him', 'They/them', 'Ze/zir', 'Ze/zan', 'Other'];
 
@@ -34,7 +35,7 @@ export default function PronounsScreen() {
       step={4} total={totalSteps(data.type)}
       footer={
         <View style={styles.footerInner}>
-          <Text style={styles.visible}>Visible on profile</Text>
+          <VisibleOnProfileBadge />
           <TouchableOpacity
             style={styles.nextBtn}
             onPress={handleContinue}
@@ -78,7 +79,6 @@ const styles = StyleSheet.create({
   checkOn: { backgroundColor: colors.blue, borderColor: colors.blue },
   checkMark: { color: '#fff', fontSize: 13, fontWeight: '700' },
   footerInner: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  visible: { fontSize: 14, color: colors.ink, fontWeight: '500' },
   nextBtn: { width: 52, height: 52, borderRadius: 26, overflow: 'hidden' },
   nextGrad: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   nextArrow: { color: '#fff', fontSize: 20, fontWeight: '700' },

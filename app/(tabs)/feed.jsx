@@ -3,6 +3,7 @@ import { useFocusEffect, useRouter } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
     Animated,
+    Easing,
     Image,
     Modal,
     Pressable,
@@ -14,6 +15,7 @@ import {
 } from 'react-native';
 import { Alert } from '../../lib/alert';
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import LikeLimitModal from "../../components/LikeLimitModal";
 import MatchCelebration from "../../components/MatchCelebration";
 import OptionIcon from "../../components/OptionIcon";
 import PhotoLightbox from "../../components/PhotoLightbox";
@@ -23,11 +25,12 @@ import { getBlockedIds } from "../../lib/blocks";
 import {
   canLikeToday,
   getRemainingLikes,
+  grantExtraLikes,
   getTodayViewedProfileIds,
   recordProfileView,
 } from "../../lib/dailyLimits";
 import { formatBudgetRange, formatMoveInDate, mapDbPrefsToUI, mapUIPrefsToDb, optionDisplay, stripLabelEmoji, toDb, toUI } from "../../lib/enums";
-import { PREF_ROWS, calculateOverlapScore, getPrefDisplay, isPrefSet, matchesPrefs } from "../../lib/prefs";
+import { PREF_ROWS, buildFeedOrder, calculateOverlapScore, getPrefDisplay, isPrefSet, matchesPrefs } from "../../lib/prefs";
 import { activeStatusText, isOnline } from "../../lib/presence";
 import { REPORT_REASONS, reportUser } from "../../lib/reports";
 import { buildFlatFacts, buildFlatGallery, buildProfileCardBlocks, buildProfileTraits, calculateProfileCompletion, isFeedReady } from "../../lib/profileUtils";
@@ -70,16 +73,48 @@ export default function FeedScreen() {
 
   useEffect(() => () => clearTimeout(likeSentTimer.current), []);
 
-  // Animation
+  const [limitVisible, setLimitVisible] = useState(false);
+
+  // Animation. The card cross-fades and slides a little so a like/pass reads as
+  // one card leaving and the next arriving, rather than a flat opacity blink.
   const fadeIn = useRef(new Animated.Value(0)).current;
+  const cardShift = useRef(new Animated.Value(0)).current;
+  // The profile body scrolls; without an explicit reset the next card inherits
+  // the previous one's offset and opens halfway down.
+  const cardScrollRef = useRef(null);
+
+  // Runs the exit animation, resets the scroll position while the card is
+  // invisible, then hands off to `advance` — the enter animation is driven by
+  // the currentIndex effect below.
+  const transitionCard = (advance) => {
+    Animated.parallel([
+      Animated.timing(fadeIn, {
+        toValue: 0,
+        duration: 180,
+        easing: Easing.in(Easing.quad),
+        useNativeDriver: true,
+      }),
+      Animated.timing(cardShift, {
+        toValue: -24,
+        duration: 180,
+        easing: Easing.in(Easing.quad),
+        useNativeDriver: true,
+      }),
+    ]).start(() => {
+      cardScrollRef.current?.scrollTo({ y: 0, animated: false });
+      advance();
+    });
+  };
 
   useEffect(() => {
     const uid = getCurrentUserId();
-    if (uid) {
-      getRemainingLikes(uid).then(setRemainingLikes);
-    }
-    fetchFeed();
     if (!uid) return;
+    getRemainingLikes(uid).then(setRemainingLikes);
+    // Prefs first, then the feed. Firing both in parallel meant the very first
+    // fetch filtered against `userPrefs === null`, i.e. against nothing — which
+    // is why an explicit "men only" still returned women until prefs were
+    // re-saved.
+    fetchMyPrefs().then((prefs) => fetchFeed(prefs));
   }, []);
 
   // Keep the completion banner in sync with edits made elsewhere
@@ -90,12 +125,25 @@ export default function FeedScreen() {
   );
 
   useEffect(() => {
+    // The list is at the top before the fresh card paints, so a mid-list
+    // remount (refresh, filter change) can't leave it scrolled either.
+    cardScrollRef.current?.scrollTo({ y: 0, animated: false });
     fadeIn.setValue(0);
-    Animated.timing(fadeIn, {
-      toValue: 1,
-      duration: 300,
-      useNativeDriver: true,
-    }).start();
+    cardShift.setValue(20);
+    Animated.parallel([
+      Animated.timing(fadeIn, {
+        toValue: 1,
+        duration: 260,
+        easing: Easing.out(Easing.quad),
+        useNativeDriver: true,
+      }),
+      Animated.spring(cardShift, {
+        toValue: 0,
+        friction: 9,
+        tension: 70,
+        useNativeDriver: true,
+      }),
+    ]).start();
 
     // Record profile view when a new profile is shown
     const uid = getCurrentUserId();
@@ -106,16 +154,19 @@ export default function FeedScreen() {
 
   const fetchMyPrefs = async () => {
     const uid = getCurrentUserId();
-    if (!uid) return;
+    if (!uid) return null;
     const { data } = await supabase
       .from("profiles")
       .select("*")
       .eq("id", uid)
       .single();
-    if (data) {
-      setUserPrefs(mapDbPrefsToUI(data));
-      setMyProfile(data);
-    }
+    if (!data) return null;
+    const prefs = mapDbPrefsToUI(data);
+    setUserPrefs(prefs);
+    setMyProfile(data);
+    // Returned as well as set: fetchFeed needs the prefs in the same tick, and
+    // the `userPrefs` state won't have landed yet.
+    return prefs;
   };
 
   const handleSavePrefs = async (newPrefs, housing) => {
@@ -211,12 +262,19 @@ export default function FeedScreen() {
         });
       }
 
-      setProfiles(filtered);
+      // Ordered last, so the flat photos attached above ride along.
+      setProfiles(buildFeedOrder(currentPrefs, filtered));
     }
   };
 
   const currentProfile = profiles[currentIndex];
-  const overlapScore = currentProfile ? calculateOverlapScore(userPrefs, currentProfile) : null;
+  // buildFeedOrder already scored every card; only fall back for profiles that
+  // reached state some other way.
+  const overlapScore = !currentProfile
+    ? null
+    : currentProfile._overlap !== undefined
+      ? currentProfile._overlap
+      : calculateOverlapScore(userPrefs, currentProfile);
 
   const cardBlocks = useMemo(() => buildProfileCardBlocks(currentProfile), [currentProfile]);
   const traits = useMemo(() => buildProfileTraits(currentProfile), [currentProfile]);
@@ -246,13 +304,7 @@ export default function FeedScreen() {
       await recordProfileView(uid, currentProfile.id);
     }
 
-    Animated.timing(fadeIn, {
-      toValue: 0,
-      duration: 150,
-      useNativeDriver: true,
-    }).start(() => {
-      advanceIndex();
-    });
+    transitionCard(advanceIndex);
   };
 
   const handleLike = async () => {
@@ -261,22 +313,13 @@ export default function FeedScreen() {
 
     const canLike = await canLikeToday(uid);
     if (!canLike) {
-      Alert.alert(
-        "Like Limit Reached",
-        "You have 5 likes per day. Come back tomorrow!",
-      );
+      setLimitVisible(true);
       return;
     }
 
     const targetId = currentProfile.id;
 
-    Animated.timing(fadeIn, {
-      toValue: 0,
-      duration: 150,
-      useNativeDriver: true,
-    }).start(() => {
-      advanceIndex();
-    });
+    transitionCard(advanceIndex);
 
     const { error } = await supabase.from("likes").insert({
       from_user_id: uid,
@@ -311,7 +354,7 @@ export default function FeedScreen() {
         // Quick feedback loop — auto-dismisses so it doesn't block swiping
         setLikeSent({ name: currentProfile.name, photo: currentProfile.photos?.[0] || null });
         clearTimeout(likeSentTimer.current);
-        likeSentTimer.current = setTimeout(() => setLikeSent(null), 1500);
+        likeSentTimer.current = setTimeout(() => setLikeSent(null), 1800);
       }
     }
   };
@@ -501,7 +544,12 @@ export default function FeedScreen() {
           </ScrollView>
         ) : (
           <>
-            <Animated.View style={[s.cardOuter, { flex: 1, opacity: fadeIn }]}>
+            <Animated.View
+              style={[
+                s.cardOuter,
+                { flex: 1, opacity: fadeIn, transform: [{ translateY: cardShift }] },
+              ]}
+            >
               {menuOpen && (
                 <Modal
                   visible
@@ -570,6 +618,7 @@ export default function FeedScreen() {
 
               {/* Scrollable Profile Content */}
               <ScrollView
+                ref={cardScrollRef}
                 style={{ flex: 1 }}
                 showsVerticalScrollIndicator={false}
                 contentContainerStyle={{ paddingBottom: 110 }}
@@ -848,6 +897,19 @@ export default function FeedScreen() {
         only={prefsSection}
         onClose={() => setPrefsVisible(false)}
         onSave={handleSavePrefs}
+      />
+
+      <LikeLimitModal
+        visible={limitVisible}
+        onClose={() => setLimitVisible(false)}
+        onConfirm={async () => {
+          const uid = getCurrentUserId();
+          if (uid) {
+            await grantExtraLikes(uid);
+            setRemainingLikes(await getRemainingLikes(uid));
+          }
+          setLimitVisible(false);
+        }}
       />
 
       {matchData && (
