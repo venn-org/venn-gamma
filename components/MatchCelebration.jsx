@@ -1,4 +1,4 @@
-import { View, Text, StyleSheet, Modal, TouchableOpacity, Pressable, Image, Animated, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, Modal, TouchableOpacity, Pressable, Image, Animated, Dimensions, Easing } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useRef } from 'react';
@@ -13,28 +13,47 @@ const random = (seed) => {
 
 export default function MatchCelebration({ visible, mode = 'match', matchedName, matchedPhoto, onDismiss, onChat }) {
   const isMatch = mode === 'match';
-  // 30 pieces of confetti
-  const pieces = Array.from({ length: 30 }).map((_, i) => ({
-    x: random(i) * 100, // 0 to 100%
-    size: 6 + random(i + 100) * 8, // 6 to 14
-    color: ['#335CFF', '#8A5BFF', '#FF4D6A', '#22C55E', '#FFD600'][Math.floor(random(i + 200) * 5)],
-    isCircle: random(i + 300) > 0.5,
-  }));
+  // 30 pieces of confetti — deterministic, so this only has to be built once.
+  const pieces = useRef(
+    Array.from({ length: 30 }).map((_, i) => ({
+      x: random(i) * 100, // 0 to 100%
+      size: 6 + random(i + 100) * 8, // 6 to 14
+      color: ['#335CFF', '#8A5BFF', '#FF4D6A', '#22C55E', '#FFD600'][Math.floor(random(i + 200) * 5)],
+      isCircle: random(i + 300) > 0.5,
+      delay: random(i + 400) * 220,
+    })),
+  ).current;
 
   const anims = useRef(pieces.map(() => new Animated.Value(0))).current;
+  const cardIn = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    if (visible) {
-      anims.forEach((anim, i) => {
-        anim.setValue(0);
-        Animated.timing(anim, {
-          toValue: 1,
-          duration: 2500 + random(i) * 1500,
-          useNativeDriver: true,
-        }).start();
-      });
-    }
-  }, [visible]);
+    if (!visible) return;
+
+    // The like toast auto-dismisses after ~1.8s, so its confetti has to finish
+    // the fall inside that window — the match overlay sticks around and can
+    // afford a slower, showier one.
+    const fallDuration = isMatch ? 2200 : 1250;
+
+    cardIn.setValue(0);
+    Animated.spring(cardIn, {
+      toValue: 1,
+      friction: 8,
+      tension: 80,
+      useNativeDriver: true,
+    }).start();
+
+    anims.forEach((anim, i) => {
+      anim.setValue(0);
+      Animated.timing(anim, {
+        toValue: 1,
+        duration: fallDuration + random(i) * (isMatch ? 900 : 350),
+        delay: pieces[i].delay,
+        easing: Easing.in(Easing.quad),
+        useNativeDriver: true,
+      }).start();
+    });
+  }, [visible, isMatch]);
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onDismiss}>
@@ -63,6 +82,16 @@ export default function MatchCelebration({ visible, mode = 'match', matchedName,
         </TouchableOpacity>
 
         {/* Card — stop propagation so tapping card doesn't dismiss */}
+        <Animated.View
+          style={{
+            width: '100%',
+            opacity: cardIn,
+            transform: [
+              { scale: cardIn.interpolate({ inputRange: [0, 1], outputRange: [0.92, 1] }) },
+              { translateY: cardIn.interpolate({ inputRange: [0, 1], outputRange: [16, 0] }) },
+            ],
+          }}
+        >
         <Pressable onPress={e => e.stopPropagation()} style={ms.card}>
           <Text style={ms.eyebrow}>{isMatch ? 'YOUR VENN OVERLAPS ✦' : 'LIKE SENT ✦'}</Text>
           {isMatch ? (
@@ -114,6 +143,7 @@ export default function MatchCelebration({ visible, mode = 'match', matchedName,
             </TouchableOpacity>
           )}
         </Pressable>
+        </Animated.View>
       </Pressable>
     </Modal>
   );
