@@ -297,9 +297,15 @@ const makeStyles = (colors) => StyleSheet.create({
     shadowColor: '#000', shadowOpacity: 0.15, shadowRadius: 8, shadowOffset: { width: 0, height: 2 }, elevation: 4,
   },
 
+  // A red wash rather than the default card fill — on card it was the same
+  // colour as the sheet behind it and read as part of the panel, not a button.
+  // tintRed alone is near-white in light mode, so the outline is what actually
+  // carries the shape there; the fill does the work in dark.
   closeBtn: {
     flex: 1, borderRadius: 50, paddingVertical: 16, alignItems: 'center',
-    backgroundColor: colors.card,
+    backgroundColor: colors.tintRed,
+    borderWidth: 1.5,
+    borderColor: colors.red,
   },
-  closeBtnText: { fontFamily: 'HankenGrotesk_700Bold', fontSize: 16, color: colors.ink },
+  closeBtnText: { fontFamily: 'HankenGrotesk_700Bold', fontSize: 16, color: colors.red },
 });
