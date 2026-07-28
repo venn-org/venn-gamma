@@ -9,6 +9,7 @@ import { useTheme, useThemedStyles } from '../../lib/ThemeContext';
 import { getCurrentUserId } from '../../lib/auth';
 import { getBlockedIds } from '../../lib/blocks';
 import { isOnline } from '../../lib/presence';
+import { MessagesListSkeleton } from '../../components/Skeleton';
 
 const Avatar = ({ photo, name, size = 48, online }) => {
   const { colors } = useTheme();
@@ -44,7 +45,11 @@ export default function MessagesScreen() {
 
   const fetchMessages = async () => {
     const uid = getCurrentUserId();
-    if (!uid) return;
+    if (!uid) {
+      // Otherwise `loading` never clears and the skeleton pulses forever.
+      setLoading(false);
+      return;
+    }
     setRefreshing(true);
     
     const blocked = await getBlockedIds(uid);
@@ -189,9 +194,10 @@ export default function MessagesScreen() {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={fetchMessages} tintColor={colors.blue} />}
       >
         {loading ? (
-          <View style={s.empty}>
-            <Text style={s.emptyText}>Loading...</Text>
-          </View>
+          // `loading` is only ever set true on mount, so the refetch that runs
+          // on every screen focus keeps the existing rows up instead of
+          // flashing back to a skeleton.
+          <MessagesListSkeleton />
         ) : isEmpty ? (
           <View style={s.empty}>
             <Text style={s.emptyTitle}>No matches yet</Text>

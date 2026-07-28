@@ -9,6 +9,7 @@ import { getCurrentUserId } from '../../lib/auth';
 import { getBlockedIds } from '../../lib/blocks';
 import ProfileViewSheet from '../../components/ProfileViewSheet';
 import MatchCelebration from '../../components/MatchCelebration';
+import { LikesGridSkeleton } from '../../components/Skeleton';
 import { useRouter } from 'expo-router';
 
 
@@ -23,13 +24,20 @@ export default function LikesScreen() {
   
   const [likes, setLikes] = useState([]);
   const [refreshing, setRefreshing] = useState(false);
+  // Distinct from `refreshing`: this only covers the cold load, so a
+  // pull-to-refresh keeps the existing cards on screen under the spinner
+  // instead of collapsing them back into a skeleton.
+  const [initialLoad, setInitialLoad] = useState(true);
   const [selectedLike, setSelectedLike] = useState(null);
   const [matchData, setMatchData] = useState(null);
   const [showBoost, setShowBoost] = useState(false);
 
   const fetchLikes = async () => {
     const uid = getCurrentUserId();
-    if (!uid) return;
+    if (!uid) {
+      setInitialLoad(false);
+      return;
+    }
     setRefreshing(true);
     
     // Fetch who liked the current user along with their full profile
@@ -83,6 +91,7 @@ export default function LikesScreen() {
       setLikes(mapped);
     }
     setRefreshing(false);
+    setInitialLoad(false);
   };
 
   useEffect(() => {
@@ -143,7 +152,11 @@ export default function LikesScreen() {
         </TouchableOpacity>
       </View>
 
-      {likes.length === 0 ? (
+      {initialLoad ? (
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 100 }}>
+          <LikesGridSkeleton cardW={cardW} />
+        </ScrollView>
+      ) : likes.length === 0 ? (
         <ScrollView
           contentContainerStyle={[s.center, { flexGrow: 1 }]}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={fetchLikes} tintColor={colors.blue} />}

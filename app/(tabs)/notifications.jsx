@@ -18,6 +18,7 @@ import {
     markAllRead,
     markRead,
 } from "../../lib/notifications";
+import { NotificationsListSkeleton } from "../../components/Skeleton";
 
 export default function NotificationsScreen() {
   const s = useThemedStyles(makeStyles);
@@ -27,14 +28,21 @@ export default function NotificationsScreen() {
 
   const [notifications, setNotifications] = useState([]);
   const [refreshing, setRefreshing] = useState(false);
+  // Cold load only — a pull-to-refresh keeps the current rows under the
+  // spinner rather than replacing them with a skeleton.
+  const [initialLoad, setInitialLoad] = useState(true);
 
   const fetchNotifs = async () => {
     const uid = getCurrentUserId();
-    if (!uid) return;
+    if (!uid) {
+      setInitialLoad(false);
+      return;
+    }
     setRefreshing(true);
     const data = await getNotifications(uid);
     setNotifications(data || []);
     setRefreshing(false);
+    setInitialLoad(false);
   };
 
   useEffect(() => {
@@ -90,7 +98,11 @@ export default function NotificationsScreen() {
         </TouchableOpacity>
       </View>
 
-      {notifications.length === 0 ? (
+      {initialLoad ? (
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 100 }}>
+          <NotificationsListSkeleton />
+        </ScrollView>
+      ) : notifications.length === 0 ? (
         <ScrollView
           contentContainerStyle={[s.center, { flexGrow: 1 }]}
           refreshControl={

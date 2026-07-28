@@ -20,6 +20,7 @@ import MatchCelebration from "../../components/MatchCelebration";
 import OptionIcon from "../../components/OptionIcon";
 import PhotoLightbox from "../../components/PhotoLightbox";
 import PreferencesSheet from "../../components/PreferencesSheet";
+import { FeedCardSkeleton } from "../../components/Skeleton";
 import { getCurrentUserId } from "../../lib/auth";
 import { getBlockedIds } from "../../lib/blocks";
 import {
@@ -46,6 +47,19 @@ const TEMP_DISABLE_VIEW_LIMIT = true;
 // only lives behind the options button.
 const FILTER_CHIPS = PREF_ROWS.filter((row) => !row.roleOnly);
 
+// Signature of the preferences a given feed list was built from. The same
+// PreferencesSheet is also rendered by the Profile tab, so prefs can change
+// while this screen is mounted but blurred; comparing this on focus catches
+// that and re-filters, instead of leaving a stale list under chips that no
+// longer describe it (an edit to "Women only" over there used to leave the
+// already-fetched men on screen). Role is absent — it no longer filters.
+const prefsKey = (p) =>
+  JSON.stringify([
+    p?.gender, p?.age, p?.areas, p?.flatType, p?.occupation,
+    p?.food, p?.smoking, p?.drinking, p?.pets,
+    p?.budgetMin, p?.budgetMax, p?.moveInDate,
+  ]);
+
 export default function FeedScreen() {
   const s = useThemedStyles(makeStyles);
   const { colors } = useTheme();
@@ -54,6 +68,13 @@ export default function FeedScreen() {
 
   const [profiles, setProfiles] = useState([]);
   const [currentIndex, setCurrentIndex] = useState(0);
+  // Starts true so the very first paint is the skeleton, never the "no more
+  // profiles" empty state — that message used to show for the whole cold
+  // fetch and read as "this app has nobody in it".
+  const [feedLoading, setFeedLoading] = useState(true);
+  // prefsKey of the preferences `profiles` was actually built from — null until
+  // the first successful fetch, so the mount focus always loads.
+  const lastFeedPrefs = useRef(null);
   // Bumped on every card advance so the entrance animation fires even when the
   // index itself lands back on the value it already had (see advanceIndex).
   const [cardNonce, setCardNonce] = useState(0);
@@ -113,17 +134,20 @@ export default function FeedScreen() {
     const uid = getCurrentUserId();
     if (!uid) return;
     getRemainingLikes(uid).then(setRemainingLikes);
-    // Prefs first, then the feed. Firing both in parallel meant the very first
-    // fetch filtered against `userPrefs === null`, i.e. against nothing — which
-    // is why an explicit "men only" still returned women until prefs were
-    // re-saved.
-    fetchMyPrefs().then((prefs) => fetchFeed(prefs));
   }, []);
 
-  // Keep the completion banner in sync with edits made elsewhere
+  // Prefs first, then the feed. Firing both in parallel meant the very first
+  // fetch filtered against `userPrefs === null`, i.e. against nothing — which
+  // is why an explicit "men only" still returned women until prefs were
+  // re-saved. This also runs on every focus (which covers the initial mount),
+  // so preferences edited on the Profile tab re-filter the list here; without
+  // the key check a plain refocus would refetch and throw away the user's
+  // place in the deck.
   useFocusEffect(
     useCallback(() => {
-      fetchMyPrefs();
+      fetchMyPrefs().then((prefs) => {
+        if (prefs && prefsKey(prefs) !== lastFeedPrefs.current) fetchFeed(prefs);
+      });
     }, []),
   );
 
@@ -211,65 +235,80 @@ export default function FeedScreen() {
 
   const fetchFeed = async (currentPrefs = userPrefs) => {
     const uid = getCurrentUserId();
-    if (!uid) return;
-
-    setCurrentIndex(0);
-    const [blocked, viewedToday] = await Promise.all([
-      getBlockedIds(uid),
-      TEMP_DISABLE_VIEW_LIMIT ? Promise.resolve(new Set()) : getTodayViewedProfileIds(uid),
-    ]);
-
-    // Deliberately unfiltered beyond the essentials (not me, not paused,
-    // onboarded). Role used to invert here so seekers only saw owners, but
-    // that halved an already-small pool and left new users staring at an
-    // empty feed — everyone sees everyone for now, and role still shows on
-    // the card via the "Has a flat" / "Looking for flat" pill.
-    const query = supabase
-      .from("profiles")
-      .select("*")
-      .neq("id", uid)
-      .eq("paused", false)
-      .eq("onboarding_done", true)
-      .order("last_active_at", { ascending: false });
-
-    // TEMP: the cap exists to keep the daily-view budget from being burned in
-    // one fetch; with the limit off it just truncates the cycle.
-    const { data, error } = await query.limit(TEMP_DISABLE_VIEW_LIMIT ? 200 : 30);
-    if (error) {
-      console.error('Feed query failed:', error);
-      Alert.alert('Error', 'Failed to load profiles. Please try again.');
+    if (!uid) {
+      // Nothing to wait for — drop the skeleton rather than pulsing forever.
+      setFeedLoading(false);
       return;
     }
-    if (data) {
-      const filtered = data.filter((p) => {
-        if (blocked.has(p.id)) return false;
-        if (viewedToday.has(p.id)) return false;
 
-        // Skip incomplete profiles — they render as empty cards
-        if (!isFeedReady(p)) return false;
+    // Every path into fetchFeed either starts empty (cold load) or is about to
+    // replace the whole list (pref/filter change, manual refresh), so there's
+    // no content for the skeleton to yank out from under the user.
+    setFeedLoading(true);
+    try {
+      setCurrentIndex(0);
+      const [blocked, viewedToday] = await Promise.all([
+        getBlockedIds(uid),
+        TEMP_DISABLE_VIEW_LIMIT ? Promise.resolve(new Set()) : getTodayViewedProfileIds(uid),
+      ]);
 
-        return matchesPrefs(currentPrefs, p);
-      });
+      // Deliberately unfiltered beyond the essentials (not me, not paused,
+      // onboarded). Role used to invert here so seekers only saw owners, but
+      // that halved an already-small pool and left new users staring at an
+      // empty feed — everyone sees everyone for now, and role still shows on
+      // the card via the "Has a flat" / "Looking for flat" pill.
+      const query = supabase
+        .from("profiles")
+        .select("*")
+        .neq("id", uid)
+        .eq("paused", false)
+        .eq("onboarding_done", true)
+        .order("last_active_at", { ascending: false });
 
-      // flat_details is a separate table (not embeddable through the
-      // `profiles` view), so owners' labelled flat photos need their own
-      // query — same as likes.jsx does.
-      const ownerIds = filtered.filter((p) => p.user_type === "owner").map((p) => p.id);
-      if (ownerIds.length > 0) {
-        const { data: flatRows } = await supabase
-          .from("flat_details")
-          .select("profile_id, photos, description")
-          .in("profile_id", ownerIds);
-        const flatByProfile = new Map((flatRows ?? []).map((r) => [r.profile_id, r]));
-        filtered.forEach((p) => {
-          const flat = flatByProfile.get(p.id);
-          p.flat_photos = flat?.photos ?? [];
-          p.flat_description = flat?.description ?? null;
-        });
+      // TEMP: the cap exists to keep the daily-view budget from being burned in
+      // one fetch; with the limit off it just truncates the cycle.
+      const { data, error } = await query.limit(TEMP_DISABLE_VIEW_LIMIT ? 200 : 30);
+      if (error) {
+        console.error('Feed query failed:', error);
+        Alert.alert('Error', 'Failed to load profiles. Please try again.');
+        return;
       }
+      if (data) {
+        const filtered = data.filter((p) => {
+          if (blocked.has(p.id)) return false;
+          if (viewedToday.has(p.id)) return false;
 
-      // Ordered last, so the flat photos attached above ride along.
-      setProfiles(buildFeedOrder(currentPrefs, filtered));
+          // Skip incomplete profiles — they render as empty cards
+          if (!isFeedReady(p)) return false;
+
+          return matchesPrefs(currentPrefs, p);
+        });
+
+        // flat_details is a separate table (not embeddable through the
+        // `profiles` view), so owners' labelled flat photos need their own
+        // query — same as likes.jsx does.
+        const ownerIds = filtered.filter((p) => p.user_type === "owner").map((p) => p.id);
+        if (ownerIds.length > 0) {
+          const { data: flatRows } = await supabase
+            .from("flat_details")
+            .select("profile_id, photos, description")
+            .in("profile_id", ownerIds);
+          const flatByProfile = new Map((flatRows ?? []).map((r) => [r.profile_id, r]));
+          filtered.forEach((p) => {
+            const flat = flatByProfile.get(p.id);
+            p.flat_photos = flat?.photos ?? [];
+            p.flat_description = flat?.description ?? null;
+          });
+        }
+
+        // Ordered last, so the flat photos attached above ride along.
+        setProfiles(buildFeedOrder(currentPrefs, filtered));
+        // Recorded only once a list actually lands, so a failed fetch doesn't
+        // convince the next focus that these prefs are already applied.
+        lastFeedPrefs.current = prefsKey(currentPrefs);
+      }
+    } finally {
+      setFeedLoading(false);
     }
   };
 
@@ -542,8 +581,16 @@ export default function FeedScreen() {
       </View>
 
       {/* Feed Content */}
-      <View style={[s.feedContent, { flex: 1 }, !currentProfile && { paddingTop: 0 }]}>
-        {!currentProfile ? (
+      <View style={[s.feedContent, { flex: 1 }, !feedLoading && !currentProfile && { paddingTop: 0 }]}>
+        {feedLoading ? (
+          // The chips stay live above the skeleton — they're driven by prefs,
+          // not by this fetch, so hiding them would make the filter row pop in
+          // a beat after the card.
+          <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
+            {renderScrollTopSection()}
+            <FeedCardSkeleton />
+          </ScrollView>
+        ) : !currentProfile ? (
           <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40, flexGrow: 1 }}>
             {renderScrollTopSection()}
             <View style={[s.empty, { flex: 1 }]}>
