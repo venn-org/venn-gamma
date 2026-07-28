@@ -29,7 +29,7 @@ import {
   getTodayViewedProfileIds,
   recordProfileView,
 } from "../../lib/dailyLimits";
-import { formatBudgetRange, formatMoveInDate, mapDbPrefsToUI, mapUIPrefsToDb, optionDisplay, stripLabelEmoji, toDb, toUI } from "../../lib/enums";
+import { formatBudgetRange, formatMoveInDate, mapDbPrefsToUI, mapUIPrefsToDb, optionDisplay, stripLabelEmoji, toUI } from "../../lib/enums";
 import { PREF_ROWS, buildFeedOrder, calculateOverlapScore, getPrefDisplay, isPrefSet, matchesPrefs } from "../../lib/prefs";
 import { activeStatusText, isOnline } from "../../lib/presence";
 import { REPORT_REASONS, reportUser } from "../../lib/reports";
@@ -54,6 +54,9 @@ export default function FeedScreen() {
 
   const [profiles, setProfiles] = useState([]);
   const [currentIndex, setCurrentIndex] = useState(0);
+  // Bumped on every card advance so the entrance animation fires even when the
+  // index itself lands back on the value it already had (see advanceIndex).
+  const [cardNonce, setCardNonce] = useState(0);
 
   const [prefsVisible, setPrefsVisible] = useState(false);
   const [prefsSection, setPrefsSection] = useState(null); // which chip opened the sheet, or null for the full sheet
@@ -145,12 +148,14 @@ export default function FeedScreen() {
       }),
     ]).start();
 
-    // Record profile view when a new profile is shown
+    // Record profile view when a new profile is shown. TEMP: skipped while the
+    // view limit is off — cycling re-shows every profile, so logging each pass
+    // would write rows that only matter once the limit comes back.
     const uid = getCurrentUserId();
-    if (uid && currentProfile) {
+    if (!TEMP_DISABLE_VIEW_LIMIT && uid && currentProfile) {
       recordProfileView(uid, currentProfile.id);
     }
-  }, [currentIndex, profiles]);
+  }, [currentIndex, cardNonce, profiles]);
 
   const fetchMyPrefs = async () => {
     const uid = getCurrentUserId();
@@ -214,7 +219,12 @@ export default function FeedScreen() {
       TEMP_DISABLE_VIEW_LIMIT ? Promise.resolve(new Set()) : getTodayViewedProfileIds(uid),
     ]);
 
-    let query = supabase
+    // Deliberately unfiltered beyond the essentials (not me, not paused,
+    // onboarded). Role used to invert here so seekers only saw owners, but
+    // that halved an already-small pool and left new users staring at an
+    // empty feed — everyone sees everyone for now, and role still shows on
+    // the card via the "Has a flat" / "Looking for flat" pill.
+    const query = supabase
       .from("profiles")
       .select("*")
       .neq("id", uid)
@@ -222,13 +232,9 @@ export default function FeedScreen() {
       .eq("onboarding_done", true)
       .order("last_active_at", { ascending: false });
 
-    if (currentPrefs?.role) {
-      const dbRole = toDb("pref_role", currentPrefs.role);
-      const targetRole = dbRole === "seeking" ? "owner" : "seeking";
-      query = query.eq("user_type", targetRole);
-    }
-
-    const { data, error } = await query.limit(30);
+    // TEMP: the cap exists to keep the daily-view budget from being burned in
+    // one fetch; with the limit off it just truncates the cycle.
+    const { data, error } = await query.limit(TEMP_DISABLE_VIEW_LIMIT ? 200 : 30);
     if (error) {
       console.error('Feed query failed:', error);
       Alert.alert('Error', 'Failed to load profiles. Please try again.');
@@ -290,17 +296,27 @@ export default function FeedScreen() {
   const advanceIndex = () => {
     setCurrentIndex((i) => {
       const next = i + 1;
-      if (TEMP_DISABLE_VIEW_LIMIT && profiles.length > 0) {
+      // Wrapping needs at least two profiles to be a cycle. With one, `% 1`
+      // pins the index to the same card forever and a pass/like looks broken —
+      // fall through to the exhausted state instead.
+      if (TEMP_DISABLE_VIEW_LIMIT && profiles.length > 1) {
         return next % profiles.length;
       }
       return next;
     });
+    // Wrapping a single-profile pool lands on the index it started from, and
+    // React bails out of re-rendering an unchanged value — which would leave
+    // the card stuck at the exit animation's opacity: 0. The nonce always
+    // changes, so the entrance below always runs.
+    setCardNonce((n) => n + 1);
   };
 
   const handlePass = async () => {
     const uid = getCurrentUserId();
-    if (uid && currentProfile) {
-      // Record the skip/pass as a view so it doesn't show up again today
+    // Record the skip/pass as a view so it doesn't show up again today. TEMP:
+    // skipped while the view limit is off, which also drops an awaited network
+    // round-trip from the front of the pass animation.
+    if (!TEMP_DISABLE_VIEW_LIMIT && uid && currentProfile) {
       await recordProfileView(uid, currentProfile.id);
     }
 
