@@ -1,0 +1,43 @@
+name: CI
+
+on:
+  push:
+    branches: [main, development]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      # Deliberately not gating on `format:check` yet: the pre-existing 12k
+      # lines have never been through Prettier, and a repo-wide reformat has
+      # to land as its own commit or it drowns every real diff. lint-staged
+      # formats each file as it is touched; flip this on once the backlog is
+      # cleared (see docs/CONTRIBUTING.md).
+      - name: Lint
+        run: npm run lint:ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Test
+        run: npm test -- --ci
+
+      # The app bundle only ever carries EXPO_PUBLIC_* values. A service_role
+      # key reaching a client build would hand every user full DB access, so
+      # fail the build rather than rely on review catching it.
+      - name: Guard against server-only secrets in client code
+        run: npm run check:secrets
