@@ -18,6 +18,23 @@ export const FLAGS = {
    * every profile and those rows only mean anything once the limit is back.
    */
   dailyViewLimitEnabled: false,
+
+  /**
+   * Request resized images from Supabase Storage's `/render/image/` endpoint.
+   *
+   * OFF because it is a paid Storage add-on that is not enabled on this
+   * project — every request returns
+   * `403 FeatureNotEnabled: feature not enabled for this tenant`, which blanks
+   * every photo in the app. Verify with:
+   *
+   *   curl -o /dev/null -w '%{http_code}\n' \
+   *     "$SUPABASE_URL/storage/v1/render/image/public/photos/<a-real-object>?width=800"
+   *
+   * A 200 means it is safe to turn on. Until then photos are served at full
+   * upload size; the cheaper fix that works on any plan is to downscale before
+   * upload in lib/photos.js#uploadPhoto.
+   */
+  supabaseImageTransforms: false,
 };
 
 export const LIMITS = {
