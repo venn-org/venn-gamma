@@ -15,10 +15,10 @@ npm install
 
 Copy `.env.example` to `.env` and fill in the two values the app bundle needs:
 
-| Variable | Where it comes from |
-| --- | --- |
-| `EXPO_PUBLIC_SUPABASE_URL` | Supabase dashboard → Project Settings → API |
-| `EXPO_PUBLIC_SUPABASE_ANON_KEY` | same page (the *anon/public* key, never the service_role key) |
+| Variable                        | Where it comes from                                           |
+| ------------------------------- | ------------------------------------------------------------- |
+| `EXPO_PUBLIC_SUPABASE_URL`      | Supabase dashboard → Project Settings → API                   |
+| `EXPO_PUBLIC_SUPABASE_ANON_KEY` | same page (the _anon/public_ key, never the service_role key) |
 
 The remaining entries in `.env.example` are optional: the two
 `SUPABASE_AUTH_EXTERNAL_GOOGLE_*` values are read by `supabase/config.toml` for
@@ -71,15 +71,20 @@ supabase migration list
 then `supabase migration repair --status applied <version>` for each one that is
 genuinely already present.
 
-## Tests
+## Checks
 
 ```bash
-npm test
+npm run verify
 ```
 
-Jest with `jest-expo`. Coverage is currently limited to the pure logic in
-`lib/` (enum mapping, preference matching, photo array manipulation, profile
-completion) — the screens have no tests.
+Lint, typecheck, tests and a scan for server-only secrets in client code — the
+same four things CI runs on every PR. Individually: `npm run lint`,
+`npm run typecheck`, `npm test`, `npm run check:secrets`.
+
+Jest with `jest-expo`. Coverage is the pure logic in `lib/`, `services/` and
+`config/` (enum mapping, preference matching, photo arrays, profile completion,
+local-day boundaries, filter-string safety, image transforms) — the screens have
+no tests yet.
 
 ## Layout
 
@@ -89,8 +94,30 @@ app/            expo-router routes; directory name = URL segment
   (onboarding)/ the 9-step signup flow
   (tabs)/       feed, standouts, likes, messages, profile
   (settings)/   edit profile, legal, help, safety
-components/     shared UI
+components/     shared UI (components/chat/ for feature-local pieces)
+config/         env validation, feature flags, tunable limits
 hooks/          useOnboarding — cross-screen onboarding draft state
-lib/            Supabase client, auth, and all domain logic
+lib/            pure domain logic, auth, theme, platform helpers
+services/       ALL Supabase access — screens never query directly
 supabase/       migrations + reference schema dump
+docs/           CONTRIBUTING + architecture decision records
+```
+
+Two conventions worth knowing before you write code — both explained in
+[docs/CONTRIBUTING.md](docs/CONTRIBUTING.md):
+
+- **Screens don't query the database.** Everything goes through `services/`,
+  and an ESLint rule enforces it. See [ADR 0003](docs/adr/0003-services-layer.md).
+- **Anything a user can bypass isn't a rule.** Daily limits, block filtering and
+  match filtering are enforced in Postgres; the client copies are for display.
+  See [ADR 0002](docs/adr/0002-server-side-daily-like-limit.md).
+
+## Builds
+
+`app.json` is the static Expo config; `app.config.js` layers on per-environment
+identity, `runtimeVersion` and `extra`. Pick an environment with
+`APP_ENV=preview|production`, or via the matching `eas.json` build profile:
+
+```bash
+eas build --profile preview --platform android
 ```

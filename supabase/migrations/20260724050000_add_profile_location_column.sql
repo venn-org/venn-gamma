@@ -6,24 +6,58 @@
 
 ALTER TABLE public.profile_core ADD COLUMN IF NOT EXISTS location text;
 
--- CREATE OR REPLACE VIEW can only append trailing columns, not insert one
--- into the existing positional order — so `location` goes at the end here,
--- even though it's grouped with the other identity fields in schema.sql.
-CREATE OR REPLACE VIEW public.profiles WITH (security_invoker = true) AS
-    SELECT
-      c.id, c.name, c.bio, c.pronouns, c.birthday, c.age, c.gender, c.user_type,
-      c.city, c.zone, c.areas, c.lat, c.lng, c.coords_private,
-      c.budget_min, c.budget_max, c.budget, c.move_in_date, c.flat_type,
-      c.photos, c.prompts, c.job_company, c.job_title, c.education_school, c.education_level,
-      l.drink, l.tobacco, l.weed,
-      p.pref_role, p.pref_gender, p.pref_age, p.pref_budget, p.pref_move_in,
-      p.pref_smoking, p.pref_drinking, p.pref_occupation, p.pref_food, p.pref_pets,
-      p.pref_flat_type, p.pref_areas,
-      c.onboarding_done, c.verified, c.paused, c.is_admin, c.last_active_at,
-      c.created_at, c.updated_at, c.location
-    FROM public.profile_core c
-    LEFT JOIN public.profile_lifestyle l ON l.profile_id = c.id
-    LEFT JOIN public.profile_preferences p ON p.profile_id = c.id;
+-- WHY THIS IS CONDITIONAL
+--
+-- 20260724043406_full_schema_redesign.sql has since been amended to create the
+-- view with `location` already in it, in its natural position (4th, next to
+-- the other identity fields). The live database was migrated before that
+-- amendment, so there the view was created *without* location and this
+-- migration appended it as the last column.
+--
+-- That leaves two legitimate starting states, and one statement cannot serve
+-- both: CREATE OR REPLACE VIEW may only append trailing columns, never
+-- reorder or rename existing ones. Running the append-at-the-end version
+-- against a view that already has `location` 4th tries to rename column 4 from
+-- "location" to "pronouns" and fails with
+--
+--   42P16: cannot change name of view column "location" to "pronouns"
+--
+-- which is exactly what a `supabase db reset` hits today. So: rebuild the view
+-- only when `location` is genuinely missing from it.
+--
+-- The resulting column ORDER therefore differs between a freshly replayed
+-- database and the live one. Nothing reads these columns positionally — the
+-- client selects by name — but it is why
+-- 20260727001000_enforce_coords_private.sql has to discover the deployed
+-- column order from the catalog instead of hardcoding it.
+DO $mig$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+     WHERE table_schema = 'public'
+       AND table_name = 'profiles'
+       AND column_name = 'location'
+  ) THEN
+    EXECUTE $view$
+      CREATE OR REPLACE VIEW public.profiles WITH (security_invoker = true) AS
+          SELECT
+            c.id, c.name, c.bio, c.pronouns, c.birthday, c.age, c.gender, c.user_type,
+            c.city, c.zone, c.areas, c.lat, c.lng, c.coords_private,
+            c.budget_min, c.budget_max, c.budget, c.move_in_date, c.flat_type,
+            c.photos, c.prompts, c.job_company, c.job_title, c.education_school, c.education_level,
+            l.drink, l.tobacco, l.weed,
+            p.pref_role, p.pref_gender, p.pref_age, p.pref_budget, p.pref_move_in,
+            p.pref_smoking, p.pref_drinking, p.pref_occupation, p.pref_food, p.pref_pets,
+            p.pref_flat_type, p.pref_areas,
+            c.onboarding_done, c.verified, c.paused, c.is_admin, c.last_active_at,
+            c.created_at, c.updated_at, c.location
+          FROM public.profile_core c
+          LEFT JOIN public.profile_lifestyle l ON l.profile_id = c.id
+          LEFT JOIN public.profile_preferences p ON p.profile_id = c.id
+    $view$;
+  END IF;
+END
+$mig$;
 
 CREATE OR REPLACE FUNCTION public.profiles_view_insert() RETURNS trigger
     LANGUAGE plpgsql AS $$
