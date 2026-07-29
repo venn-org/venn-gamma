@@ -1,5 +1,13 @@
 import { useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Image, ActivityIndicator } from 'react-native';
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  StyleSheet,
+  ScrollView,
+  Image,
+  ActivityIndicator,
+} from 'react-native';
 import { Alert } from '../../lib/alert';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -13,15 +21,15 @@ export default function PhotosScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { data, updateData, submitData } = useOnboarding();
-  
+
   const isOwner = data.type === 'owner';
-  
+
   const [uploading, setUploading] = useState(false);
   const [profilePhoto, setProfilePhoto] = useState(data.photos?.profile || null);
   const [flatPhotos, setFlatPhotos] = useState(data.photos?.flat || [null, null, null]);
 
   const pickPhoto = async (setter, aspect) => {
-    let result = await ImagePicker.launchImageLibraryAsync({
+    const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ['images'],
       allowsEditing: true,
       aspect,
@@ -37,32 +45,35 @@ export default function PhotosScreen() {
 
   const handleContinue = async () => {
     setUploading(true);
-    
+
     // Simulate upload delay
-    await new Promise(r => setTimeout(r, 600));
-    
+    await new Promise((r) => setTimeout(r, 600));
+
     updateData({
       photos: {
         profile: profilePhoto,
-        flat: flatPhotos
-      }
+        flat: flatPhotos,
+      },
     });
-    
+
     setUploading(false);
     router.push('/(onboarding)/notifications');
   };
 
-  const canContinue = isOwner 
-    ? profilePhoto && flatPhotos.some(p => p !== null)
-    : profilePhoto;
+  const canContinue = isOwner ? profilePhoto && flatPhotos.some((p) => p !== null) : profilePhoto;
 
   return (
     <OnboardingShell step={8} total={totalSteps(data.type)}>
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 20 }}>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingBottom: 20 }}
+      >
         {isOwner ? (
           <>
             <Text style={styles.title}>Add your photos</Text>
-            <Text style={styles.subtitle}>Your profile photo is shown first. Flat photos help people picture living there.</Text>
+            <Text style={styles.subtitle}>
+              Your profile photo is shown first. Flat photos help people picture living there.
+            </Text>
 
             <Text style={styles.sectionLabel}>YOUR PHOTO</Text>
             <Text style={styles.sectionNote}>Shown as your profile picture — required</Text>
@@ -71,13 +82,18 @@ export default function PhotosScreen() {
               onPress={() => pickPhoto(setProfilePhoto, [1, 1])}
               activeOpacity={0.8}
             >
-              {profilePhoto
-                ? <Image source={{ uri: profilePhoto }} style={[StyleSheet.absoluteFill, { borderRadius: 20 }]} resizeMode="cover" />
-                : <>
-                    <Ionicons name="person-add-outline" size={32} color={colors.placeholder} />
-                    <Text style={styles.slotLabel}>Add profile photo</Text>
-                  </>
-              }
+              {profilePhoto ? (
+                <Image
+                  source={{ uri: profilePhoto }}
+                  style={[StyleSheet.absoluteFill, { borderRadius: 20 }]}
+                  resizeMode="cover"
+                />
+              ) : (
+                <>
+                  <Ionicons name="person-add-outline" size={32} color={colors.placeholder} />
+                  <Text style={styles.slotLabel}>Add profile photo</Text>
+                </>
+              )}
               {profilePhoto && (
                 <View style={styles.changeOverlay}>
                   <Ionicons name="camera-outline" size={20} color="#fff" />
@@ -86,53 +102,77 @@ export default function PhotosScreen() {
             </TouchableOpacity>
 
             <Text style={[styles.sectionLabel, { marginTop: 28 }]}>FLAT PHOTOS</Text>
-            <Text style={styles.sectionNote}>At least 1 required — show the living room, bedroom, common areas</Text>
+            <Text style={styles.sectionNote}>
+              At least 1 required — show the living room, bedroom, common areas
+            </Text>
             <View style={styles.grid}>
               {flatPhotos.map((p, i) => (
                 <TouchableOpacity
                   key={i}
                   style={styles.slot}
-                  onPress={() => pickPhoto(url => setFlatPhotos(prev => prev.map((x, j) => j === i ? url : x)), [4, 3])}
+                  onPress={() =>
+                    pickPhoto(
+                      (url) => setFlatPhotos((prev) => prev.map((x, j) => (j === i ? url : x))),
+                      [4, 3],
+                    )
+                  }
                   activeOpacity={0.8}
                 >
-                  {p
-                    ? <>
-                        <Image source={{ uri: p }} style={[StyleSheet.absoluteFill, { borderRadius: 16 }]} resizeMode="cover" />
-                        <View style={styles.changeOverlaySmall}>
-                          <Ionicons name="camera-outline" size={14} color="#fff" />
-                        </View>
-                      </>
-                    : <>
-                        <Ionicons name="home-outline" size={24} color={colors.placeholder} />
-                        <Text style={styles.slotLabel}>{i === 0 ? 'Main room' : i === 1 ? 'Bedroom' : 'Kitchen'}</Text>
-                      </>
-                  }
+                  {p ? (
+                    <>
+                      <Image
+                        source={{ uri: p }}
+                        style={[StyleSheet.absoluteFill, { borderRadius: 16 }]}
+                        resizeMode="cover"
+                      />
+                      <View style={styles.changeOverlaySmall}>
+                        <Ionicons name="camera-outline" size={14} color="#fff" />
+                      </View>
+                    </>
+                  ) : (
+                    <>
+                      <Ionicons name="home-outline" size={24} color={colors.placeholder} />
+                      <Text style={styles.slotLabel}>
+                        {i === 0 ? 'Main room' : i === 1 ? 'Bedroom' : 'Kitchen'}
+                      </Text>
+                    </>
+                  )}
                 </TouchableOpacity>
               ))}
             </View>
 
             <View style={[styles.notice, { marginTop: 20 }]}>
               <Ionicons name="information-circle-outline" size={16} color={colors.blue} />
-              <Text style={styles.noticeText}>Flat photos are required so people can see what they're moving into.</Text>
+              <Text style={styles.noticeText}>
+                Flat photos are required so people can see what they're moving into.
+              </Text>
             </View>
           </>
         ) : (
           <>
             <Text style={styles.title}>Add your photo</Text>
-            <Text style={styles.subtitle}>Your profile photo is the first thing people see. Profiles with photos get 4× more responses.</Text>
+            <Text style={styles.subtitle}>
+              Your profile photo is the first thing people see. Profiles with photos get 4× more
+              responses.
+            </Text>
 
             <TouchableOpacity
               style={styles.slotMain}
               onPress={() => pickPhoto(setProfilePhoto, [1, 1])}
               activeOpacity={0.8}
             >
-              {profilePhoto
-                ? <Image source={{ uri: profilePhoto }} style={[StyleSheet.absoluteFill, { borderRadius: 20 }]} resizeMode="cover" />
-                : <>
-                    <Ionicons name="person-add-outline" size={32} color={colors.placeholder} />
-                    <Text style={styles.slotLabel}>Add profile photo</Text>
-                  </>
-              }
+              {profilePhoto ? (
+                <Image
+                  source={{ uri: profilePhoto }}
+                  style={[StyleSheet.absoluteFill, { borderRadius: 20 }]}
+                  resizeMode="cover"
+                />
+              ) : (
+                <>
+                  <Ionicons name="person-add-outline" size={32} color={colors.placeholder} />
+                  <Text style={styles.slotLabel}>Add profile photo</Text>
+                </>
+              )}
               {profilePhoto && (
                 <View style={styles.changeOverlay}>
                   <Ionicons name="camera-outline" size={20} color="#fff" />
@@ -170,48 +210,102 @@ export default function PhotosScreen() {
 }
 
 const styles = StyleSheet.create({
-  title: { fontFamily: 'SpaceGrotesk_700Bold', fontSize: 30, color: colors.ink, letterSpacing: -0.8, lineHeight: 36, marginBottom: 8 },
+  title: {
+    fontFamily: 'SpaceGrotesk_700Bold',
+    fontSize: 30,
+    color: colors.ink,
+    letterSpacing: -0.8,
+    lineHeight: 36,
+    marginBottom: 8,
+  },
   subtitle: { fontSize: 14, color: colors.slate, lineHeight: 22, marginBottom: 24 },
-  sectionLabel: { fontFamily: 'SpaceMono_400Regular', fontSize: 10, letterSpacing: 1.5, color: colors.slate, marginBottom: 4 },
+  sectionLabel: {
+    fontFamily: 'SpaceMono_400Regular',
+    fontSize: 10,
+    letterSpacing: 1.5,
+    color: colors.slate,
+    marginBottom: 4,
+  },
   sectionNote: { fontSize: 12, color: colors.placeholder, marginBottom: 14 },
-  optional: { fontFamily: 'System', textTransform: 'none', letterSpacing: 0, color: colors.placeholder, fontSize: 12 },
+  optional: {
+    fontFamily: 'System',
+    textTransform: 'none',
+    letterSpacing: 0,
+    color: colors.placeholder,
+    fontSize: 12,
+  },
 
   slotMain: {
-    width: '100%', height: 180, borderRadius: 20,
-    borderWidth: 1.5, borderColor: colors.mist, borderStyle: 'dashed',
-    alignItems: 'center', justifyContent: 'center', gap: 10,
-    backgroundColor: colors.canvas, marginBottom: 8, overflow: 'hidden',
+    width: '100%',
+    height: 180,
+    borderRadius: 20,
+    borderWidth: 1.5,
+    borderColor: colors.mist,
+    borderStyle: 'dashed',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    backgroundColor: colors.canvas,
+    marginBottom: 8,
+    overflow: 'hidden',
   },
   slotLabel: { fontSize: 13, color: colors.placeholder, textAlign: 'center' },
   changeOverlay: {
-    position: 'absolute', bottom: 10, right: 10,
-    width: 36, height: 36, borderRadius: 18,
+    position: 'absolute',
+    bottom: 10,
+    right: 10,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     backgroundColor: 'rgba(0,0,0,0.5)',
-    alignItems: 'center', justifyContent: 'center',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   changeOverlaySmall: {
-    position: 'absolute', bottom: 6, right: 6,
-    width: 24, height: 24, borderRadius: 12,
+    position: 'absolute',
+    bottom: 6,
+    right: 6,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
     backgroundColor: 'rgba(0,0,0,0.5)',
-    alignItems: 'center', justifyContent: 'center',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   slot: {
-    width: '31%', aspectRatio: 1, borderRadius: 16,
-    borderWidth: 1.5, borderColor: colors.mist, borderStyle: 'dashed',
-    alignItems: 'center', justifyContent: 'center', gap: 6,
-    backgroundColor: colors.canvas, overflow: 'hidden',
+    width: '31%',
+    aspectRatio: 1,
+    borderRadius: 16,
+    borderWidth: 1.5,
+    borderColor: colors.mist,
+    borderStyle: 'dashed',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: colors.canvas,
+    overflow: 'hidden',
   },
   plus: { fontSize: 28, color: colors.placeholder, fontWeight: '300' },
 
   notice: {
-    flexDirection: 'row', gap: 8, alignItems: 'flex-start',
-    backgroundColor: '#EEF1FF', borderRadius: 12, padding: 14,
+    flexDirection: 'row',
+    gap: 8,
+    alignItems: 'flex-start',
+    backgroundColor: '#EEF1FF',
+    borderRadius: 12,
+    padding: 14,
   },
   noticeText: { flex: 1, fontSize: 13, color: colors.ink, lineHeight: 18 },
 
-  uploadRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 16, justifyContent: 'center' },
+  uploadRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 16,
+    justifyContent: 'center',
+  },
   uploadText: { fontSize: 13, color: colors.slate },
 
   footer: { paddingHorizontal: 0, paddingTop: 24, gap: 12 },

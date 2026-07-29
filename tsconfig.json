@@ -2,19 +2,20 @@
   "extends": "expo/tsconfig.base",
   "compilerOptions": {
     "strict": true,
+    // JS is allowed through the program so a .ts module can import a .js one
+    // during the migration. `checkJs` stays off until a file is converted —
+    // turning it on across 12k untyped lines would bury the real errors.
+    "allowJs": true,
+    "checkJs": false,
+    "noEmit": true,
+    // `@/*` used to point at a `src/` directory that does not exist, so the
+    // alias silently resolved to nothing and every import was a relative
+    // chain. Anchored at the repo root, which is where the code actually is.
     "paths": {
-      "@/*": [
-        "./src/*"
-      ],
-      "@/assets/*": [
-        "./assets/*"
-      ]
+      "@/*": ["./*"],
+      "@/assets/*": ["./assets/*"]
     }
   },
-  "include": [
-    "**/*.ts",
-    "**/*.tsx",
-    ".expo/types/**/*.ts",
-    "expo-env.d.ts"
-  ]
+  "include": ["**/*.ts", "**/*.tsx", "**/*.js", "**/*.jsx", ".expo/types/**/*.ts", "expo-env.d.ts"],
+  "exclude": ["node_modules", "dist", ".expo", "scripts"]
 }

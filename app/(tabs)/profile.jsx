@@ -1,45 +1,53 @@
-import { Ionicons } from "@expo/vector-icons";
-import * as ImagePicker from "expo-image-picker";
-import { LinearGradient } from "expo-linear-gradient";
-import { useFocusEffect, useRouter } from "expo-router";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { Ionicons } from '@expo/vector-icons';
+import * as ImagePicker from 'expo-image-picker';
+import { LinearGradient } from 'expo-linear-gradient';
+import { useFocusEffect, useRouter } from 'expo-router';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
-    ActivityIndicator,
-    Animated,
-    Image,
-    Modal,
-    Pressable,
-    ScrollView,
-    StyleSheet,
-    Switch,
-    useWindowDimensions,
-    Text,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Animated,
+  Image,
+  Modal,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Switch,
+  useWindowDimensions,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import { Alert } from '../../lib/alert';
-import { useSafeAreaInsets } from "react-native-safe-area-context";
-import Svg, { Circle } from "react-native-svg";
-import FlatDetailsModal from "../../components/FlatDetailsModal";
-import PreferencesSheet from "../../components/PreferencesSheet";
-import ProfileViewSheet from "../../components/ProfileViewSheet";
-import { getCurrentUserId, signOutUser } from "../../lib/auth";
-import { formatBudgetRange, formatMoveInDate, mapDbPrefsToUI, mapUIPrefsToDb, toDb, toUI } from "../../lib/enums";
-import { fetchFlatDetails, upsertFlatDetails } from "../../lib/flatDetails";
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import Svg, { Circle } from 'react-native-svg';
+import FlatDetailsModal from '../../components/FlatDetailsModal';
+import PreferencesSheet from '../../components/PreferencesSheet';
+import ProfileViewSheet from '../../components/ProfileViewSheet';
+import { getCurrentUserId, signOutUser } from '../../lib/auth';
 import {
-    FLAT_ROOM_LABELS,
-    makeProfilePhoto,
-    MAX_FLAT_PHOTOS,
-    MAX_PHOTOS,
-    removeFlatPhotoAt,
-    removePhotoAt,
-    setFlatPhotoAt,
-    setPhotoAt,
-    uploadPhoto,
-} from "../../lib/photos";
-import { calculateProfileCompletion } from "../../lib/profileUtils";
-import { supabase } from "../../lib/supabase";
-import { useTheme, useThemedStyles } from "../../lib/ThemeContext";
+  formatBudgetRange,
+  formatMoveInDate,
+  mapDbPrefsToUI,
+  mapUIPrefsToDb,
+  toDb,
+  toUI,
+} from '../../lib/enums';
+import { fetchFlatDetails, upsertFlatDetails } from '../../lib/flatDetails';
+import {
+  FLAT_ROOM_LABELS,
+  makeProfilePhoto,
+  MAX_FLAT_PHOTOS,
+  MAX_PHOTOS,
+  removeFlatPhotoAt,
+  removePhotoAt,
+  setFlatPhotoAt,
+  setPhotoAt,
+  uploadPhoto,
+} from '../../lib/photos';
+import { calculateProfileCompletion } from '../../lib/profileUtils';
+import { error as logError, describeError } from '../../lib/log';
+import { deleteAccount, fetchMyProfile, updateMyProfile } from '../../services/profileService';
+import { useTheme, useThemedStyles } from '../../lib/ThemeContext';
 
 // Fixed pixel width per option so the sliding indicator doesn't need a layout
 // measurement pass before it can animate.
@@ -73,7 +81,7 @@ const ThemeToggle = ({ isDark, onToggle }) => {
         activeOpacity={0.8}
         accessibilityLabel="Light mode"
       >
-        <Ionicons name="sunny" size={15} color={!isDark ? "#fff" : colors.placeholder} />
+        <Ionicons name="sunny" size={15} color={!isDark ? '#fff' : colors.placeholder} />
       </TouchableOpacity>
       <TouchableOpacity
         style={s.themeToggleBtn}
@@ -81,7 +89,7 @@ const ThemeToggle = ({ isDark, onToggle }) => {
         activeOpacity={0.8}
         accessibilityLabel="Dark mode"
       >
-        <Ionicons name="moon" size={15} color={isDark ? "#fff" : colors.placeholder} />
+        <Ionicons name="moon" size={15} color={isDark ? '#fff' : colors.placeholder} />
       </TouchableOpacity>
     </View>
   );
@@ -112,25 +120,13 @@ const SettingsRow = ({
         <Ionicons name={icon} size={18} color={iconColor} />
       </View>
       <View style={{ flex: 1 }}>
-        <Text style={[s.settingsTitle, titleColor && { color: titleColor }]}>
-          {title}
-        </Text>
+        <Text style={[s.settingsTitle, titleColor && { color: titleColor }]}>{title}</Text>
         {subtitle ? (
-          <Text
-            style={[s.settingsSub, subtitleColor && { color: subtitleColor }]}
-          >
-            {subtitle}
-          </Text>
+          <Text style={[s.settingsSub, subtitleColor && { color: subtitleColor }]}>{subtitle}</Text>
         ) : null}
       </View>
       {right ??
-        (onPress ? (
-          <Ionicons
-            name="chevron-forward"
-            size={16}
-            color={colors.placeholder}
-          />
-        ) : null)}
+        (onPress ? <Ionicons name="chevron-forward" size={16} color={colors.placeholder} /> : null)}
     </TouchableOpacity>
   );
 };
@@ -172,22 +168,17 @@ export default function ProfileScreen() {
   const fetchProfile = async () => {
     const uid = getCurrentUserId();
     if (!uid) return;
-    const { data, error } = await supabase
-      .from("profiles")
-      .select("*")
-      .eq("id", uid)
-      .single();
-    if (error) console.error("fetchProfile error:", error);
+    const data = await fetchMyProfile(uid);
     if (data) {
       setProfile(data);
       setIncognito(!!data.paused);
       setUserPrefs(mapDbPrefsToUI(data));
 
-      if (data.user_type === "owner") {
+      if (data.user_type === 'owner') {
         try {
           setFlatDetails(await fetchFlatDetails(uid));
         } catch (e) {
-          console.error("fetchFlatDetails error:", e);
+          logError('fetchFlatDetails failed', describeError(e));
         }
       } else {
         setFlatDetails(null);
@@ -201,10 +192,7 @@ export default function ProfileScreen() {
   const pickPhoto = async (index) => {
     const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!perm.granted) {
-      Alert.alert(
-        "Permission needed",
-        "Allow photo access to update your pictures.",
-      );
+      Alert.alert('Permission needed', 'Allow photo access to update your pictures.');
       return;
     }
 
@@ -234,17 +222,14 @@ export default function ProfileScreen() {
     setUploadingIndex(index);
 
     try {
-      const url = await uploadPhoto(uid, uri, "profile");
+      const url = await uploadPhoto(uid, uri, 'profile');
       const nextPhotos = setPhotoAt(photos, index, url);
-      const { error } = await supabase
-        .from("profiles")
-        .update({ photos: nextPhotos })
-        .eq("id", uid);
+      const { error } = await updateMyProfile(uid, { photos: nextPhotos });
       if (error) throw error;
       setProfile((p) => ({ ...p, photos: nextPhotos }));
     } catch (e) {
-      console.error("Photo upload failed:", e);
-      Alert.alert("Error", "Failed to update photo. Please try again.");
+      logError('Photo upload failed', describeError(e));
+      Alert.alert('Error', 'Failed to update photo. Please try again.');
     } finally {
       setUploadingIndex(null);
     }
@@ -255,20 +240,17 @@ export default function ProfileScreen() {
       const uid = getCurrentUserId();
       if (!uid) return;
       const nextPhotos = removePhotoAt(photos, index);
-      const { error } = await supabase
-        .from("profiles")
-        .update({ photos: nextPhotos })
-        .eq("id", uid);
+      const { error } = await updateMyProfile(uid, { photos: nextPhotos });
       if (error) {
-        Alert.alert("Error", "Failed to remove photo.");
+        Alert.alert('Error', 'Failed to remove photo.');
         return;
       }
       setProfile((p) => ({ ...p, photos: nextPhotos }));
     };
 
-    Alert.alert("Remove photo", "Remove this photo from your profile?", [
-      { text: "Cancel", style: "cancel" },
-      { text: "Remove", style: "destructive", onPress: doRemove },
+    Alert.alert('Remove photo', 'Remove this photo from your profile?', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Remove', style: 'destructive', onPress: doRemove },
     ]);
   };
 
@@ -276,12 +258,9 @@ export default function ProfileScreen() {
     const uid = getCurrentUserId();
     if (!uid) return;
     const nextPhotos = makeProfilePhoto(photos, index);
-    const { error } = await supabase
-      .from("profiles")
-      .update({ photos: nextPhotos })
-      .eq("id", uid);
+    const { error } = await updateMyProfile(uid, { photos: nextPhotos });
     if (error) {
-      Alert.alert("Error", "Failed to set profile picture.");
+      Alert.alert('Error', 'Failed to set profile picture.');
       return;
     }
     setProfile((p) => ({ ...p, photos: nextPhotos }));
@@ -298,10 +277,7 @@ export default function ProfileScreen() {
   const pickFlatPhoto = async (index) => {
     const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!perm.granted) {
-      Alert.alert(
-        "Permission needed",
-        "Allow photo access to update your flat's pictures.",
-      );
+      Alert.alert('Permission needed', "Allow photo access to update your flat's pictures.");
       return;
     }
 
@@ -335,8 +311,8 @@ export default function ProfileScreen() {
       const saved = await upsertFlatDetails(uid, { photos: nextPhotos });
       setFlatDetails(saved);
     } catch (e) {
-      console.error("Flat photo upload failed:", e);
-      Alert.alert("Error", "Failed to update photo. Please try again.");
+      logError('Flat photo upload failed', describeError(e));
+      Alert.alert('Error', 'Failed to update photo. Please try again.');
     } finally {
       setFlatUploadingIndex(null);
     }
@@ -351,13 +327,13 @@ export default function ProfileScreen() {
         const saved = await upsertFlatDetails(uid, { photos: nextPhotos });
         setFlatDetails(saved);
       } catch (e) {
-        Alert.alert("Error", "Failed to remove photo.");
+        Alert.alert('Error', 'Failed to remove photo.');
       }
     };
 
-    Alert.alert("Remove photo", "Remove this photo from your flat?", [
-      { text: "Cancel", style: "cancel" },
-      { text: "Remove", style: "destructive", onPress: doRemove },
+    Alert.alert('Remove photo', 'Remove this photo from your flat?', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Remove', style: 'destructive', onPress: doRemove },
     ]);
   };
 
@@ -372,13 +348,19 @@ export default function ProfileScreen() {
   // The crossfade-on-switch animation lives in ThemeProvider now (it needs
   // to cover the floating tab bar too, which sits outside this screen) —
   // this just forwards the pick.
-  const handleToggleTheme = (nextDark) => setMode(nextDark ? "dark" : "light");
+  const handleToggleTheme = (nextDark) => setMode(nextDark ? 'dark' : 'light');
 
   const toggleIncognito = async (val) => {
     setIncognito(val);
     const uid = getCurrentUserId();
     if (!uid) return;
-    await supabase.from("profiles").update({ paused: val }).eq("id", uid);
+    const { error } = await updateMyProfile(uid, { paused: val });
+    if (error) {
+      // Roll the switch back rather than leaving the UI claiming a state the
+      // database never accepted.
+      setIncognito(!val);
+      Alert.alert('Error', "Couldn't update that setting. Please try again.");
+    }
   };
 
   const handleSavePrefs = async (newPrefs, housing) => {
@@ -410,7 +392,11 @@ export default function ProfileScreen() {
       };
     }
     setUserPrefs(mergedPrefs);
-    await supabase.from("profiles").update(updates).eq("id", uid);
+    const { error } = await updateMyProfile(uid, updates);
+    if (error) {
+      Alert.alert('Error', "Couldn't save your preferences. Please try again.");
+      return;
+    }
     if (updates.user_type && updates.user_type !== profile?.user_type) {
       // Re-fetch rather than patch local state by hand — switching type
       // also needs the Flat Details fetch/clear that fetchProfile() already does.
@@ -429,23 +415,22 @@ export default function ProfileScreen() {
     const uid = getCurrentUserId();
     if (!uid) return;
 
-    const { error } = await supabase
-      .from("profiles")
-      .update({ flat_type: toDb("flat_type", flatType) || null })
-      .eq("id", uid);
+    const { error } = await updateMyProfile(uid, {
+      flat_type: toDb('flat_type', flatType) || null,
+    });
     if (error) throw error;
-    setProfile((p) => ({ ...p, flat_type: toDb("flat_type", flatType) || null }));
+    setProfile((p) => ({ ...p, flat_type: toDb('flat_type', flatType) || null }));
 
     const saved = await upsertFlatDetails(uid, { description: description || null });
     setFlatDetails(saved);
   };
 
   const handleSignOut = async () => {
-    Alert.alert("Sign Out", "Are you sure you want to sign out?", [
-      { text: "Cancel", style: "cancel" },
+    Alert.alert('Sign Out', 'Are you sure you want to sign out?', [
+      { text: 'Cancel', style: 'cancel' },
       {
-        text: "Sign Out",
-        style: "destructive",
+        text: 'Sign Out',
+        style: 'destructive',
         onPress: async () => {
           await signOutUser();
         },
@@ -455,17 +440,17 @@ export default function ProfileScreen() {
 
   const handleDeleteAccount = () => {
     Alert.alert(
-      "Delete Account",
-      "This will permanently delete your profile, matches, and chats. This action cannot be undone.",
+      'Delete Account',
+      'This will permanently delete your profile, matches, and chats. This action cannot be undone.',
       [
-        { text: "Cancel", style: "cancel" },
+        { text: 'Cancel', style: 'cancel' },
         {
-          text: "Delete",
-          style: "destructive",
+          text: 'Delete',
+          style: 'destructive',
           onPress: async () => {
-            const { error } = await supabase.rpc("delete_account");
+            const { error } = await deleteAccount();
             if (error) {
-              Alert.alert("Error", "Failed to delete account.");
+              Alert.alert('Error', 'Failed to delete account.');
             } else {
               await signOutUser();
             }
@@ -475,24 +460,24 @@ export default function ProfileScreen() {
     );
   };
 
-  const name = profile?.name || "User";
+  const name = profile?.name || 'User';
   const photo = profile?.photos?.[0] || null;
   const initials = name.charAt(0).toUpperCase();
-  const isOwner = profile?.user_type === "owner";
+  const isOwner = profile?.user_type === 'owner';
 
   const renderPhotoSlot = (i) => (
     <Pressable
       key={i}
-      style={({ pressed }) => [s.photoSlot, { width: photoSlotSize, height: photoSlotSize }, pressed && { opacity: 0.8 }]}
+      style={({ pressed }) => [
+        s.photoSlot,
+        { width: photoSlotSize, height: photoSlotSize },
+        pressed && { opacity: 0.8 },
+      ]}
       onPress={() => handlePhotoSlotPress(i)}
     >
       {photos[i] ? (
         <>
-          <Image
-            source={{ uri: photos[i] }}
-            style={s.photoSlotImg}
-            resizeMode="cover"
-          />
+          <Image source={{ uri: photos[i] }} style={s.photoSlotImg} resizeMode="cover" />
           {i === 0 && (
             <View style={s.photoBadge}>
               <Ionicons name="person-circle" size={11} color="#fff" />
@@ -522,7 +507,11 @@ export default function ProfileScreen() {
     return (
       <Pressable
         key={i}
-        style={({ pressed }) => [s.photoSlot, { width: photoSlotSize, height: photoSlotSize }, pressed && { opacity: 0.8 }]}
+        style={({ pressed }) => [
+          s.photoSlot,
+          { width: photoSlotSize, height: photoSlotSize },
+          pressed && { opacity: 0.8 },
+        ]}
         onPress={() => handleFlatPhotoSlotPress(i)}
       >
         {url ? (
@@ -543,7 +532,9 @@ export default function ProfileScreen() {
           </View>
         )}
         <View style={s.photoLabelBadge}>
-          <Text style={s.photoLabelBadgeText} numberOfLines={1}>{label}</Text>
+          <Text style={s.photoLabelBadgeText} numberOfLines={1}>
+            {label}
+          </Text>
         </View>
       </Pressable>
     );
@@ -573,17 +564,17 @@ export default function ProfileScreen() {
             style={{
               width: size,
               height: size,
-              alignItems: "center",
-              justifyContent: "center",
-              position: "relative",
+              alignItems: 'center',
+              justifyContent: 'center',
+              position: 'relative',
             }}
           >
             <Svg
               width={size}
               height={size}
               style={{
-                position: "absolute",
-                transform: [{ rotate: "-90deg" }],
+                position: 'absolute',
+                transform: [{ rotate: '-90deg' }],
               }}
             >
               <Circle
@@ -608,33 +599,33 @@ export default function ProfileScreen() {
             </Svg>
             <TouchableOpacity
               activeOpacity={0.8}
-              style={{ width: 72, height: 72, position: "relative" }}
+              style={{ width: 72, height: 72, position: 'relative' }}
               onPress={() => pickPhoto(0)}
             >
               {photo ? (
                 <Image
                   source={{ uri: photo }}
-                  style={{ position: "absolute", inset: 0, borderRadius: 36 }}
+                  style={{ position: 'absolute', inset: 0, borderRadius: 36 }}
                   resizeMode="cover"
                 />
               ) : (
                 <LinearGradient
-                  colors={["#335CFF", "#8A5BFF"]}
+                  colors={['#335CFF', '#8A5BFF']}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 1 }}
                   style={{
-                    position: "absolute",
+                    position: 'absolute',
                     inset: 0,
                     borderRadius: 36,
-                    alignItems: "center",
-                    justifyContent: "center",
+                    alignItems: 'center',
+                    justifyContent: 'center',
                   }}
                 >
                   <Text
                     style={{
-                      fontFamily: "SpaceGrotesk_700Bold",
+                      fontFamily: 'SpaceGrotesk_700Bold',
                       fontSize: 24,
-                      color: "#fff",
+                      color: '#fff',
                     }}
                   >
                     {initials}
@@ -643,15 +634,15 @@ export default function ProfileScreen() {
               )}
               <View
                 style={{
-                  position: "absolute",
+                  position: 'absolute',
                   bottom: 0,
                   right: 0,
                   width: 22,
                   height: 22,
                   borderRadius: 11,
                   backgroundColor: colors.blue,
-                  alignItems: "center",
-                  justifyContent: "center",
+                  alignItems: 'center',
+                  justifyContent: 'center',
                   borderWidth: 2,
                   borderColor: colors.card,
                 }}
@@ -666,15 +657,17 @@ export default function ProfileScreen() {
             </TouchableOpacity>
           </View>
           <View style={{ flex: 1, marginLeft: 6 }}>
-            <Text style={s.profileName} numberOfLines={1}>{name}</Text>
+            <Text style={s.profileName} numberOfLines={1}>
+              {name}
+            </Text>
             <View
               style={[
                 s.rolePill,
-                { backgroundColor: profile?.user_type === "owner" ? colors.blue : colors.violet },
+                { backgroundColor: profile?.user_type === 'owner' ? colors.blue : colors.violet },
               ]}
             >
               <Text style={s.rolePillText} numberOfLines={1}>
-                {profile?.user_type === "owner" ? "Has a flat" : "Looking for flat"}
+                {profile?.user_type === 'owner' ? 'Has a flat' : 'Looking for flat'}
               </Text>
             </View>
             <Text style={s.completionText}>{percentage}% Complete</Text>
@@ -684,7 +677,7 @@ export default function ProfileScreen() {
         {/* Action Buttons */}
         <View
           style={{
-            flexDirection: "row",
+            flexDirection: 'row',
             gap: 12,
             paddingHorizontal: 20,
             marginBottom: 24,
@@ -693,11 +686,9 @@ export default function ProfileScreen() {
           <TouchableOpacity
             style={s.actionBtn}
             activeOpacity={0.85}
-            onPress={() => router.push("/(settings)/edit-profile")}
+            onPress={() => router.push('/(settings)/edit-profile')}
           >
-            <View
-              style={[s.actionIcon, { backgroundColor: colors.tintViolet }]}
-            >
+            <View style={[s.actionIcon, { backgroundColor: colors.tintViolet }]}>
               <Ionicons name="pencil" size={18} color="#8A5BFF" />
             </View>
             <Text style={s.actionText}>Edit Profile</Text>
@@ -732,8 +723,7 @@ export default function ProfileScreen() {
           <View style={s.photoHeader}>
             <Text style={s.photoHeaderLabel}>PHOTOS</Text>
             <Text style={s.photoHint}>
-              Tap a photo to change it, remove it, or make it your profile
-              picture.
+              Tap a photo to change it, remove it, or make it your profile picture.
             </Text>
           </View>
           <View style={s.photoGrid}>
@@ -755,10 +745,12 @@ export default function ProfileScreen() {
                   </View>
                   <View style={{ flex: 1 }}>
                     <Text style={s.flatTypeText} numberOfLines={1}>
-                      {toUI("flat_type", profile?.flat_type) || "Flat type not set"}
+                      {toUI('flat_type', profile?.flat_type) || 'Flat type not set'}
                     </Text>
                     {profile?.location ? (
-                      <Text style={s.flatLocationText} numberOfLines={1}>{profile.location}</Text>
+                      <Text style={s.flatLocationText} numberOfLines={1}>
+                        {profile.location}
+                      </Text>
                     ) : null}
                   </View>
                 </View>
@@ -771,9 +763,9 @@ export default function ProfileScreen() {
                 </TouchableOpacity>
               </View>
 
-              {((profile?.budget_min || profile?.budget_max) || profile?.move_in_date) && (
+              {(profile?.budget_min || profile?.budget_max || profile?.move_in_date) && (
                 <View style={s.flatStatsRow}>
-                  {(profile?.budget_min || profile?.budget_max) ? (
+                  {profile?.budget_min || profile?.budget_max ? (
                     <View style={s.flatStat}>
                       <Ionicons name="cash-outline" size={14} color={colors.placeholder} />
                       <Text style={s.flatStatText}>
@@ -788,7 +780,7 @@ export default function ProfileScreen() {
                     <View style={s.flatStat}>
                       <Ionicons name="calendar-outline" size={14} color={colors.placeholder} />
                       <Text style={s.flatStatText}>
-                        Move-in {String(profile.move_in_date).split("T")[0]}
+                        Move-in {String(profile.move_in_date).split('T')[0]}
                       </Text>
                     </View>
                   ) : null}
@@ -806,9 +798,7 @@ export default function ProfileScreen() {
               </Text>
             </View>
             <View style={s.photoGrid}>
-              {Array.from({ length: MAX_FLAT_PHOTOS }).map((_, i) =>
-                renderFlatPhotoSlot(i),
-              )}
+              {Array.from({ length: MAX_FLAT_PHOTOS }).map((_, i) => renderFlatPhotoSlot(i))}
             </View>
           </View>
         )}
@@ -818,11 +808,11 @@ export default function ProfileScreen() {
           <Text style={s.sectionLabel}>APPEARANCE</Text>
           <View style={s.settingsGroup}>
             <SettingsRow
-              icon={isDark ? "moon" : "sunny"}
+              icon={isDark ? 'moon' : 'sunny'}
               iconBg={colors.inputBg}
               iconColor={colors.slate}
               title="Appearance"
-              subtitle={isDark ? "Dark mode" : "Light mode"}
+              subtitle={isDark ? 'Dark mode' : 'Light mode'}
               right={<ThemeToggle isDark={isDark} onToggle={handleToggleTheme} />}
               last
             />
@@ -858,21 +848,21 @@ export default function ProfileScreen() {
               iconBg={colors.tintGreen}
               iconColor={colors.success}
               title="Help Center"
-              onPress={() => router.push("/(settings)/help-center")}
+              onPress={() => router.push('/(settings)/help-center')}
             />
             <SettingsRow
               icon="shield-checkmark"
               iconBg={colors.tintBlue}
               iconColor={colors.blue}
               title="Safety Center"
-              onPress={() => router.push("/(settings)/safety-center")}
+              onPress={() => router.push('/(settings)/safety-center')}
             />
             <SettingsRow
               icon="document-text"
               iconBg={colors.tintNeutral}
               iconColor={colors.placeholder}
               title="Terms & Privacy"
-              onPress={() => router.push("/(settings)/terms")}
+              onPress={() => router.push('/(settings)/terms')}
               last
             />
           </View>
@@ -901,24 +891,21 @@ export default function ProfileScreen() {
         animationType="fade"
         onRequestClose={() => setPendingPhoto(null)}
       >
-        <Pressable
-          style={s.confirmBackdrop}
-          onPress={() => setPendingPhoto(null)}
-        >
+        <Pressable style={s.confirmBackdrop} onPress={() => setPendingPhoto(null)}>
           <Pressable style={s.confirmBox} onPress={() => {}}>
             <Text style={s.confirmTitle}>
               {pendingPhoto?.index === 0
                 ? pendingPhoto?.isReplace
-                  ? "Change profile photo?"
-                  : "Set profile photo?"
+                  ? 'Change profile photo?'
+                  : 'Set profile photo?'
                 : pendingPhoto?.isReplace
-                  ? "Replace this photo?"
-                  : "Add this photo?"}
+                  ? 'Replace this photo?'
+                  : 'Add this photo?'}
             </Text>
             <Text style={s.confirmSub}>
               {pendingPhoto?.index === 0
-                ? "This is the first thing people see in the feed."
-                : "This will be shown on your profile."}
+                ? 'This is the first thing people see in the feed.'
+                : 'This will be shown on your profile.'}
             </Text>
             {pendingPhoto && (
               <Image
@@ -934,10 +921,7 @@ export default function ProfileScreen() {
               >
                 <Text style={s.confirmCancelText}>Cancel</Text>
               </TouchableOpacity>
-              <TouchableOpacity
-                style={[s.confirmBtn, s.confirmOk]}
-                onPress={confirmPhoto}
-              >
+              <TouchableOpacity style={[s.confirmBtn, s.confirmOk]} onPress={confirmPhoto}>
                 <Text style={s.confirmOkText}>Confirm</Text>
               </TouchableOpacity>
             </View>
@@ -952,10 +936,7 @@ export default function ProfileScreen() {
         animationType="fade"
         onRequestClose={() => setPhotoMenuIndex(null)}
       >
-        <Pressable
-          style={s.confirmBackdrop}
-          onPress={() => setPhotoMenuIndex(null)}
-        >
+        <Pressable style={s.confirmBackdrop} onPress={() => setPhotoMenuIndex(null)}>
           <Pressable style={s.menuSheet} onPress={() => {}}>
             {photoMenuIndex > 0 && (
               <>
@@ -967,11 +948,7 @@ export default function ProfileScreen() {
                     handleSetProfilePhoto(i);
                   }}
                 >
-                  <Ionicons
-                    name="person-circle-outline"
-                    size={18}
-                    color={colors.blue}
-                  />
+                  <Ionicons name="person-circle-outline" size={18} color={colors.blue} />
                   <Text style={[s.menuOptionText, { color: colors.blue }]}>
                     Set as profile picture
                   </Text>
@@ -1000,20 +977,11 @@ export default function ProfileScreen() {
               }}
             >
               <Ionicons name="trash-outline" size={18} color="#FF4D6A" />
-              <Text style={[s.menuOptionText, { color: "#FF4D6A" }]}>
-                Remove photo
-              </Text>
+              <Text style={[s.menuOptionText, { color: '#FF4D6A' }]}>Remove photo</Text>
             </TouchableOpacity>
             <View style={s.menuDivider} />
-            <TouchableOpacity
-              style={s.menuOption}
-              onPress={() => setPhotoMenuIndex(null)}
-            >
-              <Text
-                style={[s.menuOptionText, { flex: 1, textAlign: "center" }]}
-              >
-                Cancel
-              </Text>
+            <TouchableOpacity style={s.menuOption} onPress={() => setPhotoMenuIndex(null)}>
+              <Text style={[s.menuOptionText, { flex: 1, textAlign: 'center' }]}>Cancel</Text>
             </TouchableOpacity>
           </Pressable>
         </Pressable>
@@ -1026,18 +994,15 @@ export default function ProfileScreen() {
         animationType="fade"
         onRequestClose={() => setPendingFlatPhoto(null)}
       >
-        <Pressable
-          style={s.confirmBackdrop}
-          onPress={() => setPendingFlatPhoto(null)}
-        >
+        <Pressable style={s.confirmBackdrop} onPress={() => setPendingFlatPhoto(null)}>
           <Pressable style={s.confirmBox} onPress={() => {}}>
             <Text style={s.confirmTitle}>
-              {pendingFlatPhoto?.isReplace ? "Replace this photo?" : "Add this photo?"}
+              {pendingFlatPhoto?.isReplace ? 'Replace this photo?' : 'Add this photo?'}
             </Text>
             <Text style={s.confirmSub}>
               {pendingFlatPhoto
                 ? `This will be shown as your flat's ${FLAT_ROOM_LABELS[pendingFlatPhoto.index]} photo.`
-                : ""}
+                : ''}
             </Text>
             {pendingFlatPhoto && (
               <Image
@@ -1053,10 +1018,7 @@ export default function ProfileScreen() {
               >
                 <Text style={s.confirmCancelText}>Cancel</Text>
               </TouchableOpacity>
-              <TouchableOpacity
-                style={[s.confirmBtn, s.confirmOk]}
-                onPress={confirmFlatPhoto}
-              >
+              <TouchableOpacity style={[s.confirmBtn, s.confirmOk]} onPress={confirmFlatPhoto}>
                 <Text style={s.confirmOkText}>Confirm</Text>
               </TouchableOpacity>
             </View>
@@ -1071,10 +1033,7 @@ export default function ProfileScreen() {
         animationType="fade"
         onRequestClose={() => setFlatPhotoMenuIndex(null)}
       >
-        <Pressable
-          style={s.confirmBackdrop}
-          onPress={() => setFlatPhotoMenuIndex(null)}
-        >
+        <Pressable style={s.confirmBackdrop} onPress={() => setFlatPhotoMenuIndex(null)}>
           <Pressable style={s.menuSheet} onPress={() => {}}>
             <TouchableOpacity
               style={s.menuOption}
@@ -1097,20 +1056,11 @@ export default function ProfileScreen() {
               }}
             >
               <Ionicons name="trash-outline" size={18} color="#FF4D6A" />
-              <Text style={[s.menuOptionText, { color: "#FF4D6A" }]}>
-                Remove photo
-              </Text>
+              <Text style={[s.menuOptionText, { color: '#FF4D6A' }]}>Remove photo</Text>
             </TouchableOpacity>
             <View style={s.menuDivider} />
-            <TouchableOpacity
-              style={s.menuOption}
-              onPress={() => setFlatPhotoMenuIndex(null)}
-            >
-              <Text
-                style={[s.menuOptionText, { flex: 1, textAlign: "center" }]}
-              >
-                Cancel
-              </Text>
+            <TouchableOpacity style={s.menuOption} onPress={() => setFlatPhotoMenuIndex(null)}>
+              <Text style={[s.menuOptionText, { flex: 1, textAlign: 'center' }]}>Cancel</Text>
             </TouchableOpacity>
           </Pressable>
         </Pressable>
@@ -1123,7 +1073,8 @@ export default function ProfileScreen() {
         housing={{
           budgetMin: profile?.budget_min ?? 0,
           budgetMax: profile?.budget_max ?? 20000,
-          moveInDate: typeof profile?.move_in_date === "string" ? profile.move_in_date.split("T")[0] : "",
+          moveInDate:
+            typeof profile?.move_in_date === 'string' ? profile.move_in_date.split('T')[0] : '',
         }}
         showRole
         onClose={() => setPrefsVisible(false)}
@@ -1135,14 +1086,22 @@ export default function ProfileScreen() {
           separate flat_details row, which the sheet expects inlined. */}
       <ProfileViewSheet
         visible={previewVisible}
-        profile={profile ? { ...profile, flat_photos: flatDetails?.photos ?? [], flat_description: flatDetails?.description ?? null } : null}
+        profile={
+          profile
+            ? {
+                ...profile,
+                flat_photos: flatDetails?.photos ?? [],
+                flat_description: flatDetails?.description ?? null,
+              }
+            : null
+        }
         showActions={false}
         onClose={() => setPreviewVisible(false)}
       />
 
       <FlatDetailsModal
         visible={flatDetailsModalVisible}
-        flatType={toUI("flat_type", profile?.flat_type)}
+        flatType={toUI('flat_type', profile?.flat_type)}
         description={flatDetails?.description}
         onClose={() => setFlatDetailsModalVisible(false)}
         onSave={handleSaveFlatDetails}
@@ -1155,9 +1114,9 @@ const makeStyles = (colors) =>
   StyleSheet.create({
     screen: { flex: 1, backgroundColor: colors.canvas },
     topBar: {
-      flexDirection: "row",
-      alignItems: "center",
-      justifyContent: "space-between",
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
       paddingHorizontal: 20,
       paddingTop: 8,
       paddingBottom: 12,
@@ -1165,43 +1124,43 @@ const makeStyles = (colors) =>
     },
     title: {
       flex: 1,
-      fontFamily: "SpaceGrotesk_700Bold",
+      fontFamily: 'SpaceGrotesk_700Bold',
       fontSize: 28,
-      fontWeight: "800",
+      fontWeight: '800',
       color: colors.headerText,
       letterSpacing: -0.03 * 28,
     },
 
     headerWrap: {
-      flexDirection: "row",
-      alignItems: "center",
+      flexDirection: 'row',
+      alignItems: 'center',
       gap: 16,
       paddingHorizontal: 20,
       marginTop: 20,
       marginBottom: 20,
     },
     profileName: {
-      fontFamily: "SpaceGrotesk_700Bold",
+      fontFamily: 'SpaceGrotesk_700Bold',
       fontSize: 24,
       color: colors.ink,
       marginBottom: 4,
       letterSpacing: -0.5,
     },
     rolePill: {
-      alignSelf: "flex-start",
+      alignSelf: 'flex-start',
       borderRadius: 50,
       paddingHorizontal: 8,
       paddingVertical: 3,
       marginTop: 5,
     },
     rolePillText: {
-      fontFamily: "SpaceGrotesk_700Bold",
+      fontFamily: 'SpaceGrotesk_700Bold',
       fontSize: 11,
-      color: "#fff",
+      color: '#fff',
       letterSpacing: -0.2,
     },
     completionText: {
-      fontFamily: "HankenGrotesk_600SemiBold",
+      fontFamily: 'HankenGrotesk_600SemiBold',
       fontSize: 13,
       color: colors.blue,
       marginTop: 4,
@@ -1209,14 +1168,14 @@ const makeStyles = (colors) =>
 
     actionBtn: {
       flex: 1,
-      flexDirection: "row",
-      alignItems: "center",
+      flexDirection: 'row',
+      alignItems: 'center',
       gap: 10,
       backgroundColor: colors.card,
       paddingVertical: 12,
       paddingHorizontal: 16,
       borderRadius: 16,
-      shadowColor: "#000",
+      shadowColor: '#000',
       shadowOpacity: 0.05,
       shadowRadius: 6,
       shadowOffset: { width: 0, height: 2 },
@@ -1226,13 +1185,13 @@ const makeStyles = (colors) =>
       width: 36,
       height: 36,
       borderRadius: 18,
-      alignItems: "center",
-      justifyContent: "center",
+      alignItems: 'center',
+      justifyContent: 'center',
     },
     previewBtn: {
-      flexDirection: "row",
-      alignItems: "center",
-      justifyContent: "center",
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
       gap: 8,
       paddingVertical: 14,
       borderRadius: 16,
@@ -1241,63 +1200,63 @@ const makeStyles = (colors) =>
       backgroundColor: colors.card,
     },
     previewBtnText: {
-      fontFamily: "HankenGrotesk_600SemiBold",
+      fontFamily: 'HankenGrotesk_600SemiBold',
       fontSize: 15,
       color: colors.ink,
     },
     actionText: {
-      fontFamily: "HankenGrotesk_700Bold",
+      fontFamily: 'HankenGrotesk_700Bold',
       fontSize: 14,
       color: colors.ink,
     },
 
     avatarUploading: {
-      position: "absolute",
+      position: 'absolute',
       inset: 0,
       borderRadius: 36,
-      backgroundColor: "rgba(0,0,0,0.45)",
-      alignItems: "center",
-      justifyContent: "center",
+      backgroundColor: 'rgba(0,0,0,0.45)',
+      alignItems: 'center',
+      justifyContent: 'center',
     },
 
     // Stacked, not a row — the hint is a full sentence and was overlapping the
     // label when both sat on one line.
     photoHeader: { marginBottom: 12, gap: 4 },
     photoHeaderLabel: {
-      fontFamily: "SpaceMono_400Regular",
+      fontFamily: 'SpaceMono_400Regular',
       fontSize: 10,
       letterSpacing: 1.5,
       color: colors.placeholder,
     },
     photoHint: {
-      fontFamily: "HankenGrotesk_400Regular",
+      fontFamily: 'HankenGrotesk_400Regular',
       fontSize: 12,
       color: colors.placeholder,
       lineHeight: 17,
     },
-    photoGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+    photoGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
     photoSlot: {
       borderRadius: 14,
       backgroundColor: colors.card,
       borderWidth: 1,
       borderColor: colors.border,
-      alignItems: "center",
-      justifyContent: "center",
-      overflow: "hidden",
+      alignItems: 'center',
+      justifyContent: 'center',
+      overflow: 'hidden',
     },
     photoSlotImg: { ...StyleSheet.absoluteFillObject, borderRadius: 14 },
     photoSlotUploading: {
       ...StyleSheet.absoluteFillObject,
-      backgroundColor: "rgba(0,0,0,0.45)",
-      alignItems: "center",
-      justifyContent: "center",
+      backgroundColor: 'rgba(0,0,0,0.45)',
+      alignItems: 'center',
+      justifyContent: 'center',
     },
     photoBadge: {
-      position: "absolute",
+      position: 'absolute',
       bottom: 6,
       left: 6,
-      flexDirection: "row",
-      alignItems: "center",
+      flexDirection: 'row',
+      alignItems: 'center',
       gap: 3,
       backgroundColor: colors.blue,
       borderRadius: 50,
@@ -1305,36 +1264,36 @@ const makeStyles = (colors) =>
       paddingVertical: 3,
     },
     photoBadgeText: {
-      fontFamily: "HankenGrotesk_600SemiBold",
+      fontFamily: 'HankenGrotesk_600SemiBold',
       fontSize: 10,
-      color: "#fff",
+      color: '#fff',
     },
     photoEditBadge: {
-      position: "absolute",
+      position: 'absolute',
       top: 6,
       right: 6,
       width: 22,
       height: 22,
       borderRadius: 11,
-      backgroundColor: "rgba(0,0,0,0.5)",
-      alignItems: "center",
-      justifyContent: "center",
+      backgroundColor: 'rgba(0,0,0,0.5)',
+      alignItems: 'center',
+      justifyContent: 'center',
     },
     photoLabelBadge: {
-      position: "absolute",
+      position: 'absolute',
       bottom: 6,
       right: 6,
       left: 6,
-      backgroundColor: "rgba(0,0,0,0.55)",
+      backgroundColor: 'rgba(0,0,0,0.55)',
       borderRadius: 8,
       paddingHorizontal: 6,
       paddingVertical: 2,
     },
     photoLabelBadgeText: {
-      fontFamily: "HankenGrotesk_600SemiBold",
+      fontFamily: 'HankenGrotesk_600SemiBold',
       fontSize: 10,
-      color: "#fff",
-      textAlign: "center",
+      color: '#fff',
+      textAlign: 'center',
     },
 
     flatCard: {
@@ -1345,28 +1304,28 @@ const makeStyles = (colors) =>
       padding: 16,
       gap: 14,
       marginBottom: 16,
-      shadowColor: "#000",
+      shadowColor: '#000',
       shadowOpacity: 0.05,
       shadowRadius: 8,
       shadowOffset: { width: 0, height: 2 },
       elevation: 1,
     },
-    flatCardHeader: { flexDirection: "row", alignItems: "center", gap: 10 },
-    flatCardHeaderLeft: { flex: 1, flexDirection: "row", alignItems: "center", gap: 12 },
+    flatCardHeader: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+    flatCardHeaderLeft: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 12 },
     flatIconBadge: {
       width: 40,
       height: 40,
       borderRadius: 14,
-      alignItems: "center",
-      justifyContent: "center",
+      alignItems: 'center',
+      justifyContent: 'center',
     },
     flatTypeText: {
-      fontFamily: "SpaceGrotesk_700Bold",
+      fontFamily: 'SpaceGrotesk_700Bold',
       fontSize: 16,
       color: colors.ink,
     },
     flatLocationText: {
-      fontFamily: "HankenGrotesk_400Regular",
+      fontFamily: 'HankenGrotesk_400Regular',
       fontSize: 13,
       color: colors.placeholder,
       marginTop: 2,
@@ -1376,47 +1335,47 @@ const makeStyles = (colors) =>
       height: 32,
       borderRadius: 16,
       backgroundColor: colors.canvas,
-      alignItems: "center",
-      justifyContent: "center",
+      alignItems: 'center',
+      justifyContent: 'center',
     },
     flatStatsRow: {
-      flexDirection: "row",
-      alignItems: "center",
+      flexDirection: 'row',
+      alignItems: 'center',
       backgroundColor: colors.canvas,
       borderRadius: 12,
       paddingVertical: 10,
       paddingHorizontal: 12,
     },
-    flatStat: { flex: 1, flexDirection: "row", alignItems: "center", gap: 6 },
+    flatStat: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6 },
     flatStatText: {
-      fontFamily: "HankenGrotesk_600SemiBold",
+      fontFamily: 'HankenGrotesk_600SemiBold',
       fontSize: 12,
       color: colors.slate,
     },
     flatStatDivider: { width: 1, height: 16, backgroundColor: colors.border, marginHorizontal: 8 },
     flatDescriptionText: {
-      fontFamily: "HankenGrotesk_400Regular",
+      fontFamily: 'HankenGrotesk_400Regular',
       fontSize: 13,
       color: colors.slate,
       lineHeight: 19,
     },
 
     menuSheet: {
-      width: "100%",
+      width: '100%',
       maxWidth: 340,
       backgroundColor: colors.card,
       borderRadius: 20,
-      overflow: "hidden",
+      overflow: 'hidden',
     },
     menuOption: {
-      flexDirection: "row",
-      alignItems: "center",
+      flexDirection: 'row',
+      alignItems: 'center',
       gap: 12,
       paddingVertical: 16,
       paddingHorizontal: 20,
     },
     menuOptionText: {
-      fontFamily: "HankenGrotesk_600SemiBold",
+      fontFamily: 'HankenGrotesk_600SemiBold',
       fontSize: 15,
       color: colors.ink,
     },
@@ -1424,60 +1383,60 @@ const makeStyles = (colors) =>
 
     confirmBackdrop: {
       flex: 1,
-      backgroundColor: "rgba(0,0,0,0.45)",
-      alignItems: "center",
-      justifyContent: "center",
+      backgroundColor: 'rgba(0,0,0,0.45)',
+      alignItems: 'center',
+      justifyContent: 'center',
       padding: 30,
     },
     confirmBox: {
-      width: "100%",
+      width: '100%',
       maxWidth: 340,
       backgroundColor: colors.card,
       borderRadius: 20,
       padding: 20,
     },
     confirmTitle: {
-      fontFamily: "SpaceGrotesk_700Bold",
+      fontFamily: 'SpaceGrotesk_700Bold',
       fontSize: 18,
       color: colors.ink,
       marginBottom: 4,
     },
     confirmSub: {
-      fontFamily: "HankenGrotesk_400Regular",
+      fontFamily: 'HankenGrotesk_400Regular',
       fontSize: 13,
       color: colors.placeholder,
       marginBottom: 16,
     },
     confirmPreview: {
-      width: "100%",
+      width: '100%',
       height: 200,
       borderRadius: 14,
       marginBottom: 18,
       backgroundColor: colors.canvas,
     },
-    confirmActions: { flexDirection: "row", gap: 10 },
+    confirmActions: { flexDirection: 'row', gap: 10 },
     confirmBtn: {
       flex: 1,
       borderRadius: 50,
       paddingVertical: 12,
-      alignItems: "center",
+      alignItems: 'center',
     },
     confirmCancel: { backgroundColor: colors.canvas },
     confirmCancelText: {
-      fontFamily: "HankenGrotesk_600SemiBold",
+      fontFamily: 'HankenGrotesk_600SemiBold',
       fontSize: 14,
       color: colors.ink,
     },
     confirmOk: { backgroundColor: colors.blue },
     confirmOkText: {
-      fontFamily: "HankenGrotesk_600SemiBold",
+      fontFamily: 'HankenGrotesk_600SemiBold',
       fontSize: 14,
-      color: "#fff",
+      color: '#fff',
     },
 
     section: { paddingHorizontal: 20, marginBottom: 24 },
     menuHeading: {
-      fontFamily: "SpaceGrotesk_700Bold",
+      fontFamily: 'SpaceGrotesk_700Bold',
       fontSize: 15,
       color: colors.ink,
       paddingHorizontal: 20,
@@ -1486,7 +1445,7 @@ const makeStyles = (colors) =>
     },
 
     sectionLabel: {
-      fontFamily: "SpaceMono_400Regular",
+      fontFamily: 'SpaceMono_400Regular',
       fontSize: 10,
       letterSpacing: 1.5,
       color: colors.placeholder,
@@ -1495,13 +1454,13 @@ const makeStyles = (colors) =>
     settingsGroup: {
       backgroundColor: colors.card,
       borderRadius: 16,
-      overflow: "hidden",
+      overflow: 'hidden',
       borderWidth: 1,
       borderColor: colors.border,
     },
     settingsRow: {
-      flexDirection: "row",
-      alignItems: "center",
+      flexDirection: 'row',
+      alignItems: 'center',
       padding: 14,
       gap: 14,
     },
@@ -1513,30 +1472,30 @@ const makeStyles = (colors) =>
       width: 36,
       height: 36,
       borderRadius: 18,
-      alignItems: "center",
-      justifyContent: "center",
+      alignItems: 'center',
+      justifyContent: 'center',
     },
     settingsTitle: {
-      fontFamily: "HankenGrotesk_600SemiBold",
+      fontFamily: 'HankenGrotesk_600SemiBold',
       fontSize: 15,
       color: colors.ink,
     },
     settingsSub: {
-      fontFamily: "HankenGrotesk_400Regular",
+      fontFamily: 'HankenGrotesk_400Regular',
       fontSize: 13,
       color: colors.placeholder,
       marginTop: 2,
     },
 
     themeToggle: {
-      flexDirection: "row",
+      flexDirection: 'row',
       backgroundColor: colors.inputBg,
       borderRadius: 20,
       padding: 3,
       width: THEME_TOGGLE_BTN_W * 2 + 6,
     },
     themeToggleThumb: {
-      position: "absolute",
+      position: 'absolute',
       top: 3,
       left: 3,
       width: THEME_TOGGLE_BTN_W,
@@ -1547,7 +1506,7 @@ const makeStyles = (colors) =>
     themeToggleBtn: {
       width: THEME_TOGGLE_BTN_W,
       height: 26,
-      alignItems: "center",
-      justifyContent: "center",
+      alignItems: 'center',
+      justifyContent: 'center',
     },
   });

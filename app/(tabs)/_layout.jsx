@@ -1,17 +1,12 @@
 import { useEffect, useState } from 'react';
-import { Platform, View, StyleSheet, Text } from 'react-native';
+import { AppState, Platform, View, StyleSheet, Text } from 'react-native';
 import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../lib/ThemeContext';
-import { supabase } from '../../lib/supabase';
 import { getCurrentUserId } from '../../lib/auth';
-import { getUnreadCount } from '../../lib/notifications';
-
-// Realtime subscription below is the primary update path; this is only a
-// fallback for delayed/dropped realtime delivery, so it doesn't need to be
-// fast.
-const POLL_INTERVAL_MS = 15000;
+import { INTERVALS } from '../../config/flags';
+import { fetchBadgeCounts, subscribeToBadgeEvents } from '../../services/badgeService';
 
 const TabIcon = ({ name, size, color, count, badgeRing }) => (
   <View>
@@ -34,88 +29,60 @@ export default function TabsLayout() {
 
   useEffect(() => {
     if (!uid) return;
-    
+
     let cancelled = false;
-    let channel = null;
 
-    const fetchCounts = async () => {
-      try {
-        // Unread messages: messages in your matches sent by the other person
-        // that you haven't read yet.
-        const { data: matches } = await supabase
-          .from('matches')
-          .select('id, user1_id, user2_id')
-          .or(`user1_id.eq.${uid},user2_id.eq.${uid}`);
-        const matchIds = (matches ?? []).map((m) => m.id);
-        const matchedUserIds = new Set(
-          (matches ?? []).map((m) => (m.user1_id === uid ? m.user2_id : m.user1_id))
-        );
-
-        // Pending likes: everyone currently in your Likes queue (matches what
-        // the Likes tab itself shows). A mutual like already turned into a
-        // match is never cleaned up from `likes` server-side, so exclude
-        // anyone already matched — otherwise the badge over-counts.
-        const { data: likers } = await supabase
-          .from('likes')
-          .select('from_user_id')
-          .eq('to_user_id', uid);
-        const likesCount = (likers ?? []).filter((l) => !matchedUserIds.has(l.from_user_id)).length;
-
-        if (!cancelled) setUnreadLikes(likesCount);
-
-        let msgCount = 0;
-        if (matchIds.length > 0) {
-          const { count } = await supabase
-            .from('messages')
-            .select('id', { count: 'exact', head: true })
-            .in('match_id', matchIds)
-            .eq('read', false)
-            .neq('sender_id', uid);
-          msgCount = count ?? 0;
-        }
-
-        if (!cancelled) setUnreadMessages(msgCount);
-      } catch (e) {
-        console.warn('Failed to fetch tab badges:', e);
-      }
+    const refreshCounts = async () => {
+      const counts = await fetchBadgeCounts(uid);
+      // null means the fetch failed — keep the badges that are on screen
+      // rather than flashing them to zero and back.
+      if (cancelled || !counts) return;
+      setUnreadLikes(counts.likes);
+      setUnreadMessages(counts.messages);
     };
 
-    fetchCounts();
+    refreshCounts();
 
-    // `messages` can't be filtered server-side to "rows in my matches" — a
-    // realtime filter only takes one column, and match membership needs a
-    // join. RLS still keeps other people's messages from being delivered, but
-    // a busy conversation would otherwise fire fetchCounts (three queries) per
-    // row. Collapse bursts into a single refresh.
+    // Every message insert app-wide reaches this subscription (see
+    // badgeService), and each event would otherwise fire three queries.
+    // Collapse bursts into a single refresh.
     let refreshTimer = null;
     const scheduleRefresh = () => {
       clearTimeout(refreshTimer);
-      refreshTimer = setTimeout(fetchCounts, 400);
+      refreshTimer = setTimeout(refreshCounts, INTERVALS.badgeRefreshDebounceMs);
     };
 
-    // Subscribe to realtime updates. `likes`/`matches` are client-facing views
-    // (active rows only) with INSTEAD OF triggers fanning writes into the
-    // real `likes_log`/`matches_log` tables — Postgres logical replication
-    // (which realtime is built on) only ever fires on the real tables, so
-    // the subscription has to target `likes_log`, not the `likes` view.
-    // Unliking/dismissing now soft-revokes (UPDATE revoked_at) instead of
-    // deleting the row, so this listens for UPDATE instead of DELETE.
-    channel = supabase.channel('tab-badges')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'likes_log', filter: `to_user_id=eq.${uid}` }, scheduleRefresh)
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'likes_log' }, scheduleRefresh)
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, scheduleRefresh)
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'messages' }, scheduleRefresh)
-      .subscribe();
+    const unsubscribe = subscribeToBadgeEvents(uid, scheduleRefresh);
 
-    // Fallback poll: realtime delivery can be delayed/dropped, so periodically
-    // re-fetch to make sure the badge clears once messages are marked read.
-    const pollInterval = setInterval(fetchCounts, POLL_INTERVAL_MS);
+    // Fallback poll for delayed/dropped realtime, paused while backgrounded —
+    // badges are only worth refreshing while someone can see them.
+    let pollInterval = null;
+    const startPolling = () => {
+      if (pollInterval) return;
+      pollInterval = setInterval(refreshCounts, INTERVALS.badgePollMs);
+    };
+    const stopPolling = () => {
+      if (!pollInterval) return;
+      clearInterval(pollInterval);
+      pollInterval = null;
+    };
+
+    startPolling();
+    const appSub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') {
+        refreshCounts();
+        startPolling();
+      } else {
+        stopPolling();
+      }
+    });
 
     return () => {
       cancelled = true;
-      clearInterval(pollInterval);
+      stopPolling();
+      appSub.remove();
       clearTimeout(refreshTimer);
-      if (channel) supabase.removeChannel(channel);
+      unsubscribe();
     };
   }, [uid]);
 
@@ -213,12 +180,21 @@ export default function TabsLayout() {
 
 const dotStyles = StyleSheet.create({
   badge: {
-    position: 'absolute', top: -4, right: -8,
-    minWidth: 16, height: 16, borderRadius: 8,
-    backgroundColor: '#FF4D6A', borderWidth: 1.5,
-    alignItems: 'center', justifyContent: 'center', paddingHorizontal: 3,
+    position: 'absolute',
+    top: -4,
+    right: -8,
+    minWidth: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: '#FF4D6A',
+    borderWidth: 1.5,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 3,
   },
   badgeText: {
-    fontFamily: 'HankenGrotesk_700Bold', fontSize: 9, color: '#fff',
-  }
+    fontFamily: 'HankenGrotesk_700Bold',
+    fontSize: 9,
+    color: '#fff',
+  },
 });

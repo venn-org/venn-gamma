@@ -84,7 +84,25 @@ REVOKE ALL ON FUNCTION public.is_admin(text) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.is_admin(text) TO authenticated, service_role;
 
 -- Narrow only, not defined in this repo — see note at the top of this file.
-REVOKE ALL ON FUNCTION public.is_panel_admin() FROM PUBLIC, anon, authenticated;
+--
+-- Guarded because of that: the function exists on the live database (created
+-- outside these migrations by the admin panel) but never on a database built
+-- from this repo alone, where an unconditional REVOKE fails with
+-- `42883: function public.is_panel_admin() does not exist` and takes
+-- `supabase db reset` down with it.
+DO $mig$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM pg_proc p
+      JOIN pg_namespace n ON n.oid = p.pronamespace
+     WHERE n.nspname = 'public'
+       AND p.proname = 'is_panel_admin'
+       AND p.pronargs = 0
+  ) THEN
+    REVOKE ALL ON FUNCTION public.is_panel_admin() FROM PUBLIC, anon, authenticated;
+  END IF;
+END
+$mig$;
 
 
 -- ----------------------------------------------------------------------------
