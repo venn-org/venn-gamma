@@ -1,29 +1,54 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState } from 'react';
 import { View, StyleSheet, Text, AppState, LogBox } from 'react-native';
 import { Stack, useRouter, useSegments } from 'expo-router';
-import { useFonts, SpaceGrotesk_700Bold, SpaceGrotesk_600SemiBold } from '@expo-google-fonts/space-grotesk';
+import {
+  useFonts,
+  SpaceGrotesk_700Bold,
+  SpaceGrotesk_600SemiBold,
+} from '@expo-google-fonts/space-grotesk';
 import { SpaceMono_400Regular } from '@expo-google-fonts/space-mono';
-import { HankenGrotesk_400Regular, HankenGrotesk_600SemiBold, HankenGrotesk_700Bold } from '@expo-google-fonts/hanken-grotesk';
+import {
+  HankenGrotesk_400Regular,
+  HankenGrotesk_600SemiBold,
+  HankenGrotesk_700Bold,
+} from '@expo-google-fonts/hanken-grotesk';
 import { Ionicons } from '@expo/vector-icons';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
-import { supabase, getCurrentUserId, ensureProfile, isOnboardingComplete, subscribeOnboardingComplete, loadSession, onAuthChange } from '../lib';
+import {
+  getCurrentUserId,
+  ensureProfile,
+  isOnboardingComplete,
+  subscribeOnboardingComplete,
+  loadSession,
+  onAuthChange,
+} from '../lib';
 import { loadLocations } from '../lib/locations';
 import { ThemeProvider, useTheme } from '../lib/ThemeContext';
+import AppErrorBoundary from '../components/ErrorBoundary';
+import { touchPresence } from '../services/presenceService';
+import { INTERVALS } from '../config/flags';
+import { error as logError, describeError } from '../lib/log';
 
 LogBox.ignoreLogs([
   '"shadow*" style props are deprecated',
-  'Animated: `useNativeDriver` is not supported'
+  'Animated: `useNativeDriver` is not supported',
 ]);
 
 // Prevent auto-hiding the splash screen until fonts & auth are ready
 SplashScreen.preventAutoHideAsync();
 
+// expo-router renders a route's exported ErrorBoundary in place of the screen
+// when it throws. Exporting it from the root layout covers the whole tree.
+export { default as ErrorBoundary } from '../components/ErrorBoundary';
+
 export default function RootLayout() {
   return (
-    <ThemeProvider>
-      <RootLayoutInner />
-    </ThemeProvider>
+    <AppErrorBoundary>
+      <ThemeProvider>
+        <RootLayoutInner />
+      </ThemeProvider>
+    </AppErrorBoundary>
   );
 }
 
@@ -54,7 +79,7 @@ function RootLayoutInner() {
   // synchronously and would otherwise render against an empty list.
   useEffect(() => {
     loadLocations()
-      .catch((e) => console.error('loadLocations failed:', e))
+      .catch((e) => logError('loadLocations failed', describeError(e)))
       .finally(() => setLocationsReady(true));
   }, []);
 
@@ -95,7 +120,7 @@ function RootLayoutInner() {
     loadSession()
       .then(applySession)
       .catch((e) => {
-        console.error('loadSession failed:', e);
+        logError('loadSession failed', describeError(e));
         setAuthReady(true);
       })
       .finally(() => {
@@ -143,25 +168,41 @@ function RootLayoutInner() {
     }
   }, [session, onboardingDone, segments, authReady, fontsLoaded, locationsReady]);
 
-  // Presence heartbeat (last_active_at)
+  // Presence heartbeat (last_active_at).
+  //
+  // Each beat is a write through the `profiles` view's INSTEAD OF triggers, so
+  // it is the app's highest-volume write by a wide margin. The timer now stops
+  // while the app is backgrounded and restarts (with an immediate beat) on
+  // foreground: a suspended app has no one looking at its "Active now" badge,
+  // and on web the timer would otherwise keep firing in a hidden tab forever.
   useEffect(() => {
     if (!session || !onboardingDone) return;
 
-    const updatePresence = async () => {
-      const uid = getCurrentUserId();
-      if (!uid) return;
-      await supabase.from('profiles').update({ last_active_at: new Date().toISOString() }).eq('id', uid);
+    let interval = null;
+
+    const beat = () => touchPresence(getCurrentUserId());
+
+    const start = () => {
+      if (interval) return;
+      beat();
+      interval = setInterval(beat, INTERVALS.presenceHeartbeatMs);
     };
 
-    updatePresence();
-    const interval = setInterval(updatePresence, 30000); // every 30s
+    const stop = () => {
+      if (!interval) return;
+      clearInterval(interval);
+      interval = null;
+    };
 
-    const appStateSub = AppState.addEventListener('change', nextState => {
-      if (nextState === 'active') updatePresence();
+    start();
+
+    const appStateSub = AppState.addEventListener('change', (nextState) => {
+      if (nextState === 'active') start();
+      else stop();
     });
 
     return () => {
-      clearInterval(interval);
+      stop();
       appStateSub.remove();
     };
   }, [session, onboardingDone]);
@@ -196,7 +237,12 @@ function RootLayoutInner() {
 }
 
 const s = StyleSheet.create({
-  splash: { ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center', gap: 14 },
+  splash: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 14,
+  },
   logoWrap: { width: 68, height: 44, position: 'relative' },
   circle: { position: 'absolute', top: 0, width: 44, height: 44, borderRadius: 22 },
   text: { fontSize: 26, fontWeight: '700', letterSpacing: -0.5 },
