@@ -41,8 +41,15 @@
   },
   "devDependencies": {
     "@types/react": "~19.2.2",
+    "eslint": "^9.39.5",
+    "eslint-config-expo": "^57.0.0",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "husky": "^9.1.7",
     "jest": "^29.7.0",
     "jest-expo": "~57.0.0",
+    "lint-staged": "^17.2.0",
+    "prettier": "^3.9.6",
     "react-native-svg-transformer": "^1.5.3",
     "typescript": "~6.0.3"
   },
@@ -53,9 +60,18 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "build": "expo export -p web",
-    "lint": "expo lint",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "lint:ci": "eslint . --max-warnings 400",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "typecheck": "tsc --noEmit",
+    "check:secrets": "node ./scripts/check-secrets.js",
+    "verify": "npm run lint && npm run typecheck && npm test && npm run check:secrets",
     "test": "jest",
-    "test:watch": "jest --watch"
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage",
+    "prepare": "husky"
   },
   "private": true,
   "allowScripts": {
@@ -63,9 +79,26 @@
   },
   "jest": {
     "preset": "jest-expo",
+    "setupFilesAfterEnv": [
+      "<rootDir>/jest.setup.js"
+    ],
     "testPathIgnorePatterns": [
       "/node_modules/",
       "/.expo/"
-    ]
+    ],
+    "collectCoverageFrom": [
+      "lib/**/*.{js,jsx}",
+      "services/**/*.{js,jsx}",
+      "config/**/*.{js,jsx}",
+      "!**/__tests__/**"
+    ],
+    "coverageThreshold": {
+      "global": {
+        "statements": 25,
+        "branches": 20,
+        "functions": 20,
+        "lines": 25
+      }
+    }
   }
 }
