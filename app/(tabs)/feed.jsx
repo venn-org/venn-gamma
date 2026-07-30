@@ -48,6 +48,7 @@ import {
   calculateOverlapScore,
   canReceiveLikeFrom,
   getPrefDisplay,
+  interleaveByScore,
   isPrefSet,
   matchesPrefs,
 } from '../../lib/prefs';
@@ -66,6 +67,7 @@ import { FLAGS, LIMITS } from '../../config/flags';
 import {
   attachFlatDetails,
   fetchFeedCandidates,
+  fetchFeedPage,
   fetchMyProfile,
   updateMyProfile,
 } from '../../services/profileService';
@@ -341,6 +343,38 @@ export default function FeedScreen() {
     setFeedLoading(true);
     try {
       setCurrentIndex(0);
+
+      // Preferred path: the database ranks the entire eligible pool and returns
+      // one page in score order. Everything the block below does — blocks,
+      // viewed-today, incomplete profiles, both halves of the gender rule, and
+      // the overlap scoring itself — is already applied in SQL, so there is
+      // nothing to filter and nothing to re-sort. See
+      // supabase/migrations/20260731000000_feed_ranking_rpc.sql.
+      const page = await fetchFeedPage({
+        limit: VIEW_LIMIT_ON ? LIMITS.feedPageSizeLimited : LIMITS.feedPageSize,
+        excludeViewed: VIEW_LIMIT_ON,
+      });
+      if (!isCurrent()) return;
+
+      if (page.ranked) {
+        if (page.error) {
+          logError('Feed query failed', describeError(page.error));
+          Alert.alert('Error', 'Failed to load profiles. Please try again.');
+          return;
+        }
+        // The RPC returns the badge as `overlap_score`; the card reads
+        // `_overlap`, and interleaveByScore needs it under that name too.
+        const ranked = page.data.map((p) => ({ ...p, _overlap: p.overlap_score ?? null }));
+        const withFlats = await attachFlatDetails(ranked);
+        if (!isCurrent()) return;
+
+        setProfiles(interleaveByScore(withFlats));
+        lastFeedPrefs.current = prefsKey(currentPrefs);
+        return;
+      }
+
+      // Fallback: the migration has not been applied to this database. Fetch a
+      // recency-ordered page and do all of the above on the client.
       const [blocked, viewedToday] = await Promise.all([
         getBlockedIds(uid),
         VIEW_LIMIT_ON ? getTodayViewedProfileIds(uid) : Promise.resolve(new Set()),
@@ -905,7 +939,14 @@ export default function FeedScreen() {
                   <View style={s.infoRow}>
                     <View style={s.infoItem}>
                       <Ionicons name="location-outline" size={16} color="#9AA0B2" />
-                      <Text style={s.infoItemText}>{currentProfile.location || '-'}</Text>
+                      {/* distance_km is only present on the ranked path, and
+                          only when both sides have coordinates — the free-text
+                          location stays the primary label either way. */}
+                      <Text style={s.infoItemText}>
+                        {currentProfile.distance_km != null
+                          ? `${currentProfile.distance_km} km away`
+                          : currentProfile.location || '-'}
+                      </Text>
                     </View>
                     <View style={s.infoDivider} />
                     <View style={[s.infoItem, { paddingLeft: 12 }]}>

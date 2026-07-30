@@ -110,6 +110,71 @@ export async function fetchFeedCandidates({
 }
 
 /**
+ * PostgREST reports a missing RPC as PGRST202 (schema cache) or 42883
+ * (undefined_function) — either means 20260731000000_feed_ranking_rpc.sql has
+ * not been applied here yet.
+ */
+const MISSING_RPC_CODES = new Set(['PGRST202', '42883']);
+
+let feedRpcAvailable = null; // null = unknown, false = confirmed missing
+
+/**
+ * One ranked page of the feed.
+ *
+ * The ranking is the database's (see
+ * supabase/migrations/20260731000000_feed_ranking_rpc.sql). That is the whole
+ * point: fetchFeedCandidates above can only order by `last_active_at` and hand
+ * the client a page to sort, so the "best match" was always the best of an
+ * arbitrary 200 — the scoring never saw the rest of the pool. The RPC scores
+ * everyone eligible, then pages.
+ *
+ * It also returns things the client cannot compute at all:
+ *   `reciprocal_score` — how well I fit THEIR stated preferences, which needs
+ *                        every candidate's preference row.
+ *   `distance_km`      — real PostGIS distance; the coordinates it comes from
+ *                        stay masked (see enforce_coords_private).
+ *   and an exposure term that damps profiles already flooded with likes, which
+ *   depends on what every OTHER user is doing.
+ *
+ * Blocks, prior likes, incomplete profiles and both halves of the gender rule
+ * are applied in SQL, so `data` needs no post-filtering — unlike the legacy
+ * path, whose callers must still do all of it.
+ *
+ * Returns `{ data, error, ranked }`. `ranked: false` means the fallback ran and
+ * the caller still owns filtering and ordering.
+ */
+export async function fetchFeedPage({
+  limit = 40,
+  offset = 0,
+  maxDistanceKm = null,
+  excludeViewed = false,
+} = {}) {
+  if (feedRpcAvailable !== false) {
+    const { data, error } = await supabase.rpc('feed_candidates', {
+      p_limit: limit,
+      p_offset: offset,
+      p_max_distance_km: maxDistanceKm,
+      p_exclude_viewed: excludeViewed,
+    });
+
+    if (!error) {
+      feedRpcAvailable = true;
+      return { data: data ?? [], error: null, ranked: true };
+    }
+
+    if (!MISSING_RPC_CODES.has(error.code)) {
+      warn('feed_candidates failed', describeError(error));
+      return { data: [], error, ranked: true };
+    }
+
+    feedRpcAvailable = false;
+    warn('feed_candidates RPC unavailable — falling back to client ranking', describeError(error));
+  }
+
+  return { data: [], error: null, ranked: false };
+}
+
+/**
  * Permanently delete the signed-in user's account.
  *
  * A SECURITY DEFINER RPC, because the cascade spans tables the client has no
