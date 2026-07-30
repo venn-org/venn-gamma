@@ -43,8 +43,10 @@ import {
 } from '../../lib/enums';
 import {
   PREF_ROWS,
+  acceptingPrefGenders,
   buildFeedOrder,
   calculateOverlapScore,
+  canReceiveLikeFrom,
   getPrefDisplay,
   isPrefSet,
   matchesPrefs,
@@ -187,6 +189,12 @@ export default function FeedScreen() {
   // response that is no longer the newest request.
   const feedRequestSeq = useRef(0);
 
+  // My own gender, needed to apply the *other* side of the gender rule (which
+  // profiles would accept a like from me). Held in a ref, not read from
+  // `myProfile`, because fetchFeed runs in the same tick as the prefs fetch
+  // that sets it — the state has not landed yet, exactly as with `userPrefs`.
+  const myGenderRef = useRef(null);
+
   // Prefs first, then the feed. Firing both in parallel meant the very first
   // fetch filtered against `userPrefs === null`, i.e. against nothing — which
   // is why an explicit "men only" still returned women until prefs were
@@ -251,6 +259,7 @@ export default function FeedScreen() {
     const data = await fetchMyProfile(uid);
     if (!data) return null;
     const prefs = mapDbPrefsToUI(data);
+    myGenderRef.current = data.gender ?? null;
     setUserPrefs(prefs);
     setMyProfile(data);
     // Returned as well as set: fetchFeed needs the prefs in the same tick, and
@@ -346,10 +355,16 @@ export default function FeedScreen() {
       //
       // The cap keeps a day's view budget from being burned in one fetch; with
       // the view limit off it just bounds the cycle.
+      const myGender = myGenderRef.current;
+
       const { data, error } = await fetchFeedCandidates({
         uid,
         limit: VIEW_LIMIT_ON ? LIMITS.feedPageSizeLimited : LIMITS.feedPageSize,
         genderFilter: genderColumnFilter(currentPrefs),
+        // The other half of the gender rule: drop anyone whose own preference
+        // would refuse a like from me, so the deck holds no cards whose like
+        // button can only fail.
+        acceptingPrefs: acceptingPrefGenders(myGender),
       });
       if (!isCurrent()) return;
 
@@ -365,6 +380,11 @@ export default function FeedScreen() {
 
         // Skip incomplete profiles — they render as empty cards
         if (!isFeedReady(p)) return false;
+
+        // Belt and braces against the two halves of the rule: mine about them,
+        // and theirs about me. Both are already applied in SQL above; these
+        // stay as the single source of truth for the semantics.
+        if (!canReceiveLikeFrom(p, { gender: myGender })) return false;
 
         return matchesPrefs(currentPrefs, p);
       });
@@ -475,10 +495,25 @@ export default function FeedScreen() {
       }
 
       if (!result.ok) {
-        // The server refused: out of likes. Roll the counter back to the
-        // truth and show the same sheet the pre-check would have.
+        // Roll the counter back to whatever the server says is true — a
+        // refused like is never charged.
         setRemainingLikes(result.remaining ?? 0);
-        setLimitVisible(true);
+
+        if (result.reason === 'limit_reached') {
+          // Out of likes: offering more is the useful response.
+          setLimitVisible(true);
+          return;
+        }
+
+        // 'not_accepted' (the recipient's gender preference excludes this
+        // profile) and 'blocked' are both permanent for this pair, so the
+        // like-limit sheet would be actively misleading — no number of extra
+        // likes changes the outcome. The card has already advanced, which is
+        // the right outcome either way: it isn't coming back.
+        //
+        // Deliberately worded without revealing the recipient's preference or
+        // that a block exists — both would leak something about them.
+        Alert.alert('Not available', "You can't like this profile right now.");
         return;
       }
 

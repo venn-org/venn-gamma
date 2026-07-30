@@ -169,9 +169,24 @@ CREATE INDEX idx_profile_prefs_areas ON public.profile_preferences USING gin (pr
 -- Client-facing compatibility view: same flat column shape the app has
 -- always read/written. security_invoker = true so RLS on the underlying
 -- tables is evaluated as the calling user, not the view owner.
+-- `location` is deliberately ABSENT here and appended by
+-- 20260724050000_add_profile_location_column.sql, which is the order this
+-- actually ran in against the live database.
+--
+-- It was once amended into this list (4th, next to the other identity fields)
+-- to look tidier. That single edit broke `supabase db reset` three separate
+-- ways, because CREATE OR REPLACE VIEW can only append trailing columns — never
+-- reorder or rename existing ones. With `location` 4th here, both the follow-up
+-- migration and the pulled production snapshot
+-- (20260729081420_remote_schema.sql) try to move it back to the end and fail
+-- with `42P16: cannot change name of view column "location" to "pronouns"`.
+--
+-- Production has `location` last. Keeping this file faithful to what ran is
+-- what makes a fresh replay produce the same column order as production —
+-- which is the whole point of a migration chain.
 CREATE VIEW public.profiles WITH (security_invoker = true) AS
     SELECT
-      c.id, c.name, c.bio, c.location, c.pronouns, c.birthday, c.age, c.gender, c.user_type,
+      c.id, c.name, c.bio, c.pronouns, c.birthday, c.age, c.gender, c.user_type,
       c.city, c.zone, c.areas, c.lat, c.lng, c.coords_private,
       c.budget_min, c.budget_max, c.budget, c.move_in_date, c.flat_type,
       c.photos, c.prompts, c.job_company, c.job_title, c.education_school, c.education_level,

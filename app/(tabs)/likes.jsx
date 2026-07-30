@@ -16,10 +16,11 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme, useThemedStyles } from '../../lib/ThemeContext';
 import { getCurrentUserId } from '../../lib/auth';
 import { getBlockedIds } from '../../lib/blocks';
+import { canReceiveLikeFrom } from '../../lib/prefs';
 import { error as logError, describeError } from '../../lib/log';
 import { dismissLike, fetchIncomingLikes, sendLike } from '../../services/likeService';
 import { fetchMatchedUserIds } from '../../services/matchService';
-import { attachFlatDetails } from '../../services/profileService';
+import { attachFlatDetails, fetchMyProfile } from '../../services/profileService';
 import ProfileViewSheet from '../../components/ProfileViewSheet';
 import MatchCelebration from '../../components/MatchCelebration';
 import { LikesGridSkeleton } from '../../components/Skeleton';
@@ -59,15 +60,28 @@ export default function LikesScreen() {
     // row), so matched users are filtered out here. Blocking is bidirectional;
     // without that filter a blocked user's like kept showing here even though
     // they were gone from feed and messages.
-    const [{ data }, blocked, matchedUserIds] = await Promise.all([
+    const [{ data }, blocked, matchedUserIds, me] = await Promise.all([
       fetchIncomingLikes(uid),
       getBlockedIds(uid),
       fetchMatchedUserIds(uid),
+      fetchMyProfile(uid),
     ]);
 
     const mapped = data
       .map((l) => ({ likeId: l.id, userId: l.from_user_id, profile: l.profiles }))
-      .filter((l) => l.profile && !matchedUserIds.has(l.userId) && !blocked.has(l.userId));
+      .filter(
+        (l) =>
+          l.profile &&
+          !matchedUserIds.has(l.userId) &&
+          !blocked.has(l.userId) &&
+          // My gender preference governs who may like me. New likes are
+          // refused server-side, but two cases still reach here: likes sent
+          // before that rule existed which already produced a match (the
+          // backfill deliberately leaves those alone), and likes that were
+          // legitimate when sent and became non-conforming when I later
+          // tightened the preference. Neither should sit in my Likes queue.
+          canReceiveLikeFrom(me, l.profile),
+      );
 
     // Returns new profile objects rather than mutating the fetched rows in
     // place, which is what this used to do — in-place writes are visible
@@ -113,6 +127,15 @@ export default function LikesScreen() {
       logError('Failed to like back', describeError(result.error));
       Alert.alert('Error', 'Failed to match');
       fetchLikes(); // put the card back — the optimistic removal was wrong
+      return;
+    }
+
+    if (!result.ok && result.reason === 'not_accepted') {
+      // They set a gender preference that excludes me — liking back can never
+      // succeed, so drop the card rather than leaving a button that always
+      // fails. Worded without disclosing their preference.
+      fetchLikes();
+      Alert.alert('Not available', "You can't like this profile right now.");
       return;
     }
 

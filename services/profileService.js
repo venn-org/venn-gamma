@@ -1,5 +1,6 @@
 import { supabase } from '../lib/supabase';
 import { MY_PROFILE_COLUMNS, PROFILE_CARD_COLUMNS, PROFILE_SUMMARY_COLUMNS } from './columns';
+import { assertFilterSafeId } from './queryFilters';
 import { warn, describeError } from '../lib/log';
 
 /**
@@ -63,13 +64,27 @@ export async function fetchProfileSummaries(userIds) {
  * Feed candidates: everyone but me, not paused, onboarded, most recently
  * active first.
  *
- * `genderFilter` is pushed into the query rather than applied after the fetch.
- * It is the only hard preference (see lib/prefs.js#matchesPrefs), so filtering
- * it server-side means the row budget is spent on profiles that can actually
- * appear — previously a "women only" preference could have most of the fetched
- * page discarded on the client, leaving a short deck for no visible reason.
+ * Both directions of the gender rule are pushed into the query rather than
+ * applied after the fetch, so the row budget is spent on profiles that can
+ * actually appear:
+ *
+ *   `genderFilter`     — MY preference about them. The only hard preference
+ *                        (see lib/prefs.js#matchesPrefs).
+ *   `acceptingPrefs`   — THEIR preference about me. Someone who accepts only
+ *                        men will refuse a like from anyone else
+ *                        (like_profile enforces it), so showing them is a dead
+ *                        end: the user spends a swipe on a card whose like
+ *                        button can only ever fail.
+ *
+ * `pref_gender IS NULL` counts as accepting — a user who never stated a
+ * preference has not excluded anyone.
  */
-export async function fetchFeedCandidates({ uid, limit, genderFilter = null }) {
+export async function fetchFeedCandidates({
+  uid,
+  limit,
+  genderFilter = null,
+  acceptingPrefs = null,
+}) {
   if (!uid) return { data: [], error: null };
 
   let query = supabase
@@ -82,6 +97,13 @@ export async function fetchFeedCandidates({ uid, limit, genderFilter = null }) {
     .limit(limit);
 
   if (genderFilter) query = query.eq('gender', genderFilter);
+
+  if (acceptingPrefs?.length) {
+    // Values are enum constants from lib/prefs.js, never user input, but they
+    // are still spliced into a filter expression — keep them shaped like ids.
+    acceptingPrefs.forEach((p) => assertFilterSafeId(p, 'pref_gender'));
+    query = query.or(`pref_gender.is.null,pref_gender.in.(${acceptingPrefs.join(',')})`);
+  }
 
   const { data, error } = await query;
   return { data: data ?? [], error };
