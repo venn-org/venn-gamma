@@ -100,21 +100,27 @@ noticing, because `db push` only ever runs the migrations a given database has
 not seen — so a file that has already been applied everywhere can be silently
 unreplayable for months.
 
-Two real examples, both fixed by guarding the statement in a `DO` block rather
-than by editing history:
+Two real examples:
 
-- `20260724050000` recreated the `profiles` view with `location` appended last.
-  `20260724043406` was later amended to include `location` in its natural
-  position, so on a fresh replay the two disagree and Postgres refuses with
-  `42P16: cannot change name of view column`.
+- **Never "tidy up" a migration that has already run.** `20260724043406` was
+  amended to move `location` into its natural position in the `profiles` view.
+  Production had it last, because that is where
+  `20260724050000_add_profile_location_column.sql` appended it. That one
+  cosmetic edit broke `db reset` three separate ways — the follow-up migration,
+  and later the pulled production snapshot, both tried to move the column back
+  and hit `42P16: cannot change name of view column "location" to "pronouns"`
+  (CREATE OR REPLACE VIEW may append trailing columns, never reorder or rename).
+  Fixed by restoring the file to what actually ran. **An applied migration is a
+  historical record, not source code** — to change the schema, add a new one.
 - `20260725202735` revoked grants on `public.is_panel_admin()`, a function that
   exists only on the live database (it was created outside this repo), so a
-  fresh replay died with `42883: function does not exist`.
+  fresh replay died with `42883: function does not exist`. Fixed by guarding the
+  statement in a `DO` block — the right tool when a migration must tolerate two
+  legitimate starting states.
 
-Because of the first one, **column order in the `profiles` view differs between
-a freshly replayed database and production**. Nothing reads columns
-positionally, but it is why `20260727001000` discovers the deployed order from
-the catalog instead of hardcoding it.
+A freshly replayed database now produces the same `profiles` column order as
+production. `20260727001000` still discovers the order from the catalog rather
+than hardcoding it, which is what kept it working while the two disagreed.
 
 ### If `db push` says there is nothing to apply but the objects are missing
 

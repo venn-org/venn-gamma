@@ -28,7 +28,14 @@ let rpcAvailable = null; // null = unknown, false = confirmed missing
  * Falls back to the plain insert when the migration has not been applied, so
  * pulling this code does not require a database push to keep liking working.
  *
- * @returns {{ ok: boolean, reason?: 'limit_reached', remaining: number|null, matched: boolean, error?: object }}
+ * `reason` distinguishes refusals the user can do something about from ones
+ * they cannot:
+ *   - 'limit_reached' — out of likes today; offering more likes helps.
+ *   - 'not_accepted'  — the recipient's gender preference excludes this
+ *                       profile; no amount of likes will change that.
+ *   - 'blocked'       — one of the two has blocked the other.
+ *
+ * @returns {{ ok: boolean, reason?: string, remaining: number|null, matched: boolean, matchId?: string, error?: object }}
  */
 export async function sendLike(uid, targetId) {
   if (!uid || !targetId) {
@@ -43,9 +50,12 @@ export async function sendLike(uid, targetId) {
       const row = Array.isArray(data) ? data[0] : data;
       return {
         ok: !!row?.ok,
-        reason: row?.ok ? undefined : 'limit_reached',
+        // `reason` is only present once 20260730090000 is applied; before that
+        // the only refusal the RPC could produce was the daily limit.
+        reason: row?.ok ? undefined : (row?.reason ?? 'limit_reached'),
         remaining: row?.remaining ?? null,
         matched: !!row?.matched,
+        matchId: row?.match_id ?? undefined,
       };
     }
 
@@ -60,11 +70,20 @@ export async function sendLike(uid, targetId) {
   return sendLikeLegacy(uid, targetId);
 }
 
+/** PostgreSQL insufficient_privilege — the likes trigger's refusal code. */
+const INSUFFICIENT_PRIVILEGE = '42501';
+
 /** Pre-RPC path: insert, then look up whether that completed a match. */
 async function sendLikeLegacy(uid, targetId) {
   const { error } = await supabase
     .from('likes')
     .insert({ from_user_id: uid, to_user_id: targetId });
+
+  // The gender rule is enforced by the likes INSTEAD OF INSERT trigger too, so
+  // it applies on this path as well — it surfaces as a raise, not a row count.
+  if (error?.code === INSUFFICIENT_PRIVILEGE) {
+    return { ok: false, reason: 'not_accepted', remaining: null, matched: false };
+  }
 
   if (error && error.code !== UNIQUE_VIOLATION) {
     return { ok: false, remaining: null, matched: false, error };
