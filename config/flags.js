@@ -44,8 +44,15 @@ export const LIMITS = {
   dailyViews: 10,
   /** Likes added by one "get more likes" grant. */
   bonusLikesGrant: 5,
-  /** Rows pulled per feed fetch. Larger while the deck cycles. */
-  feedPageSize: 200,
+  /**
+   * Rows pulled per feed fetch. Larger while the deck cycles.
+   *
+   * Capped at 100 because feed_candidates() clamps p_limit to 100 server-side
+   * (it is a "SELECT the user table" endpoint otherwise). Asking for 200 did
+   * not fetch 200 — it fetched 100 and made the page size look bigger than it
+   * was. Raise both together or neither.
+   */
+  feedPageSize: 100,
   feedPageSizeLimited: 30,
   /** Messages loaded when a chat opens; older ones page in on scroll. */
   chatInitialMessages: 50,
