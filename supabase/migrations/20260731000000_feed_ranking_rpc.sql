@@ -394,7 +394,7 @@ BEGIN
       ))
       AND (
         p_max_distance_km IS NULL
-        OR c.geog IS NULL OR me.geog IS NULL
+        OR c.geog IS NULL OR me.my_geog IS NULL
         -- ST_DWithin is the indexable form; the distance above is only computed
         -- for display, and would not use idx_profiles_geog on its own.
         OR extensions.ST_DWithin(c.geog, me.my_geog, p_max_distance_km * 1000.0)
