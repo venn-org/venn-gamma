@@ -1,12 +1,20 @@
 import { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Platform, KeyboardAvoidingView } from 'react-native';
+import {
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  StyleSheet,
+  Platform,
+  KeyboardAvoidingView,
+} from 'react-native';
 import { Alert } from '../../lib/alert';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors } from '../../lib/theme';
 import { useOnboarding, totalSteps } from '../../hooks/useOnboarding';
-import { deleteAccountAndSignOut } from '../../lib/auth';
+import { deleteAccountAndSignOut, getOAuthName } from '../../lib/auth';
 
 export default function NameScreen() {
   const router = useRouter();
@@ -15,8 +23,12 @@ export default function NameScreen() {
   const [loading, setLoading] = useState(false);
   const total = totalSteps(data.type);
 
-  const [first, setFirst] = useState(data.firstName || '');
-  const [last, setLast] = useState(data.lastName || '');
+  // Prefill from the Google identity, but only as a starting value: these stay
+  // ordinary controlled inputs, so the user can edit or clear them. A draft the
+  // user already typed (data.*) always wins over the OAuth name.
+  const [oauth] = useState(getOAuthName);
+  const [first, setFirst] = useState(data.firstName || oauth.first);
+  const [last, setLast] = useState(data.lastName || oauth.last);
 
   const handleContinue = async () => {
     if (!first.trim()) return;
@@ -58,7 +70,12 @@ export default function NameScreen() {
     >
       <View style={styles.topBar}>
         <View style={styles.progressTrack}>
-          <LinearGradient colors={[colors.blue, colors.violet]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={[styles.progressFill, { width: `${Math.round((1 / total) * 100)}%` }]} />
+          <LinearGradient
+            colors={[colors.blue, colors.violet]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={[styles.progressFill, { width: `${Math.round((1 / total) * 100)}%` }]}
+          />
         </View>
         <Text style={styles.stepLabel}>STEP 1 OF {total}</Text>
       </View>
@@ -69,7 +86,9 @@ export default function NameScreen() {
 
       <View style={styles.body}>
         <Text style={styles.title}>What's your name?</Text>
-        <Text style={styles.subtitle}>Venn doesn't verify names. We count on flatmates to be real with each other.</Text>
+        <Text style={styles.subtitle}>
+          Venn doesn't verify names. We count on flatmates to be real with each other.
+        </Text>
 
         <Text style={styles.label}>FIRST NAME</Text>
         <TextInput
@@ -81,7 +100,9 @@ export default function NameScreen() {
           autoFocus
         />
 
-        <Text style={[styles.label, { marginTop: 14 }]}>LAST NAME <Text style={styles.optional}>(optional)</Text></Text>
+        <Text style={[styles.label, { marginTop: 14 }]}>
+          LAST NAME <Text style={styles.optional}>(optional)</Text>
+        </Text>
         <TextInput
           style={styles.input}
           placeholder="Your last name"
@@ -90,7 +111,9 @@ export default function NameScreen() {
           onChangeText={setLast}
         />
 
-        <Text style={styles.hint}>Last name is optional and only shared with confirmed matches.</Text>
+        <Text style={styles.hint}>
+          Last name is optional and only shared with confirmed matches.
+        </Text>
       </View>
 
       <View style={[styles.footer, { paddingBottom: insets.bottom + 24 }]}>
@@ -108,19 +131,70 @@ export default function NameScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.paper, ...Platform.select({ web: { height: '100dvh', overflow: 'hidden' } }) },
+  container: {
+    flex: 1,
+    backgroundColor: colors.paper,
+    ...Platform.select({ web: { height: '100dvh', overflow: 'hidden' } }),
+  },
   topBar: { paddingHorizontal: 28, paddingTop: 14, gap: 8 },
-  progressTrack: { height: 3, backgroundColor: 'rgba(0,0,0,0.08)', borderRadius: 2, overflow: 'hidden' },
+  progressTrack: {
+    height: 3,
+    backgroundColor: 'rgba(0,0,0,0.08)',
+    borderRadius: 2,
+    overflow: 'hidden',
+  },
   progressFill: { height: '100%', borderRadius: 2 },
-  stepLabel: { fontFamily: 'SpaceMono_400Regular', fontSize: 10, color: colors.placeholder, letterSpacing: 1.2, textAlign: 'right' },
-  back: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center', marginLeft: 16, marginTop: 4 },
+  stepLabel: {
+    fontFamily: 'SpaceMono_400Regular',
+    fontSize: 10,
+    color: colors.placeholder,
+    letterSpacing: 1.2,
+    textAlign: 'right',
+  },
+  back: {
+    width: 40,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: 16,
+    marginTop: 4,
+  },
   backArrow: { fontSize: 28, color: colors.ink, lineHeight: 32 },
   body: { flex: 1, paddingHorizontal: 28, paddingTop: 32 },
-  title: { fontFamily: 'SpaceGrotesk_700Bold', fontSize: 32, color: colors.ink, letterSpacing: -1, lineHeight: 38, marginBottom: 8 },
+  title: {
+    fontFamily: 'SpaceGrotesk_700Bold',
+    fontSize: 32,
+    color: colors.ink,
+    letterSpacing: -1,
+    lineHeight: 38,
+    marginBottom: 8,
+  },
   subtitle: { fontSize: 14, color: colors.slate, lineHeight: 22, marginBottom: 32 },
-  label: { fontFamily: 'SpaceMono_400Regular', fontSize: 10, letterSpacing: 1.5, color: colors.slate, marginBottom: 7 },
-  optional: { fontFamily: 'System', textTransform: 'none', letterSpacing: 0, color: colors.placeholder, fontSize: 12 },
-  input: { backgroundColor: colors.inputBg, borderRadius: 14, paddingHorizontal: 18, paddingVertical: 17, fontSize: 16, color: colors.ink, borderWidth: 2, borderColor: 'transparent', marginBottom: 4 },
+  label: {
+    fontFamily: 'SpaceMono_400Regular',
+    fontSize: 10,
+    letterSpacing: 1.5,
+    color: colors.slate,
+    marginBottom: 7,
+  },
+  optional: {
+    fontFamily: 'System',
+    textTransform: 'none',
+    letterSpacing: 0,
+    color: colors.placeholder,
+    fontSize: 12,
+  },
+  input: {
+    backgroundColor: colors.inputBg,
+    borderRadius: 14,
+    paddingHorizontal: 18,
+    paddingVertical: 17,
+    fontSize: 16,
+    color: colors.ink,
+    borderWidth: 2,
+    borderColor: 'transparent',
+    marginBottom: 4,
+  },
   hint: { fontSize: 12, color: colors.placeholder, textAlign: 'center', marginTop: 16 },
   footer: { paddingHorizontal: 28, paddingTop: 12 },
   btn: { backgroundColor: colors.ink, borderRadius: 50, paddingVertical: 18, alignItems: 'center' },
