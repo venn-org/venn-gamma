@@ -40,28 +40,38 @@ const VARIANTS = {
 
 const variant = VARIANTS[APP_ENV] ?? VARIANTS.development;
 
-module.exports = ({ config }) => ({
-  ...config,
-  name: variant.name,
-  // The OAuth deep link is registered against this scheme, so a variant with
-  // its own scheme needs its own redirect URL allow-listed in the Supabase
-  // dashboard. Production keeps `venn`, which is what is already configured.
-  scheme: variant.scheme,
-  ios: {
-    ...config.ios,
-    bundleIdentifier: `${config.ios.bundleIdentifier}${variant.bundleSuffix}`,
-  },
-  android: {
-    ...config.android,
-    package: `${config.android.package}${variant.bundleSuffix.replace(/\./g, '')}`,
-  },
-  // Native code changes with the SDK, not with every JS release: an OTA update
-  // is only safe for builds sharing this value.
-  runtimeVersion: { policy: 'appVersion' },
-  extra: {
-    ...config.extra,
-    appEnv: APP_ENV,
-    // Surfaced in-app (settings/debug) so a bug report identifies its build.
-    commitSha: process.env.EAS_BUILD_GIT_COMMIT_HASH ?? null,
-  },
-});
+module.exports = ({ config }) => {
+  // Set once `eas init`/`eas build:configure` writes extra.eas.projectId into
+  // app.json. Until then there's no EAS Update server to point at, so leave
+  // `updates` untouched rather than pointing at a URL that doesn't exist yet.
+  const projectId = config.extra?.eas?.projectId;
+
+  return {
+    ...config,
+    name: variant.name,
+    // The OAuth deep link is registered against this scheme, so a variant with
+    // its own scheme needs its own redirect URL allow-listed in the Supabase
+    // dashboard. Production keeps `venn`, which is what is already configured.
+    scheme: variant.scheme,
+    ios: {
+      ...config.ios,
+      bundleIdentifier: `${config.ios.bundleIdentifier}${variant.bundleSuffix}`,
+    },
+    android: {
+      ...config.android,
+      package: `${config.android.package}${variant.bundleSuffix.replace(/\./g, '')}`,
+    },
+    // Native code changes with the SDK, not with every JS release: an OTA update
+    // is only safe for builds sharing this value.
+    runtimeVersion: { policy: 'appVersion' },
+    ...(projectId
+      ? { updates: { ...config.updates, url: `https://u.expo.dev/${projectId}` } }
+      : {}),
+    extra: {
+      ...config.extra,
+      appEnv: APP_ENV,
+      // Surfaced in-app (settings/debug) so a bug report identifies its build.
+      commitSha: process.env.EAS_BUILD_GIT_COMMIT_HASH ?? null,
+    },
+  };
+};

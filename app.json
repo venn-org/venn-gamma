@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "Vennflat",
-    "slug": "Vennflat",
+    "slug": "vennflat",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
@@ -45,10 +45,28 @@
       ],
       "expo-image",
       "expo-status-bar",
-      "expo-web-browser"
+      "expo-web-browser",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Venn needs access to your photos so you can add pictures of yourself and your flat to your profile.",
+          "cameraPermission": false,
+          "microphonePermission": false
+        }
+      ],
+      "expo-location"
     ],
     "experiments": {
       "typedRoutes": true
-    }
+    },
+    "extra": {
+      "appEnv": "development",
+      "commitSha": {},
+      "router": {},
+      "eas": {
+        "projectId": "06ccf53b-214b-4436-a8c2-a482d0347f77"
+      }
+    },
+    "owner": "starpredetors-team"
   }
 }

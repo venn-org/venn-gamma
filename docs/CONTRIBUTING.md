@@ -1,5 +1,9 @@
 # Contributing
 
+See `docs/CICD.md` for how a change actually reaches production — git
+workflow, EAS/OTA vs. native builds, database migration deploys, and
+rollback procedures. This file covers day-to-day local development.
+
 ## Before you push
 
 ```bash

@@ -1,13 +1,13 @@
-import { useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Platform } from 'react-native';
-import { useRouter } from 'expo-router';
-import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
+import { useRouter } from 'expo-router';
+import { useState } from 'react';
+import { Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { colors } from '../../lib/theme';
-import { useOnboarding, totalSteps } from '../../hooks/useOnboarding';
 import OptionIcon from '../../components/OptionIcon';
+import { totalSteps, useOnboarding } from '../../hooks/useOnboarding';
 import { optionIcon } from '../../lib/enums';
+import { colors } from '../../lib/theme';
 
 export default function AccountTypeScreen() {
   const router = useRouter();
@@ -32,14 +32,18 @@ export default function AccountTypeScreen() {
         <View style={styles.progressTrack}>
           <LinearGradient
             colors={[colors.blue, colors.violet]}
-            start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
             style={[styles.progressFill, { width: `${Math.round((2 / total) * 100)}%` }]}
           />
         </View>
         <Text style={styles.stepLabel}>STEP 2 OF {total}</Text>
       </View>
 
-      <TouchableOpacity style={styles.back} onPress={() => router.canGoBack() ? router.back() : router.replace('/(onboarding)/name')}>
+      <TouchableOpacity
+        style={styles.back}
+        onPress={() => (router.canGoBack() ? router.back() : router.replace('/(onboarding)/name'))}
+      >
         <Text style={styles.backArrow}>‹</Text>
       </TouchableOpacity>
 
@@ -53,19 +57,21 @@ export default function AccountTypeScreen() {
           activeOpacity={0.8}
         >
           <View style={[styles.cardIcon, type === 'seeking' && styles.cardIconActive]}>
-            <OptionIcon name={optionIcon('pref_role', 'seeking')} size={26} color={type === 'seeking' ? colors.blue : colors.slate} />
+            <OptionIcon
+              name={optionIcon('pref_role', 'seeking')}
+              size={26}
+              color={type === 'seeking' ? colors.blue : colors.slate}
+            />
           </View>
           <View style={{ flex: 1 }}>
             <Text style={[styles.cardTitle, type === 'seeking' && styles.cardTitleActive]}>
-              I'm looking for a flat
+              Looking for a flatmate and a flat.
             </Text>
             <Text style={[styles.cardSub, type === 'seeking' && styles.cardSubActive]}>
-              Your profile appears in others' feeds as a potential flatmate
+              Your profile appears in others feeds as a potential flatmate.
             </Text>
           </View>
-          {type === 'seeking' && (
-            <Ionicons name="checkmark-circle" size={22} color={colors.blue} />
-          )}
+          {type === 'seeking' && <Ionicons name="checkmark-circle" size={22} color={colors.blue} />}
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -74,19 +80,21 @@ export default function AccountTypeScreen() {
           activeOpacity={0.8}
         >
           <View style={[styles.cardIcon, type === 'owner' && styles.cardIconActive]}>
-            <OptionIcon name={optionIcon('pref_role', 'owner')} size={26} color={type === 'owner' ? colors.blue : colors.slate} />
+            <OptionIcon
+              name={optionIcon('pref_role', 'owner')}
+              size={26}
+              color={type === 'owner' ? colors.blue : colors.slate}
+            />
           </View>
           <View style={{ flex: 1 }}>
             <Text style={[styles.cardTitle, type === 'owner' && styles.cardTitleActive]}>
-              I have a flat
+              Looking for a flatmate.
             </Text>
             <Text style={[styles.cardSub, type === 'owner' && styles.cardSubActive]}>
-              Your listing appears in Standouts — people send you a Key 🔑 to connect
+              Your profile appears in others feeds as potential flat hosts.
             </Text>
           </View>
-          {type === 'owner' && (
-            <Ionicons name="checkmark-circle" size={22} color={colors.blue} />
-          )}
+          {type === 'owner' && <Ionicons name="checkmark-circle" size={22} color={colors.blue} />}
         </TouchableOpacity>
       </View>
 
@@ -105,31 +113,78 @@ export default function AccountTypeScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.paper, ...Platform.select({ web: { height: '100dvh', overflow: 'hidden' } }) },
+  container: {
+    flex: 1,
+    backgroundColor: colors.paper,
+    ...Platform.select({ web: { height: '100dvh', overflow: 'hidden' } }),
+  },
   topBar: { paddingHorizontal: 28, paddingTop: 14, gap: 8 },
-  progressTrack: { height: 3, backgroundColor: 'rgba(0,0,0,0.08)', borderRadius: 2, overflow: 'hidden' },
+  progressTrack: {
+    height: 3,
+    backgroundColor: 'rgba(0,0,0,0.08)',
+    borderRadius: 2,
+    overflow: 'hidden',
+  },
   progressFill: { height: '100%', borderRadius: 2 },
-  stepLabel: { fontFamily: 'SpaceMono_400Regular', fontSize: 10, color: colors.placeholder, letterSpacing: 1.2, textAlign: 'right' },
-  back: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center', marginLeft: 16, marginTop: 4 },
+  stepLabel: {
+    fontFamily: 'SpaceMono_400Regular',
+    fontSize: 10,
+    color: colors.placeholder,
+    letterSpacing: 1.2,
+    textAlign: 'right',
+  },
+  back: {
+    width: 40,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: 16,
+    marginTop: 4,
+  },
   backArrow: { fontSize: 28, color: colors.ink, lineHeight: 32 },
   body: { flex: 1, paddingHorizontal: 28, paddingTop: 28 },
-  title: { fontFamily: 'SpaceGrotesk_700Bold', fontSize: 32, color: colors.ink, letterSpacing: -1, lineHeight: 38, marginBottom: 8 },
+  title: {
+    fontFamily: 'SpaceGrotesk_700Bold',
+    fontSize: 32,
+    color: colors.ink,
+    letterSpacing: -1,
+    lineHeight: 38,
+    marginBottom: 8,
+  },
   subtitle: { fontSize: 14, color: colors.slate, lineHeight: 22, marginBottom: 32 },
 
   card: {
-    flexDirection: 'row', alignItems: 'center', gap: 16,
-    backgroundColor: '#fff', borderRadius: 20, padding: 20,
-    marginBottom: 14, borderWidth: 2, borderColor: 'transparent',
-    shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 8, shadowOffset: { width: 0, height: 2 },
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
+    backgroundColor: '#fff',
+    borderRadius: 20,
+    padding: 20,
+    marginBottom: 14,
+    borderWidth: 2,
+    borderColor: 'transparent',
+    shadowColor: '#000',
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 2 },
     elevation: 2,
   },
   cardActive: { borderColor: colors.blue, backgroundColor: '#EEF1FF' },
   cardIcon: {
-    width: 56, height: 56, borderRadius: 16,
-    backgroundColor: colors.canvas, alignItems: 'center', justifyContent: 'center',
+    width: 56,
+    height: 56,
+    borderRadius: 16,
+    backgroundColor: colors.canvas,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   cardIconActive: { backgroundColor: '#fff' },
-  cardTitle: { fontFamily: 'SpaceGrotesk_700Bold', fontSize: 16, color: colors.ink, marginBottom: 4 },
+  cardTitle: {
+    fontFamily: 'SpaceGrotesk_700Bold',
+    fontSize: 16,
+    color: colors.ink,
+    marginBottom: 4,
+  },
   cardTitleActive: { color: colors.blue },
   cardSub: { fontSize: 13, color: colors.slate, lineHeight: 18 },
   cardSubActive: { color: colors.ink },

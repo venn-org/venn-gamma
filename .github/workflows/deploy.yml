@@ -1,0 +1,85 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: 'What to ship'
+        required: true
+        default: build
+        type: choice
+        options: [build, ota-update]
+      profile:
+        description: 'EAS profile (build profile, or OTA channel)'
+        required: true
+        default: production
+        type: choice
+        options: [production, preview]
+
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  # Native build: anything that changes native code, a config plugin, or the
+  # Expo SDK version. Goes through app-store review, so this can run
+  # unattended — nothing reaches a user until someone submits and a store
+  # approves it.
+  build:
+    if: github.event_name == 'push' || github.event.inputs.mode == 'build'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Setup EAS
+        uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      # --no-wait: don't block the runner on the remote build; check progress on expo.dev.
+      # Submission isn't wired up yet — eas.json's submit.production has no store
+      # credentials configured, so `eas submit` would only work interactively.
+      - name: EAS build
+        run: eas build --platform all --profile ${{ github.event.inputs.profile || 'production' }} --non-interactive --no-wait
+
+  # OTA update: JS-only changes (UI, business logic, bugfixes) that touch no
+  # native code. Ships in minutes, no store review, no new binary — but it
+  # also reaches every user on that channel immediately with no gate but this
+  # one, hence `environment: production` (configure required reviewers in
+  # Settings > Environments) and manual-dispatch-only. See
+  # docs/CICD.md#shipping-a-change for the build-vs-OTA decision.
+  #
+  # One-time prerequisite: `eas update:configure` must have been run once
+  # (by someone logged into EAS) before this job can publish anything.
+  ota-update:
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.mode == 'ota-update'
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Setup EAS
+        uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Publish OTA update
+        run: eas update --channel ${{ github.event.inputs.profile }} --message "${{ github.sha }}" --non-interactive
