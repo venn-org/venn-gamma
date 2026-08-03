@@ -1,0 +1,39 @@
+name: Database Migrations
+
+# Proves the migration chain still replays from zero, on a throwaway local
+# Postgres — the same thing docs/CONTRIBUTING.md asks a human to run by hand
+# before every push, now enforced so it can't be forgotten. Runs against
+# nothing real: no secrets, no production project touched.
+
+on:
+  push:
+    branches: [main, development]
+    paths: ['supabase/migrations/**']
+  pull_request:
+    paths: ['supabase/migrations/**']
+
+concurrency:
+  group: db-migrations-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  replay:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Start local Postgres
+        run: supabase start
+
+      # Replays every file in supabase/migrations/ in filename order against a
+      # fresh database. This is the only thing that proves the chain still
+      # works — `db push` against a real project only ever applies migrations
+      # that project hasn't seen, so a file that already ran everywhere can be
+      # silently unreplayable for months (see docs/CONTRIBUTING.md's "Database
+      # changes" section for two real incidents this caught after the fact).
+      - name: Replay every migration from zero
+        run: supabase db reset

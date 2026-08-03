@@ -1,0 +1,49 @@
+name: Deploy Database Migrations
+
+# Manual only, deliberately — this is the highest-blast-radius workflow in
+# the repo (it writes to the real production database). Gated by the
+# `production` GitHub Environment: configure required reviewers for it in
+# Settings > Environments so this can't run without a second person clicking
+# approve. See docs/CICD.md#database-migrations.
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: db-deploy
+  cancel-in-progress: false
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      # Re-proves the replay this commit's PR already passed in
+      # db-migrations.yml, immediately before touching the real database.
+      # That earlier run and this one can be testing different things: a
+      # migration merged days ago plus today's hotfix on top is a combination
+      # CI never actually exercised together until right now.
+      - name: Replay every migration from zero (throwaway local Postgres)
+        run: |
+          supabase start
+          supabase db reset
+
+      # Project ref isn't secret — it's already in the client-visible API URL
+      # (https://iahnrlgeivjzmzzqloan.supabase.co) hardcoded in
+      # notify_send_push() in supabase/schema.sql.
+      - name: Link production project
+        run: supabase link --project-ref iahnrlgeivjzmzzqloan
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+      - name: Push migrations to production
+        run: supabase db push
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
