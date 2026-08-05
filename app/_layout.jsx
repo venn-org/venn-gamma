@@ -1,3 +1,4 @@
+import * as Sentry from '@sentry/react-native';
 import { useEffect, useState } from 'react';
 import { View, StyleSheet, Text, AppState, LogBox } from 'react-native';
 import { Stack, useRouter, useSegments } from 'expo-router';
@@ -29,6 +30,7 @@ import AppErrorBoundary from '../components/ErrorBoundary';
 import { touchPresence } from '../services/presenceService';
 import { INTERVALS } from '../config/flags';
 import { error as logError, describeError } from '../lib/log';
+import { initMonitoring, identifyUser } from '../lib/monitoring';
 
 LogBox.ignoreLogs([
   '"shadow*" style props are deprecated',
@@ -38,11 +40,19 @@ LogBox.ignoreLogs([
 // Prevent auto-hiding the splash screen until fonts & auth are ready
 SplashScreen.preventAutoHideAsync();
 
+// At module scope, not in an effect: a crash during the first render is
+// exactly the kind this needs to catch, and an effect runs too late for that.
+// No-ops when the DSN is unset or in development — see lib/monitoring.js.
+initMonitoring();
+
 // expo-router renders a route's exported ErrorBoundary in place of the screen
 // when it throws. Exporting it from the root layout covers the whole tree.
 export { default as ErrorBoundary } from '../components/ErrorBoundary';
 
-export default function RootLayout() {
+// Sentry.wrap adds the routing/performance instrumentation that turns
+// expo-router navigations into traced transactions. It is a pass-through when
+// Sentry.init() was never called, so a development build is unaffected.
+export default Sentry.wrap(function RootLayout() {
   return (
     <AppErrorBoundary>
       <ThemeProvider>
@@ -50,7 +60,7 @@ export default function RootLayout() {
       </ThemeProvider>
     </AppErrorBoundary>
   );
-}
+});
 
 function RootLayoutInner() {
   const { colors, isDark } = useTheme();
@@ -99,6 +109,9 @@ function RootLayoutInner() {
       }
       lastUserId = uid;
       setSession(session);
+      // Opaque id only — enough to tell one user crashing ten times from ten
+      // users crashing once, without putting anything identifying in Sentry.
+      identifyUser(uid);
 
       if (session) {
         // Every sign-in method funnels through here, so this is the one place

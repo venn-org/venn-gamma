@@ -2,7 +2,9 @@
 
 See `docs/CICD.md` for how a change actually reaches production — git
 workflow, EAS/OTA vs. native builds, database migration deploys, and
-rollback procedures. This file covers day-to-day local development.
+rollback procedures. See `docs/PERFORMANCE.md` for load-testing methodology
+and the indexing findings behind `20260804000000_feed_scale_indexes.sql`.
+This file covers day-to-day local development.
 
 ## Before you push
 

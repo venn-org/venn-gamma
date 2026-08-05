@@ -11,6 +11,9 @@
 // syntactically valid and point nowhere.
 process.env.EXPO_PUBLIC_SUPABASE_URL ??= 'https://test.supabase.co';
 process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ??= 'test-anon-key';
+// Read at module load by config/env.js, so it has to exist before any test
+// imports lib/monitoring.js. Points nowhere; the SDK itself is mocked.
+process.env.EXPO_PUBLIC_SENTRY_DSN ??= 'https://testkey@o0.ingest.sentry.io/0';
 
 // AsyncStorage ships an official in-memory mock for exactly this.
 jest.mock('@react-native-async-storage/async-storage', () =>
