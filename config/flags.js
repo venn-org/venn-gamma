@@ -9,6 +9,7 @@
  * Values are read once at module load — treat them as build-time constants.
  * When these move to remote config, only this file changes.
  */
+import { isDev } from './env';
 
 export const FLAGS = {
   /**
@@ -35,6 +36,19 @@ export const FLAGS = {
    * upload in lib/photos.js#uploadPhoto.
    */
   supabaseImageTransforms: false,
+
+  /**
+   * Send crashes, errors, and performance data to Sentry.
+   *
+   * Off in development on purpose: dev-time crashes are already visible in
+   * Metro/the browser console, and reporting them only burns the monthly
+   * event quota with noise from half-finished code. Mirrors the `isDev` guard
+   * lib/log.js already applies to debug(). Set EXPO_PUBLIC_SENTRY_DSN and flip
+   * this to `true` locally if you need to verify the wiring itself.
+   *
+   * `preview` and `production` builds report; see lib/monitoring.js.
+   */
+  monitoringEnabled: !isDev,
 };
 
 export const LIMITS = {

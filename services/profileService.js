@@ -2,6 +2,7 @@ import { supabase } from '../lib/supabase';
 import { MY_PROFILE_COLUMNS, PROFILE_CARD_COLUMNS, PROFILE_SUMMARY_COLUMNS } from './columns';
 import { assertFilterSafeId } from './queryFilters';
 import { warn, describeError } from '../lib/log';
+import { traceJourney } from '../lib/monitoring';
 
 /**
  * All reads and writes against the `profiles` view.
@@ -143,7 +144,16 @@ let feedRpcAvailable = null; // null = unknown, false = confirmed missing
  * Returns `{ data, error, ranked }`. `ranked: false` means the fallback ran and
  * the caller still owns filtering and ordering.
  */
-export async function fetchFeedPage({
+export async function fetchFeedPage(options = {}) {
+  // Named span, on top of the automatic fetch instrumentation: this is the
+  // query docs/PERFORMANCE.md identifies as the app's architectural hot spot
+  // (whole-pool reciprocal scoring, ~135ms of inherent eligibility cost at
+  // 50k profiles), so it is worth being able to watch its real p95 rather
+  // than inferring it from an anonymous RPC POST among hundreds.
+  return traceJourney('feed.load', () => fetchFeedPageInner(options));
+}
+
+async function fetchFeedPageInner({
   limit = 40,
   offset = 0,
   maxDistanceKm = null,

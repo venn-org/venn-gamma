@@ -62,7 +62,7 @@
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
-    "build": "expo export -p web",
+    "build": "expo export -p web --source-maps && node ./scripts/upload-sourcemaps.js",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "lint:ci": "eslint . --max-warnings 400",

@@ -15,6 +15,9 @@ const RAW = {
   supabaseUrl: process.env.EXPO_PUBLIC_SUPABASE_URL,
   supabaseAnonKey: process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY,
   vapidPublicKey: process.env.EXPO_PUBLIC_VAPID_PUBLIC_KEY,
+  // Deliberately not in REQUIRED: monitoring must never be the reason the app
+  // fails to boot. Absent DSN just means lib/monitoring.js stays inert.
+  sentryDsn: process.env.EXPO_PUBLIC_SENTRY_DSN,
 };
 
 const REQUIRED = ['supabaseUrl', 'supabaseAnonKey'];
@@ -23,6 +26,7 @@ const ENV_VAR_NAMES = {
   supabaseUrl: 'EXPO_PUBLIC_SUPABASE_URL',
   supabaseAnonKey: 'EXPO_PUBLIC_SUPABASE_ANON_KEY',
   vapidPublicKey: 'EXPO_PUBLIC_VAPID_PUBLIC_KEY',
+  sentryDsn: 'EXPO_PUBLIC_SENTRY_DSN',
 };
 
 function validate(raw) {
