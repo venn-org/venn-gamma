@@ -1,7 +1,16 @@
 import { useEffect, useState } from 'react';
-import { View, Text, TouchableOpacity, Modal, StyleSheet, Image, useWindowDimensions, Pressable } from 'react-native';
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  Modal,
+  StyleSheet,
+  useWindowDimensions,
+  Pressable,
+} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import RemoteImage from './RemoteImage';
 
 /**
  * Full-screen viewer for a set of `{url, label}` photos, opened from a gallery
@@ -28,16 +37,33 @@ export default function PhotoLightbox({ visible, photos = [], startIndex = 0, on
   const multiple = photos.length > 1;
 
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose} statusBarTranslucent>
+    <Modal
+      visible={visible}
+      transparent
+      animationType="fade"
+      onRequestClose={onClose}
+      statusBarTranslucent
+    >
       <View style={styles.backdrop}>
         {/* Tapping the background closes; the image sits above it. */}
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
 
-        <Image source={{ uri: photo.url }} style={{ width: screenW, height: screenH * 0.72 }} resizeMode="contain" />
+        {/* RemoteImage, not RN's Image: this is the largest photo the app ever
+            renders, and RN caches in memory only — reopening the lightbox would
+            re-download it every time. `priority="high"` because it is the only
+            thing on screen and the user is waiting for it. */}
+        <RemoteImage
+          uri={photo.url}
+          width={screenW}
+          style={{ width: screenW, height: screenH * 0.72 }}
+          contentFit="contain"
+          priority="high"
+        />
 
         <View style={[styles.topBar, { top: insets.top + 10 }]}>
           <Text style={styles.counter}>
-            {photo.label ? `${photo.label} · ` : ''}{index + 1}/{photos.length}
+            {photo.label ? `${photo.label} · ` : ''}
+            {index + 1}/{photos.length}
           </Text>
           <TouchableOpacity style={styles.iconBtn} onPress={onClose} activeOpacity={0.8}>
             <Ionicons name="close" size={22} color="#fff" />
@@ -68,23 +94,41 @@ export default function PhotoLightbox({ visible, photos = [], startIndex = 0, on
 }
 
 const styles = StyleSheet.create({
-  backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.94)', alignItems: 'center', justifyContent: 'center' },
-
+  backdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.94)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
 
   topBar: {
-    position: 'absolute', left: 16, right: 16,
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    position: 'absolute',
+    left: 16,
+    right: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
   },
   counter: { fontFamily: 'HankenGrotesk_600SemiBold', fontSize: 14, color: '#fff' },
   iconBtn: {
-    width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.16)',
-    alignItems: 'center', justifyContent: 'center',
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(255,255,255,0.16)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 
   navBtn: {
-    position: 'absolute', top: '50%', marginTop: -22,
-    width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(255,255,255,0.16)',
-    alignItems: 'center', justifyContent: 'center',
+    position: 'absolute',
+    top: '50%',
+    marginTop: -22,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(255,255,255,0.16)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   navLeft: { left: 14 },
   navRight: { right: 14 },

@@ -1,7 +1,18 @@
-import { View, Text, StyleSheet, Modal, TouchableOpacity, Pressable, Image, Animated, Dimensions, Easing } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  Modal,
+  TouchableOpacity,
+  Pressable,
+  Animated,
+  Dimensions,
+  Easing,
+} from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useRef } from 'react';
+import RemoteImage from './RemoteImage';
 
 const { height: SCREEN_H } = Dimensions.get('window');
 
@@ -11,14 +22,23 @@ const random = (seed) => {
   return x - Math.floor(x);
 };
 
-export default function MatchCelebration({ visible, mode = 'match', matchedName, matchedPhoto, onDismiss, onChat }) {
+export default function MatchCelebration({
+  visible,
+  mode = 'match',
+  matchedName,
+  matchedPhoto,
+  onDismiss,
+  onChat,
+}) {
   const isMatch = mode === 'match';
   // 30 pieces of confetti — deterministic, so this only has to be built once.
   const pieces = useRef(
     Array.from({ length: 30 }).map((_, i) => ({
       x: random(i) * 100, // 0 to 100%
       size: 6 + random(i + 100) * 8, // 6 to 14
-      color: ['#335CFF', '#8A5BFF', '#FF4D6A', '#22C55E', '#FFD600'][Math.floor(random(i + 200) * 5)],
+      color: ['#335CFF', '#8A5BFF', '#FF4D6A', '#22C55E', '#FFD600'][
+        Math.floor(random(i + 200) * 5)
+      ],
       isCircle: random(i + 300) > 0.5,
       delay: random(i + 400) * 220,
     })),
@@ -71,8 +91,18 @@ export default function MatchCelebration({ visible, mode = 'match', matchedName,
               height: p.size,
               backgroundColor: p.color,
               borderRadius: p.isCircle ? p.size / 2 : 2,
-              transform: [{ translateY: anims[i].interpolate({ inputRange: [0, 1], outputRange: [-20, SCREEN_H + 20] }) }],
-              opacity: anims[i].interpolate({ inputRange: [0, 0.7, 1], outputRange: [0.9, 0.9, 0] }),
+              transform: [
+                {
+                  translateY: anims[i].interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [-20, SCREEN_H + 20],
+                  }),
+                },
+              ],
+              opacity: anims[i].interpolate({
+                inputRange: [0, 0.7, 1],
+                outputRange: [0.9, 0.9, 0],
+              }),
             }}
           />
         ))}
@@ -92,57 +122,61 @@ export default function MatchCelebration({ visible, mode = 'match', matchedName,
             ],
           }}
         >
-        <Pressable onPress={e => e.stopPropagation()} style={ms.card}>
-          <Text style={ms.eyebrow}>{isMatch ? 'YOUR VENN OVERLAPS ✦' : 'LIKE SENT ✦'}</Text>
-          {isMatch ? (
-            <Text style={ms.heading}>
-              {'You & '}<Text style={{ color: '#fff' }}>{matchedName}</Text>{'\nare a circle apart'}
+          <Pressable onPress={(e) => e.stopPropagation()} style={ms.card}>
+            <Text style={ms.eyebrow}>{isMatch ? 'YOUR VENN OVERLAPS ✦' : 'LIKE SENT ✦'}</Text>
+            {isMatch ? (
+              <Text style={ms.heading}>
+                {'You & '}
+                <Text style={{ color: '#fff' }}>{matchedName}</Text>
+                {'\nare a circle apart'}
+              </Text>
+            ) : (
+              <Text style={ms.heading}>
+                {'You liked '}
+                <Text style={{ color: '#fff' }}>{matchedName}</Text>
+              </Text>
+            )}
+            <Text style={ms.sub}>
+              {isMatch
+                ? 'Lifestyle, budget and area preferences overlap — say hi and see where it goes'
+                : "They'll be notified — if they like you back, it's a match!"}
             </Text>
-          ) : (
-            <Text style={ms.heading}>
-              {'You liked '}<Text style={{ color: '#fff' }}>{matchedName}</Text>
-            </Text>
-          )}
-          <Text style={ms.sub}>
-            {isMatch
-              ? 'Lifestyle, budget and area preferences overlap — say hi and see where it goes'
-              : "They'll be notified — if they like you back, it's a match!"}
-          </Text>
 
-          {/* Avatar pair */}
-          <View style={ms.avatarRow}>
-            <View style={ms.avatarWrapLeft}>
-              <LinearGradient colors={['#335CFF', '#8A5BFF']} style={ms.avatarInner}>
-                <Text style={ms.avatarInitial}>Me</Text>
-              </LinearGradient>
-            </View>
-            <View style={ms.heartCircle}>
-              <Ionicons name="heart" size={18} color="#fff" />
-            </View>
-            <View style={ms.avatarWrapRight}>
-              {matchedPhoto ? (
-                <Image source={{ uri: matchedPhoto }} style={ms.avatarImg} resizeMode="cover" />
-              ) : (
-                <LinearGradient colors={['#8A5BFF', '#335CFF']} style={ms.avatarInner}>
-                  <Text style={ms.avatarInitial}>{matchedName?.[0] ?? '?'}</Text>
+            {/* Avatar pair */}
+            <View style={ms.avatarRow}>
+              <View style={ms.avatarWrapLeft}>
+                <LinearGradient colors={['#335CFF', '#8A5BFF']} style={ms.avatarInner}>
+                  <Text style={ms.avatarInitial}>Me</Text>
                 </LinearGradient>
-              )}
+              </View>
+              <View style={ms.heartCircle}>
+                <Ionicons name="heart" size={18} color="#fff" />
+              </View>
+              <View style={ms.avatarWrapRight}>
+                {matchedPhoto ? (
+                  <RemoteImage uri={matchedPhoto} width={88} style={ms.avatarImg} priority="high" />
+                ) : (
+                  <LinearGradient colors={['#8A5BFF', '#335CFF']} style={ms.avatarInner}>
+                    <Text style={ms.avatarInitial}>{matchedName?.[0] ?? '?'}</Text>
+                  </LinearGradient>
+                )}
+              </View>
             </View>
-          </View>
 
-          {/* Send a message — only once it's an actual match */}
-          {isMatch && (
-            <TouchableOpacity onPress={onChat} activeOpacity={0.85} style={{ width: '100%' }}>
-              <LinearGradient
-                colors={['#335CFF', '#8A5BFF']}
-                start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-                style={ms.btnPrimary}
-              >
-                <Text style={ms.btnPrimaryText}>Send a message</Text>
-              </LinearGradient>
-            </TouchableOpacity>
-          )}
-        </Pressable>
+            {/* Send a message — only once it's an actual match */}
+            {isMatch && (
+              <TouchableOpacity onPress={onChat} activeOpacity={0.85} style={{ width: '100%' }}>
+                <LinearGradient
+                  colors={['#335CFF', '#8A5BFF']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                  style={ms.btnPrimary}
+                >
+                  <Text style={ms.btnPrimaryText}>Send a message</Text>
+                </LinearGradient>
+              </TouchableOpacity>
+            )}
+          </Pressable>
         </Animated.View>
       </Pressable>
     </Modal>
@@ -150,19 +184,86 @@ export default function MatchCelebration({ visible, mode = 'match', matchedName,
 }
 
 const ms = StyleSheet.create({
-  bg: { flex: 1, backgroundColor: 'rgba(10,10,20,0.92)', alignItems: 'center', justifyContent: 'center', padding: 24 },
-  closeBtn: { position: 'absolute', top: 56, right: 24, zIndex: 3, width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.12)', alignItems: 'center', justifyContent: 'center' },
+  bg: {
+    flex: 1,
+    backgroundColor: 'rgba(10,10,20,0.92)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 24,
+  },
+  closeBtn: {
+    position: 'absolute',
+    top: 56,
+    right: 24,
+    zIndex: 3,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(255,255,255,0.12)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   card: { width: '100%', alignItems: 'center', zIndex: 2 },
-  eyebrow: { fontFamily: 'SpaceMono_400Regular', fontSize: 11, color: '#8A5BFF', letterSpacing: 2, marginBottom: 12, textTransform: 'uppercase' },
-  heading: { fontFamily: 'SpaceGrotesk_700Bold', fontSize: 28, color: 'rgba(255,255,255,0.7)', textAlign: 'center', letterSpacing: -0.8, lineHeight: 34, marginBottom: 10 },
-  sub: { fontFamily: 'HankenGrotesk_400Regular', fontSize: 14, color: 'rgba(255,255,255,0.5)', textAlign: 'center', lineHeight: 20, marginBottom: 32 },
-  avatarRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginBottom: 36 },
-  avatarWrapLeft: { width: 88, height: 88, borderRadius: 44, borderWidth: 3, borderColor: '#335CFF', overflow: 'hidden' },
-  avatarWrapRight: { width: 88, height: 88, borderRadius: 44, borderWidth: 3, borderColor: '#8A5BFF', overflow: 'hidden' },
+  eyebrow: {
+    fontFamily: 'SpaceMono_400Regular',
+    fontSize: 11,
+    color: '#8A5BFF',
+    letterSpacing: 2,
+    marginBottom: 12,
+    textTransform: 'uppercase',
+  },
+  heading: {
+    fontFamily: 'SpaceGrotesk_700Bold',
+    fontSize: 28,
+    color: 'rgba(255,255,255,0.7)',
+    textAlign: 'center',
+    letterSpacing: -0.8,
+    lineHeight: 34,
+    marginBottom: 10,
+  },
+  sub: {
+    fontFamily: 'HankenGrotesk_400Regular',
+    fontSize: 14,
+    color: 'rgba(255,255,255,0.5)',
+    textAlign: 'center',
+    lineHeight: 20,
+    marginBottom: 32,
+  },
+  avatarRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 36,
+  },
+  avatarWrapLeft: {
+    width: 88,
+    height: 88,
+    borderRadius: 44,
+    borderWidth: 3,
+    borderColor: '#335CFF',
+    overflow: 'hidden',
+  },
+  avatarWrapRight: {
+    width: 88,
+    height: 88,
+    borderRadius: 44,
+    borderWidth: 3,
+    borderColor: '#8A5BFF',
+    overflow: 'hidden',
+  },
   avatarInner: { width: '100%', height: '100%', alignItems: 'center', justifyContent: 'center' },
   avatarImg: { width: '100%', height: '100%' },
   avatarInitial: { fontFamily: 'SpaceGrotesk_700Bold', fontSize: 24, color: '#fff' },
-  heartCircle: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#335CFF', alignItems: 'center', justifyContent: 'center', zIndex: 1, marginHorizontal: -8 },
+  heartCircle: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#335CFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 1,
+    marginHorizontal: -8,
+  },
   btnPrimary: { borderRadius: 50, paddingVertical: 16, alignItems: 'center', width: '100%' },
   btnPrimaryText: { fontFamily: 'SpaceGrotesk_700Bold', fontSize: 16, color: '#fff' },
 });

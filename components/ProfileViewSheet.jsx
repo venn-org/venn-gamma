@@ -1,17 +1,40 @@
 import { Fragment, useRef, useEffect, useMemo, useState } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, Modal, Pressable, StyleSheet, Image, Dimensions, Animated } from 'react-native';
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  ScrollView,
+  Modal,
+  Pressable,
+  StyleSheet,
+  Dimensions,
+  Animated,
+} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme, useThemedStyles } from '../lib/ThemeContext';
-import { buildFlatFacts, buildFlatGallery, buildProfileCardBlocks, buildProfileTraits } from '../lib/profileUtils';
+import {
+  buildFlatFacts,
+  buildFlatGallery,
+  buildProfileCardBlocks,
+  buildProfileTraits,
+} from '../lib/profileUtils';
 import OptionIcon from './OptionIcon';
 import PhotoLightbox from './PhotoLightbox';
+import RemoteImage from './RemoteImage';
 
-const { height: SCREEN_H } = Dimensions.get('window');
+const { height: SCREEN_H, width: SCREEN_W } = Dimensions.get('window');
 
 // `showActions` is off for read-only uses — previewing your own profile, or
 // viewing a match you're already chatting with — where pass/like make no sense.
-export default function ProfileViewSheet({ visible, profile, onClose, onPass, onLike, showActions = true }) {
+export default function ProfileViewSheet({
+  visible,
+  profile,
+  onClose,
+  onPass,
+  onLike,
+  showActions = true,
+}) {
   const s = useThemedStyles(makeStyles);
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
@@ -47,265 +70,492 @@ export default function ProfileViewSheet({ visible, profile, onClose, onPass, on
 
   return (
     <Fragment>
-    <Modal visible={visible} transparent animationType="none" onRequestClose={onClose}>
-      <View style={{ flex: 1, justifyContent: 'flex-end' }}>
-        <Animated.View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.6)', opacity: backdropOpacity }]} />
-        <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
+      <Modal visible={visible} transparent animationType="none" onRequestClose={onClose}>
+        <View style={{ flex: 1, justifyContent: 'flex-end' }}>
+          <Animated.View
+            style={[
+              StyleSheet.absoluteFill,
+              { backgroundColor: 'rgba(0,0,0,0.6)', opacity: backdropOpacity },
+            ]}
+          />
+          <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
 
-        <Animated.View style={[s.sheet, { paddingTop: 20, paddingBottom: insets.bottom + 12, transform: [{ translateY: sheetY }] }]}>
-          <View style={s.handle} />
-          
-          <ScrollView showsVerticalScrollIndicator={false} style={{ flexShrink: 1 }} contentContainerStyle={{ paddingBottom: 20 }}>
-            {/* Header matches feed card */}
-            <View style={s.cardHeader}>
-              <View>
-                <View style={s.nameRow}>
-                  <Text style={s.name}>{profile.name}</Text>
-                  <View style={s.verifiedBadge}>
-                    <Ionicons name="checkmark" size={12} color="#fff" />
-                  </View>
-                  <View style={[s.overlapPill, { backgroundColor: profile.user_type === 'owner' ? colors.blue : colors.violet, marginLeft: 6 }]}>
-                    <Text style={s.overlapText}>{profile.user_type === 'owner' ? 'Has a flat' : 'Looking for flat'}</Text>
-                  </View>
-                </View>
-                <View style={s.statusRow}>
-                  <Text style={s.pronouns}>{profile.pronouns?.[0] || '-'}</Text>
-                  <Text style={s.dot}> • </Text>
-                  <Text style={s.active}>Active now</Text>
-                </View>
-              </View>
-            </View>
+          <Animated.View
+            style={[
+              s.sheet,
+              {
+                paddingTop: 20,
+                paddingBottom: insets.bottom + 12,
+                transform: [{ translateY: sheetY }],
+              },
+            ]}
+          >
+            <View style={s.handle} />
 
-            {/* Main Photo */}
-            <View style={s.photoWrap}>
-              {profile.photos?.[0] ? (
-                <Image source={{ uri: profile.photos[0] }} style={s.photo} resizeMode="cover" />
-              ) : (
-                <View style={[s.photo, s.photoPlaceholder]}>
-                  <Text style={{color: '#9AA0B2'}}>No Photo</Text>
-                </View>
-              )}
-            </View>
-
-            {/* Info Card */}
-            <View style={s.infoCard}>
-              <View style={s.infoRow}>
-                <View style={s.infoItem}>
-                  <Ionicons name="calendar-outline" size={16} color="#9AA0B2" />
-                  <Text style={s.infoItemText}>{profile.age || '-'}</Text>
-                </View>
-                <View style={s.infoDivider} />
-                <View style={[s.infoItem, { paddingLeft: 12 }]}>
-                  <Ionicons name="person-outline" size={16} color="#9AA0B2" />
-                  <Text style={s.infoItemText}>{profile.gender || '-'}</Text>
-                </View>
-              </View>
-              <View style={s.infoHorizDivider} />
-              <View style={s.infoRow}>
-                <View style={s.infoItem}>
-                  <Ionicons name="location-outline" size={16} color="#9AA0B2" />
-                  <Text style={s.infoItemText}>{profile.location || '-'}</Text>
-                </View>
-                <View style={s.infoDivider} />
-                <View style={[s.infoItem, { paddingLeft: 12 }]}>
-                  <Ionicons name="cash-outline" size={16} color="#9AA0B2" />
-                  <Text style={s.infoItemText}>{(profile.budget_max || profile.budget) ? `₹${profile.budget_max || profile.budget}/mo` : '-'}</Text>
-                </View>
-              </View>
-            </View>
-
-            {/* Lifestyle traits — only the ones this profile has set */}
-            {traits.length > 0 && (
-              <View style={s.traitCard}>
-                <Text style={s.traitTitle}>Lifestyle</Text>
-                <View style={s.traitChips}>
-                  {traits.map((t) => (
-                    <View key={t.group} style={s.traitChip}>
-                      <OptionIcon name={t.icon} size={14} color="#9AA0B2" />
-                      <Text style={s.traitChipText}>{t.label}</Text>
+            <ScrollView
+              showsVerticalScrollIndicator={false}
+              style={{ flexShrink: 1 }}
+              contentContainerStyle={{ paddingBottom: 20 }}
+            >
+              {/* Header matches feed card */}
+              <View style={s.cardHeader}>
+                <View>
+                  <View style={s.nameRow}>
+                    <Text style={s.name}>{profile.name}</Text>
+                    <View style={s.verifiedBadge}>
+                      <Ionicons name="checkmark" size={12} color="#fff" />
                     </View>
-                  ))}
+                    <View
+                      style={[
+                        s.overlapPill,
+                        {
+                          backgroundColor:
+                            profile.user_type === 'owner' ? colors.blue : colors.violet,
+                          marginLeft: 6,
+                        },
+                      ]}
+                    >
+                      <Text style={s.overlapText}>
+                        {profile.user_type === 'owner' ? 'Has a flat' : 'Looking for flat'}
+                      </Text>
+                    </View>
+                  </View>
+                  <View style={s.statusRow}>
+                    <Text style={s.pronouns}>{profile.pronouns?.[0] || '-'}</Text>
+                    <Text style={s.dot}> • </Text>
+                    <Text style={s.active}>Active now</Text>
+                  </View>
                 </View>
               </View>
-            )}
 
-            {/* Prompts and remaining photos, interleaved — shares the feed
-                card's builder so the preview can't drift from the real card */}
-            {cardBlocks.map((block, i) =>
-              block.kind === 'prompt' ? (
-                <View
-                  key={`prompt-${i}`}
-                  style={block.accent ? [s.promptAccent, { backgroundColor: colors.tintViolet }] : s.promptWhite}
-                >
-                  <Text style={block.accent ? s.promptAccentQ : s.promptQ}>{block.q}</Text>
-                  <Text style={s.promptA}>{block.a}</Text>
-                </View>
-              ) : (
-                <View key={`photo-${i}`} style={s.blockPhotoWrap}>
-                  <Image source={{ uri: block.url }} style={s.blockPhoto} resizeMode="cover" />
-                  {block.label && (
-                    <View style={s.flatLabel}>
-                      <Text style={s.flatLabelText}>{block.label}</Text>
-                    </View>
-                  )}
-                </View>
-              ),
-            )}
-
-            {/* Owners' flat: facts, then the room photos as one gallery —
-                mirrors the feed card's placement after the prompts. */}
-            {(flatFacts.length > 0 || flatGallery.length > 0) && (
-              <View style={s.flatSection}>
-                <Text style={s.flatSectionTitle}>The flat</Text>
-                {flatFacts.map((f) => (
-                  <View key={f.key} style={s.flatFactRow}>
-                    <Ionicons name={f.icon} size={15} color="#9AA0B2" />
-                    <Text style={s.flatFactText}>{f.text}</Text>
-                  </View>
-                ))}
-                {profile.flat_description ? (
-                  <Text style={s.flatDescription}>{profile.flat_description}</Text>
-                ) : null}
-
-                {flatGallery.length > 0 && (
-                  <View style={s.galleryGrid}>
-                    {flatGallery.map((photo, i) => (
-                      <TouchableOpacity
-                        key={`flat-${i}`}
-                        style={s.galleryTile}
-                        activeOpacity={0.85}
-                        onPress={() => setLightboxIndex(i)}
-                      >
-                        <Image source={{ uri: photo.url }} style={s.galleryPhoto} resizeMode="cover" />
-                        {photo.label && (
-                          <View style={[s.flatLabel, s.galleryLabel]}>
-                            <Text style={s.flatLabelText}>{photo.label}</Text>
-                          </View>
-                        )}
-                      </TouchableOpacity>
-                    ))}
+              {/* Main Photo */}
+              <View style={s.photoWrap}>
+                {profile.photos?.[0] ? (
+                  <RemoteImage
+                    uri={profile.photos[0]}
+                    width={SCREEN_W}
+                    style={s.photo}
+                    priority="high"
+                  />
+                ) : (
+                  <View style={[s.photo, s.photoPlaceholder]}>
+                    <Text style={{ color: '#9AA0B2' }}>No Photo</Text>
                   </View>
                 )}
               </View>
+
+              {/* Info Card */}
+              <View style={s.infoCard}>
+                <View style={s.infoRow}>
+                  <View style={s.infoItem}>
+                    <Ionicons name="calendar-outline" size={16} color="#9AA0B2" />
+                    <Text style={s.infoItemText}>{profile.age || '-'}</Text>
+                  </View>
+                  <View style={s.infoDivider} />
+                  <View style={[s.infoItem, { paddingLeft: 12 }]}>
+                    <Ionicons name="person-outline" size={16} color="#9AA0B2" />
+                    <Text style={s.infoItemText}>{profile.gender || '-'}</Text>
+                  </View>
+                </View>
+                <View style={s.infoHorizDivider} />
+                <View style={s.infoRow}>
+                  <View style={s.infoItem}>
+                    <Ionicons name="location-outline" size={16} color="#9AA0B2" />
+                    <Text style={s.infoItemText}>{profile.location || '-'}</Text>
+                  </View>
+                  <View style={s.infoDivider} />
+                  <View style={[s.infoItem, { paddingLeft: 12 }]}>
+                    <Ionicons name="cash-outline" size={16} color="#9AA0B2" />
+                    <Text style={s.infoItemText}>
+                      {profile.budget_max || profile.budget
+                        ? `₹${profile.budget_max || profile.budget}/mo`
+                        : '-'}
+                    </Text>
+                  </View>
+                </View>
+              </View>
+
+              {/* Lifestyle traits — only the ones this profile has set */}
+              {traits.length > 0 && (
+                <View style={s.traitCard}>
+                  <Text style={s.traitTitle}>Lifestyle</Text>
+                  <View style={s.traitChips}>
+                    {traits.map((t) => (
+                      <View key={t.group} style={s.traitChip}>
+                        <OptionIcon name={t.icon} size={14} color="#9AA0B2" />
+                        <Text style={s.traitChipText}>{t.label}</Text>
+                      </View>
+                    ))}
+                  </View>
+                </View>
+              )}
+
+              {/* Prompts and remaining photos, interleaved — shares the feed
+                card's builder so the preview can't drift from the real card */}
+              {cardBlocks.map((block, i) =>
+                block.kind === 'prompt' ? (
+                  <View
+                    key={`prompt-${i}`}
+                    style={
+                      block.accent
+                        ? [s.promptAccent, { backgroundColor: colors.tintViolet }]
+                        : s.promptWhite
+                    }
+                  >
+                    <Text style={block.accent ? s.promptAccentQ : s.promptQ}>{block.q}</Text>
+                    <Text style={s.promptA}>{block.a}</Text>
+                  </View>
+                ) : (
+                  <View key={`photo-${i}`} style={s.blockPhotoWrap}>
+                    <RemoteImage uri={block.url} width={SCREEN_W} style={s.blockPhoto} />
+                    {block.label && (
+                      <View style={s.flatLabel}>
+                        <Text style={s.flatLabelText}>{block.label}</Text>
+                      </View>
+                    )}
+                  </View>
+                ),
+              )}
+
+              {/* Owners' flat: facts, then the room photos as one gallery —
+                mirrors the feed card's placement after the prompts. */}
+              {(flatFacts.length > 0 || flatGallery.length > 0) && (
+                <View style={s.flatSection}>
+                  <Text style={s.flatSectionTitle}>The flat</Text>
+                  {flatFacts.map((f) => (
+                    <View key={f.key} style={s.flatFactRow}>
+                      <Ionicons name={f.icon} size={15} color="#9AA0B2" />
+                      <Text style={s.flatFactText}>{f.text}</Text>
+                    </View>
+                  ))}
+                  {profile.flat_description ? (
+                    <Text style={s.flatDescription}>{profile.flat_description}</Text>
+                  ) : null}
+
+                  {flatGallery.length > 0 && (
+                    <View style={s.galleryGrid}>
+                      {flatGallery.map((photo, i) => (
+                        <TouchableOpacity
+                          key={`flat-${i}`}
+                          style={s.galleryTile}
+                          activeOpacity={0.85}
+                          onPress={() => setLightboxIndex(i)}
+                        >
+                          {/* Two-up tiles, so half the screen width is the right
+                            size hint — asking for a full-width variant here
+                            would download roughly 4x the pixels needed. */}
+                          <RemoteImage
+                            uri={photo.url}
+                            width={SCREEN_W / 2}
+                            style={s.galleryPhoto}
+                          />
+                          {photo.label && (
+                            <View style={[s.flatLabel, s.galleryLabel]}>
+                              <Text style={s.flatLabelText}>{photo.label}</Text>
+                            </View>
+                          )}
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  )}
+                </View>
+              )}
+            </ScrollView>
+
+            {/* Action Footer */}
+            {showActions ? (
+              <View style={s.actions}>
+                <TouchableOpacity
+                  style={s.navBtn}
+                  onPress={() => {
+                    onClose();
+                    onPass?.();
+                  }}
+                >
+                  <Ionicons name="close" size={24} color={colors.ink} />
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={s.navBtnHeart}
+                  onPress={() => {
+                    onClose();
+                    onLike?.();
+                  }}
+                >
+                  <Ionicons name="heart" size={24} color="#fff" />
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <View style={s.actions}>
+                <TouchableOpacity style={s.closeBtn} onPress={onClose} activeOpacity={0.85}>
+                  <Text style={s.closeBtnText}>Close</Text>
+                </TouchableOpacity>
+              </View>
             )}
+          </Animated.View>
+        </View>
+      </Modal>
 
-          </ScrollView>
-
-          {/* Action Footer */}
-          {showActions ? (
-            <View style={s.actions}>
-              <TouchableOpacity style={s.navBtn} onPress={() => { onClose(); onPass?.(); }}>
-                <Ionicons name="close" size={24} color={colors.ink} />
-              </TouchableOpacity>
-              <TouchableOpacity style={s.navBtnHeart} onPress={() => { onClose(); onLike?.(); }}>
-                <Ionicons name="heart" size={24} color="#fff" />
-              </TouchableOpacity>
-            </View>
-          ) : (
-            <View style={s.actions}>
-              <TouchableOpacity style={s.closeBtn} onPress={onClose} activeOpacity={0.85}>
-                <Text style={s.closeBtnText}>Close</Text>
-              </TouchableOpacity>
-            </View>
-          )}
-
-        </Animated.View>
-      </View>
-    </Modal>
-
-    {/* Sibling of the sheet rather than nested inside it, so it layers on top
+      {/* Sibling of the sheet rather than nested inside it, so it layers on top
         the same way PreferencesSheet stacks its confirm dialog. */}
-    <PhotoLightbox
-      visible={lightboxIndex !== null}
-      photos={flatGallery}
-      startIndex={lightboxIndex ?? 0}
-      onClose={() => setLightboxIndex(null)}
-    />
+      <PhotoLightbox
+        visible={lightboxIndex !== null}
+        photos={flatGallery}
+        startIndex={lightboxIndex ?? 0}
+        onClose={() => setLightboxIndex(null)}
+      />
     </Fragment>
   );
 }
 
-const makeStyles = (colors) => StyleSheet.create({
-  sheet: { backgroundColor: colors.canvas, borderTopLeftRadius: 24, borderTopRightRadius: 24, maxHeight: SCREEN_H * 0.9 },
-  handle: { width: 40, height: 4, backgroundColor: '#D1D5DB', borderRadius: 2, alignSelf: 'center', marginBottom: 20 },
-  
-  cardHeader: {
-    flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between',
-    paddingHorizontal: 20, paddingBottom: 12,
-  },
-  nameRow: { flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' },
-  name: { fontFamily: 'SpaceGrotesk_700Bold', fontSize: 26, color: colors.ink, letterSpacing: -0.4 },
-  verifiedBadge: { width: 18, height: 18, borderRadius: 9, backgroundColor: colors.violet, alignItems: 'center', justifyContent: 'center' },
-  overlapPill: { borderRadius: 50, paddingHorizontal: 8, paddingVertical: 3 },
-  overlapText: { fontFamily: 'SpaceGrotesk_700Bold', fontSize: 12, color: '#fff', letterSpacing: -0.2 },
-  statusRow: { flexDirection: 'row', alignItems: 'center', marginTop: 3 },
-  pronouns: { fontFamily: 'HankenGrotesk_400Regular', fontSize: 13, color: colors.placeholder },
-  dot: { fontSize: 13, color: colors.placeholder },
-  active: { fontFamily: 'HankenGrotesk_600SemiBold', fontSize: 13, color: colors.blue },
+const makeStyles = (colors) =>
+  StyleSheet.create({
+    sheet: {
+      backgroundColor: colors.canvas,
+      borderTopLeftRadius: 24,
+      borderTopRightRadius: 24,
+      maxHeight: SCREEN_H * 0.9,
+    },
+    handle: {
+      width: 40,
+      height: 4,
+      backgroundColor: '#D1D5DB',
+      borderRadius: 2,
+      alignSelf: 'center',
+      marginBottom: 20,
+    },
 
-  photoWrap: { position: 'relative', borderRadius: 20, overflow: 'hidden', marginBottom: 10, height: 400, marginHorizontal: 16 },
-  photo: { width: '100%', height: '100%' },
-  photoPlaceholder: { backgroundColor: colors.border, alignItems: 'center', justifyContent: 'center' },
+    cardHeader: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      justifyContent: 'space-between',
+      paddingHorizontal: 20,
+      paddingBottom: 12,
+    },
+    nameRow: { flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' },
+    name: {
+      fontFamily: 'SpaceGrotesk_700Bold',
+      fontSize: 26,
+      color: colors.ink,
+      letterSpacing: -0.4,
+    },
+    verifiedBadge: {
+      width: 18,
+      height: 18,
+      borderRadius: 9,
+      backgroundColor: colors.violet,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    overlapPill: { borderRadius: 50, paddingHorizontal: 8, paddingVertical: 3 },
+    overlapText: {
+      fontFamily: 'SpaceGrotesk_700Bold',
+      fontSize: 12,
+      color: '#fff',
+      letterSpacing: -0.2,
+    },
+    statusRow: { flexDirection: 'row', alignItems: 'center', marginTop: 3 },
+    pronouns: { fontFamily: 'HankenGrotesk_400Regular', fontSize: 13, color: colors.placeholder },
+    dot: { fontSize: 13, color: colors.placeholder },
+    active: { fontFamily: 'HankenGrotesk_600SemiBold', fontSize: 13, color: colors.blue },
 
-  infoCard: { backgroundColor: colors.card, borderRadius: 20, padding: 18, marginBottom: 10, marginHorizontal: 16 },
-  infoRow: { flexDirection: 'row', alignItems: 'center' },
-  infoItem: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8 },
-  infoItemText: { fontFamily: 'HankenGrotesk_600SemiBold', fontSize: 14, color: colors.ink },
-  infoDivider: { width: 1, height: 20, backgroundColor: colors.divider },
-  infoHorizDivider: { height: 1, backgroundColor: colors.divider, marginVertical: 8 },
+    photoWrap: {
+      position: 'relative',
+      borderRadius: 20,
+      overflow: 'hidden',
+      marginBottom: 10,
+      height: 400,
+      marginHorizontal: 16,
+    },
+    photo: { width: '100%', height: '100%' },
+    photoPlaceholder: {
+      backgroundColor: colors.border,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
 
-  traitCard: { backgroundColor: colors.card, borderRadius: 20, padding: 18, marginBottom: 10, marginHorizontal: 16 },
-  traitTitle: { fontFamily: 'HankenGrotesk_600SemiBold', fontSize: 13, color: colors.slate, marginBottom: 12 },
-  traitChips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  traitChip: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: colors.mist, borderRadius: 50, paddingHorizontal: 12, paddingVertical: 7 },
-  traitChipText: { fontFamily: 'HankenGrotesk_600SemiBold', fontSize: 13, color: colors.ink },
+    infoCard: {
+      backgroundColor: colors.card,
+      borderRadius: 20,
+      padding: 18,
+      marginBottom: 10,
+      marginHorizontal: 16,
+    },
+    infoRow: { flexDirection: 'row', alignItems: 'center' },
+    infoItem: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8 },
+    infoItemText: { fontFamily: 'HankenGrotesk_600SemiBold', fontSize: 14, color: colors.ink },
+    infoDivider: { width: 1, height: 20, backgroundColor: colors.divider },
+    infoHorizDivider: { height: 1, backgroundColor: colors.divider, marginVertical: 8 },
 
-  promptWhite: { position: 'relative', backgroundColor: colors.card, borderRadius: 20, padding: 24, paddingBottom: 30, marginBottom: 10, marginHorizontal: 16 },
-  promptQ: { fontFamily: 'HankenGrotesk_600SemiBold', fontSize: 14, color: colors.slate, marginBottom: 10 },
-  promptA: { fontFamily: 'SpaceGrotesk_700Bold', fontSize: 22, color: colors.ink, letterSpacing: -0.4, lineHeight: 30 },
-  
-  promptAccent: { position: 'relative', borderRadius: 20, padding: 24, paddingBottom: 30, marginBottom: 10, marginHorizontal: 16 },
-  promptAccentQ: { fontFamily: 'HankenGrotesk_600SemiBold', fontSize: 14, color: colors.violet, marginBottom: 10 },
+    traitCard: {
+      backgroundColor: colors.card,
+      borderRadius: 20,
+      padding: 18,
+      marginBottom: 10,
+      marginHorizontal: 16,
+    },
+    traitTitle: {
+      fontFamily: 'HankenGrotesk_600SemiBold',
+      fontSize: 13,
+      color: colors.slate,
+      marginBottom: 12,
+    },
+    traitChips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+    traitChip: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      backgroundColor: colors.mist,
+      borderRadius: 50,
+      paddingHorizontal: 12,
+      paddingVertical: 7,
+    },
+    traitChipText: { fontFamily: 'HankenGrotesk_600SemiBold', fontSize: 13, color: colors.ink },
 
-  // Full-width stacked photos, matching the feed card's interleaved layout
-  // (the old horizontal strip only ever showed owners' flat photos).
-  blockPhotoWrap: { position: 'relative', borderRadius: 20, overflow: 'hidden', height: 260, marginBottom: 10, marginHorizontal: 16 },
-  blockPhoto: { width: '100%', height: '100%' },
-  flatLabel: { position: 'absolute', bottom: 14, left: 14, backgroundColor: 'rgba(0,0,0,0.42)', borderRadius: 50, paddingHorizontal: 12, paddingVertical: 6 },
-  galleryLabel: { bottom: 8, left: 8, paddingHorizontal: 10, paddingVertical: 4 },
+    promptWhite: {
+      position: 'relative',
+      backgroundColor: colors.card,
+      borderRadius: 20,
+      padding: 24,
+      paddingBottom: 30,
+      marginBottom: 10,
+      marginHorizontal: 16,
+    },
+    promptQ: {
+      fontFamily: 'HankenGrotesk_600SemiBold',
+      fontSize: 14,
+      color: colors.slate,
+      marginBottom: 10,
+    },
+    promptA: {
+      fontFamily: 'SpaceGrotesk_700Bold',
+      fontSize: 22,
+      color: colors.ink,
+      letterSpacing: -0.4,
+      lineHeight: 30,
+    },
 
-  flatSection: { backgroundColor: colors.card, borderRadius: 20, padding: 18, marginBottom: 10, marginHorizontal: 16 },
-  flatSectionTitle: { fontFamily: 'SpaceGrotesk_700Bold', fontSize: 18, color: colors.ink, letterSpacing: -0.3, marginBottom: 12 },
-  flatFactRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 },
-  flatFactText: { fontFamily: 'HankenGrotesk_600SemiBold', fontSize: 14, color: colors.ink },
-  flatDescription: { fontFamily: 'HankenGrotesk_400Regular', fontSize: 14, color: colors.slate, lineHeight: 21, marginTop: 4 },
-  // Two-up tiles; flexGrow lets a lone trailing photo take the full width.
-  galleryGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 14 },
-  galleryTile: { position: 'relative', flexGrow: 1, flexBasis: '47%', aspectRatio: 1, borderRadius: 14, overflow: 'hidden', backgroundColor: colors.mist },
-  galleryPhoto: { width: '100%', height: '100%' },
-  flatLabelText: { fontFamily: 'HankenGrotesk_600SemiBold', fontSize: 12, color: '#fff' },
+    promptAccent: {
+      position: 'relative',
+      borderRadius: 20,
+      padding: 24,
+      paddingBottom: 30,
+      marginBottom: 10,
+      marginHorizontal: 16,
+    },
+    promptAccentQ: {
+      fontFamily: 'HankenGrotesk_600SemiBold',
+      fontSize: 14,
+      color: colors.violet,
+      marginBottom: 10,
+    },
 
-  actions: { flexDirection: 'row', justifyContent: 'center', gap: 20, paddingTop: 16, paddingHorizontal: 20, borderTopWidth: 1, borderTopColor: colors.border },
-  navBtn: {
-    width: 60, height: 60, borderRadius: 30, backgroundColor: colors.card,
-    alignItems: 'center', justifyContent: 'center',
-    shadowColor: '#000', shadowOpacity: 0.10, shadowRadius: 6, shadowOffset: { width: 0, height: 1 }, elevation: 2,
-  },
-  navBtnHeart: {
-    width: 60, height: 60, borderRadius: 30, backgroundColor: colors.violet,
-    alignItems: 'center', justifyContent: 'center',
-    shadowColor: '#000', shadowOpacity: 0.15, shadowRadius: 8, shadowOffset: { width: 0, height: 2 }, elevation: 4,
-  },
+    // Full-width stacked photos, matching the feed card's interleaved layout
+    // (the old horizontal strip only ever showed owners' flat photos).
+    blockPhotoWrap: {
+      position: 'relative',
+      borderRadius: 20,
+      overflow: 'hidden',
+      height: 260,
+      marginBottom: 10,
+      marginHorizontal: 16,
+    },
+    blockPhoto: { width: '100%', height: '100%' },
+    flatLabel: {
+      position: 'absolute',
+      bottom: 14,
+      left: 14,
+      backgroundColor: 'rgba(0,0,0,0.42)',
+      borderRadius: 50,
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+    },
+    galleryLabel: { bottom: 8, left: 8, paddingHorizontal: 10, paddingVertical: 4 },
 
-  // A red wash rather than the default card fill — on card it was the same
-  // colour as the sheet behind it and read as part of the panel, not a button.
-  // tintRed alone is near-white in light mode, so the outline is what actually
-  // carries the shape there; the fill does the work in dark.
-  closeBtn: {
-    flex: 1, borderRadius: 50, paddingVertical: 16, alignItems: 'center',
-    backgroundColor: colors.tintRed,
-    borderWidth: 1.5,
-    borderColor: colors.red,
-  },
-  closeBtnText: { fontFamily: 'HankenGrotesk_700Bold', fontSize: 16, color: colors.red },
-});
+    flatSection: {
+      backgroundColor: colors.card,
+      borderRadius: 20,
+      padding: 18,
+      marginBottom: 10,
+      marginHorizontal: 16,
+    },
+    flatSectionTitle: {
+      fontFamily: 'SpaceGrotesk_700Bold',
+      fontSize: 18,
+      color: colors.ink,
+      letterSpacing: -0.3,
+      marginBottom: 12,
+    },
+    flatFactRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 },
+    flatFactText: { fontFamily: 'HankenGrotesk_600SemiBold', fontSize: 14, color: colors.ink },
+    flatDescription: {
+      fontFamily: 'HankenGrotesk_400Regular',
+      fontSize: 14,
+      color: colors.slate,
+      lineHeight: 21,
+      marginTop: 4,
+    },
+    // Two-up tiles; flexGrow lets a lone trailing photo take the full width.
+    galleryGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 14 },
+    galleryTile: {
+      position: 'relative',
+      flexGrow: 1,
+      flexBasis: '47%',
+      aspectRatio: 1,
+      borderRadius: 14,
+      overflow: 'hidden',
+      backgroundColor: colors.mist,
+    },
+    galleryPhoto: { width: '100%', height: '100%' },
+    flatLabelText: { fontFamily: 'HankenGrotesk_600SemiBold', fontSize: 12, color: '#fff' },
+
+    actions: {
+      flexDirection: 'row',
+      justifyContent: 'center',
+      gap: 20,
+      paddingTop: 16,
+      paddingHorizontal: 20,
+      borderTopWidth: 1,
+      borderTopColor: colors.border,
+    },
+    navBtn: {
+      width: 60,
+      height: 60,
+      borderRadius: 30,
+      backgroundColor: colors.card,
+      alignItems: 'center',
+      justifyContent: 'center',
+      shadowColor: '#000',
+      shadowOpacity: 0.1,
+      shadowRadius: 6,
+      shadowOffset: { width: 0, height: 1 },
+      elevation: 2,
+    },
+    navBtnHeart: {
+      width: 60,
+      height: 60,
+      borderRadius: 30,
+      backgroundColor: colors.violet,
+      alignItems: 'center',
+      justifyContent: 'center',
+      shadowColor: '#000',
+      shadowOpacity: 0.15,
+      shadowRadius: 8,
+      shadowOffset: { width: 0, height: 2 },
+      elevation: 4,
+    },
+
+    // A red wash rather than the default card fill — on card it was the same
+    // colour as the sheet behind it and read as part of the panel, not a button.
+    // tintRed alone is near-white in light mode, so the outline is what actually
+    // carries the shape there; the fill does the work in dark.
+    closeBtn: {
+      flex: 1,
+      borderRadius: 50,
+      paddingVertical: 16,
+      alignItems: 'center',
+      backgroundColor: colors.tintRed,
+      borderWidth: 1.5,
+      borderColor: colors.red,
+    },
+    closeBtnText: { fontFamily: 'HankenGrotesk_700Bold', fontSize: 16, color: colors.red },
+  });
